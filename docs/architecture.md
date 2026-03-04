@@ -45,4 +45,6 @@ Client (React + Vite)
 - 소켓 기본 연결 테스트 완료
 - `join_room`, `send_message`, `receive_message` 최소 이벤트 구현 완료
 - 메시지 DB 저장 및 히스토리 조회 API 구현 완료
+- Socket handshake JWT 인증 적용 완료
+- 카카오톡형 2단 레이아웃 UI 1차 적용 완료
 - DB 미설정 환경에서도 서버 기동 가능 (로컬 스모크 테스트용)
