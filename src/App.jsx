@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import './App.css'
 
@@ -20,6 +20,7 @@ const parseJwtPayload = (token) => {
 }
 
 function App() {
+  const messagesEndRef = useRef(null)
   // socket 인스턴스를 상태로 관리하면 이벤트 핸들러/버튼 로직에서 재사용하기 쉽다.
   const [socket, setSocket] = useState(null)
   // 연결 상태는 상단 배지, 버튼 활성화, 에러 메시지 해석에 사용한다.
@@ -193,6 +194,12 @@ function App() {
     return authPayload?.userId || authPayload?.sub || ''
   }, [authPayload])
 
+  // 메시지 목록이 갱신되면 마지막 메시지로 자동 스크롤한다.
+  useEffect(() => {
+    if (!messagesEndRef.current) return
+    messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages, joinedRoomId, isLoadingHistory])
+
   return (
     <main className="chat-app">
       <header className="top-bar">
@@ -294,6 +301,7 @@ function App() {
                 })}
               </ul>
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="composer">
