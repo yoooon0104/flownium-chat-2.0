@@ -9,6 +9,7 @@ function App() {
   const [socketId, setSocketId] = useState('')
 
   useEffect(() => {
+    // 최초 연결만 확인하는 소켓 스모크 테스트.
     const socket = io(SOCKET_SERVER_URL)
 
     socket.on('connect', () => {
@@ -23,6 +24,7 @@ function App() {
       console.log('Disconnected from socket server')
     })
 
+    // 컴포넌트 종료 시 소켓 연결을 정리한다.
     return () => {
       socket.disconnect()
     }
