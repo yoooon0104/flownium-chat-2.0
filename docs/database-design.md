@@ -8,7 +8,7 @@ MongoDB + Mongoose 기반 설계
 - `nickname`: String, required
 - `profileImage`: String
 - `lastLoginAt`: Date
-- `refreshToken`: String
+- `refreshTokenHash`: String (SHA-256 hash)
 - `timestamps: true`
 
 ## Message Schema (현재 구현)

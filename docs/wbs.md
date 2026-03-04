@@ -6,19 +6,19 @@
 
 - [x] Express + Socket.IO 서버 기본 부트스트랩
 - [x] 헬스체크 API (`GET /api/health`)
-- [x] Socket 기본 이벤트 구현
-- [x] `join_room`
-- [x] `send_message`
-- [x] `receive_message`
+- [x] Socket 기본 이벤트 구현 (`join_room`, `send_message`, `receive_message`)
 - [x] 메시지 저장 모델 구현 (`Message`)
 - [x] 메시지 히스토리 API 구현 (`GET /api/chatrooms/:id/messages`)
 - [x] Socket JWT handshake 인증 구현
 - [x] 카카오 OAuth callback API 구현 (`GET /auth/kakao/callback`)
 - [x] JWT refresh API 구현 (`POST /auth/refresh`)
 - [x] `User` 모델 구현
-- [x] 프론트 소켓 테스트 UI 구현
+- [x] refresh token 해시 저장 적용 (`refreshTokenHash`)
+- [x] auth 라우트/서비스 분리 (`routes/auth.routes.cjs`, `services/*`)
+- [x] 카카오 실패 상세 로그 보강 (status/body)
 - [x] 프론트에서 room 입장 후 히스토리 로드 구현
 - [x] UI 1차 레이아웃 전환 (카카오톡형 2단 구조)
+- [x] 작은 창에서 전송 버튼 고정 + 메시지 영역 스크롤 구조 수정
 - [x] 문서 동기화 프로세스 정착 (변경 시 docs 동시 업데이트)
 
 ## 2) 진행중 (In Progress)
