@@ -2,10 +2,19 @@
 
 MongoDB + Mongoose 기반 설계
 
+## User Schema (현재 구현)
+
+- `kakaoId`: String, unique, required, index
+- `nickname`: String, required
+- `profileImage`: String
+- `lastLoginAt`: Date
+- `refreshToken`: String
+- `timestamps: true`
+
 ## Message Schema (현재 구현)
 
 - `chatRoomId`: String, required, index
-- `senderId`: String, nullable
+- `senderId`: String, required
 - `senderNickname`: String, required
 - `type`: `text | system`, 기본값 `text`
 - `text`: String, required
@@ -13,13 +22,6 @@ MongoDB + Mongoose 기반 설계
 - `timestamps: true`
 
 ## Planned Schema
-
-### User
-- `kakaoId` (unique)
-- `nickname`
-- `profileImage`
-- `lastLoginAt`
-- `timestamps: true`
 
 ### ChatRoom
 - `participants: [ObjectId]`

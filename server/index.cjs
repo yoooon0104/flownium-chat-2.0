@@ -7,16 +7,24 @@ const jwt = require('jsonwebtoken');
 const path = require('path');
 const { Server } = require('socket.io');
 const Message = require('./models/message.model.cjs');
+const User = require('./models/user.model.cjs');
 
 // 실행 위치와 무관하게 server/.env를 항상 읽도록 절대 경로 기준으로 로드한다.
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const server = http.createServer(app);
+
 // 환경변수가 없을 때도 로컬 개발이 가능하도록 안전한 기본값을 둔다.
 const PORT = process.env.PORT || 3010;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
+const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN || '1h';
+const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '14d';
+const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY;
+const KAKAO_REDIRECT_URI = process.env.KAKAO_REDIRECT_URI;
+const KAKAO_CLIENT_SECRET = process.env.KAKAO_CLIENT_SECRET || '';
 
 // REST와 Socket 모두 동일한 origin 정책을 적용해 CORS 불일치를 방지한다.
 const io = new Server(server, {
@@ -25,6 +33,112 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
   },
 });
+
+const toClientUser = (userDoc) => ({
+  id: String(userDoc._id),
+  kakaoId: userDoc.kakaoId,
+  nickname: userDoc.nickname,
+  profileImage: userDoc.profileImage || '',
+});
+
+// Access/Refresh 토큰을 한 곳에서 발급해 payload/만료 정책을 일관되게 유지한다.
+const issueJwtTokens = (userDoc) => {
+  if (!JWT_SECRET || !JWT_REFRESH_SECRET) {
+    throw new Error('JWT secret is not configured');
+  }
+
+  const userId = String(userDoc._id);
+  const nickname = String(userDoc.nickname || 'unknown');
+
+  const accessToken = jwt.sign(
+    {
+      userId,
+      nickname,
+      tokenType: 'access',
+    },
+    JWT_SECRET,
+    { expiresIn: ACCESS_TOKEN_EXPIRES_IN }
+  );
+
+  const refreshToken = jwt.sign(
+    {
+      userId,
+      tokenType: 'refresh',
+    },
+    JWT_REFRESH_SECRET,
+    { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
+  );
+
+  return { accessToken, refreshToken };
+};
+
+const assertDbConnected = (res) => {
+  if (mongoose.connection.readyState !== 1) {
+    res.status(503).json({ error: 'database is not connected' });
+    return false;
+  }
+
+  return true;
+};
+
+const exchangeKakaoAccessToken = async (code) => {
+  const params = new URLSearchParams({
+    grant_type: 'authorization_code',
+    client_id: KAKAO_REST_API_KEY,
+    redirect_uri: KAKAO_REDIRECT_URI,
+    code,
+  });
+
+  if (KAKAO_CLIENT_SECRET) {
+    params.append('client_secret', KAKAO_CLIENT_SECRET);
+  }
+
+  const response = await fetch('https://kauth.kakao.com/oauth/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+    },
+    body: params,
+  });
+
+  if (!response.ok) {
+    throw new Error('failed to exchange kakao token');
+  }
+
+  return response.json();
+};
+
+const fetchKakaoUserProfile = async (accessToken) => {
+  const response = await fetch('https://kapi.kakao.com/v2/user/me', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('failed to fetch kakao profile');
+  }
+
+  const profile = await response.json();
+  const kakaoId = String(profile.id || '').trim();
+
+  if (!kakaoId) {
+    throw new Error('invalid kakao profile');
+  }
+
+  return {
+    kakaoId,
+    nickname:
+      profile?.kakao_account?.profile?.nickname ||
+      profile?.properties?.nickname ||
+      `kakao-${kakaoId}`,
+    profileImage:
+      profile?.kakao_account?.profile?.profile_image_url ||
+      profile?.properties?.profile_image ||
+      '',
+  };
+};
 
 // 소켓 연결 단계에서 JWT를 검증한다.
 // 실패하면 connection 자체를 차단해 이후 이벤트 처리로 진입하지 못하게 한다.
@@ -49,8 +163,9 @@ io.use((socket, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
     const userId = String(decoded.userId || decoded.sub || '').trim();
     const nickname = String(decoded.nickname || 'unknown').trim();
+    const tokenType = String(decoded.tokenType || 'access').trim();
 
-    if (!userId) {
+    if (!userId || tokenType !== 'access') {
       return next(new Error('unauthorized'));
     }
 
@@ -73,6 +188,103 @@ app.get('/api/health', (_req, res) => {
   res.status(200).json({ ok: true });
 });
 
+// 카카오 OAuth callback code를 access token으로 교환하고,
+// 카카오 사용자 정보를 바탕으로 User를 upsert한 뒤 JWT를 발급한다.
+app.get('/auth/kakao/callback', async (req, res) => {
+  const code = String(req.query.code || '').trim();
+
+  if (!code) {
+    res.status(400).json({ error: 'code is required' });
+    return;
+  }
+
+  if (!KAKAO_REST_API_KEY || !KAKAO_REDIRECT_URI) {
+    res.status(500).json({ error: 'kakao oauth config is missing' });
+    return;
+  }
+
+  if (!assertDbConnected(res)) {
+    return;
+  }
+
+  try {
+    const kakaoToken = await exchangeKakaoAccessToken(code);
+    const kakaoUser = await fetchKakaoUserProfile(kakaoToken.access_token);
+
+    const user = await User.findOneAndUpdate(
+      { kakaoId: kakaoUser.kakaoId },
+      {
+        $set: {
+          nickname: kakaoUser.nickname,
+          profileImage: kakaoUser.profileImage,
+          lastLoginAt: new Date(),
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+
+    const tokens = issueJwtTokens(user);
+    user.refreshToken = tokens.refreshToken;
+    await user.save();
+
+    res.status(200).json({
+      user: toClientUser(user),
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    });
+  } catch (_error) {
+    res.status(502).json({ error: 'failed to complete kakao login' });
+  }
+});
+
+// refresh token을 검증하고 access/refresh token을 재발급한다.
+app.post('/auth/refresh', async (req, res) => {
+  const refreshToken = String(req.body?.refreshToken || '').trim();
+
+  if (!refreshToken) {
+    res.status(400).json({ error: 'refreshToken is required' });
+    return;
+  }
+
+  if (!assertDbConnected(res)) {
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+    const userId = String(decoded.userId || '').trim();
+    const tokenType = String(decoded.tokenType || '').trim();
+
+    if (!userId || tokenType !== 'refresh') {
+      res.status(401).json({ error: 'invalid refresh token' });
+      return;
+    }
+
+    const user = await User.findOne({ _id: userId, refreshToken });
+
+    if (!user) {
+      res.status(401).json({ error: 'refresh token is not recognized' });
+      return;
+    }
+
+    const tokens = issueJwtTokens(user);
+    user.refreshToken = tokens.refreshToken;
+    await user.save();
+
+    res.status(200).json({
+      user: toClientUser(user),
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    });
+  } catch (_error) {
+    res.status(401).json({ error: 'invalid refresh token' });
+  }
+});
+
 // 채팅방 메시지 히스토리 조회 API.
 // 최신 limit개를 조회한 뒤 UI 표시를 위해 오름차순으로 되돌려 반환한다.
 app.get('/api/chatrooms/:id/messages', async (req, res) => {
@@ -84,8 +296,7 @@ app.get('/api/chatrooms/:id/messages', async (req, res) => {
     return;
   }
 
-  if (mongoose.connection.readyState !== 1) {
-    res.status(503).json({ error: 'database is not connected' });
+  if (!assertDbConnected(res)) {
     return;
   }
 
@@ -172,7 +383,7 @@ async function start() {
   const { MONGODB_URI } = process.env;
 
   // 초기 단계 테스트를 위해 DB 설정이 없어도 서버는 기동한다.
-  // 단, 히스토리 조회 API는 DB 미연결 시 503을 반환한다.
+  // 단, 히스토리 조회/API 인증 관련 기능은 DB 미연결 시 제약이 있다.
   if (MONGODB_URI) {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');

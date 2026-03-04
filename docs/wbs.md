@@ -13,10 +13,13 @@
 - [x] 메시지 저장 모델 구현 (`Message`)
 - [x] 메시지 히스토리 API 구현 (`GET /api/chatrooms/:id/messages`)
 - [x] Socket JWT handshake 인증 구현
+- [x] 카카오 OAuth callback API 구현 (`GET /auth/kakao/callback`)
+- [x] JWT refresh API 구현 (`POST /auth/refresh`)
+- [x] `User` 모델 구현
 - [x] 프론트 소켓 테스트 UI 구현
 - [x] 프론트에서 room 입장 후 히스토리 로드 구현
-- [x] 문서 동기화 프로세스 정착 (변경 시 docs 동시 업데이트)
 - [x] UI 1차 레이아웃 전환 (카카오톡형 2단 구조)
+- [x] 문서 동기화 프로세스 정착 (변경 시 docs 동시 업데이트)
 
 ## 2) 진행중 (In Progress)
 
@@ -25,12 +28,11 @@
 
 ## 3) 다음 작업 (Next)
 
-- [ ] 카카오 OAuth 콜백 및 JWT 발급/재발급 API 구현
-- [ ] `User` 모델 구현
 - [ ] `ChatRoom` 모델 구현
 - [ ] 채팅방 API 구현
 - [ ] `POST /api/chatrooms` (roomKey 기반 중복 방지)
 - [ ] `GET /api/chatrooms`
+- [ ] 프론트 room 목록 API 연동
 - [ ] 프론트 구조 분리 (`socketClient`, `chatApi`, `useChatSocket`)
 - [ ] CSS 2차 정리 (hover/active/skeleton/접근성)
 
@@ -40,6 +42,7 @@
 - [ ] 메시지 페이징 커서 방식 고도화 (`before`, `limit`)
 - [ ] 에러 코드 표준화 (`error.code`, `error.message`)
 - [ ] E2E 테스트 시나리오 추가
+- [ ] 메시지 암호화 전략 확정 (전송/저장/키관리)
 - [ ] 배포 환경 체크리스트 문서화 (Vercel/Render/Railway)
 
 ## 5) 운영 규칙

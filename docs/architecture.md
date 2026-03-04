@@ -15,6 +15,8 @@ Client (React + Vite)
 - 메시지 히스토리 조회
 - 사용자 인증 처리
 - 헬스체크: `GET /api/health` -> `{ "ok": true }`
+- 카카오 콜백: `GET /auth/kakao/callback`
+- 토큰 재발급: `POST /auth/refresh`
 
 ### WebSocket (Socket.IO)
 - 실시간 메시지 송수신
@@ -27,9 +29,9 @@ Client (React + Vite)
 ## Authentication Flow
 
 1. 카카오 로그인 -> 서버 callback 처리
-2. JWT Access Token 발급
+2. JWT Access/Refresh Token 발급
 3. REST 요청 시 Authorization Header 사용
-4. Socket 연결 시 handshake에서 JWT 검증 (구현 완료)
+4. Socket 연결 시 handshake에서 JWT Access Token 검증
 
 ## Deployment Structure
 
@@ -46,5 +48,6 @@ Client (React + Vite)
 - `join_room`, `send_message`, `receive_message` 최소 이벤트 구현 완료
 - 메시지 DB 저장 및 히스토리 조회 API 구현 완료
 - Socket handshake JWT 인증 적용 완료
+- 카카오 OAuth callback + refresh API(백엔드) 구현 완료
 - 카카오톡형 2단 레이아웃 UI 1차 적용 완료
 - DB 미설정 환경에서도 서버 기동 가능 (로컬 스모크 테스트용)
