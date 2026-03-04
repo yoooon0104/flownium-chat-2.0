@@ -1,42 +1,59 @@
 # Socket Events
 
----
+## Client -> Server
 
-## Client → Server
-
-join_room
+### join_room
 payload:
+```json
 {
-  roomId: string
+  "roomId": "string"
 }
+```
 
-send_message
+### send_message
 payload:
+```json
 {
-  roomId: string,
-  text: string,
-  type: "text"
+  "roomId": "string",
+  "text": "string",
+  "type": "text"
 }
+```
 
-leave_room
+### leave_room (예정)
 payload:
+```json
 {
-  roomId: string
+  "roomId": "string"
 }
+```
 
----
+## Server -> Client
 
-## Server → Client
-
-receive_message
+### room_joined
 payload:
+```json
 {
-  chatRoomId,
-  senderId,
-  senderNickname,
-  text,
-  timestamp
+  "roomId": "string"
 }
+```
 
-room_joined
-error
+### receive_message
+payload:
+```json
+{
+  "chatRoomId": "string",
+  "senderId": "string",
+  "senderNickname": "string",
+  "text": "string",
+  "timestamp": "ISO-8601 string"
+}
+```
+
+### error
+payload:
+```json
+{
+  "message": "string"
+}
+```
