@@ -1,34 +1,40 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import { useEffect, useState } from 'react'
+import { io } from 'socket.io-client'
 import './App.css'
 
+const SOCKET_SERVER_URL = 'http://localhost:3010'
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [isConnected, setIsConnected] = useState(false)
+  const [socketId, setSocketId] = useState('')
+
+  useEffect(() => {
+    const socket = io(SOCKET_SERVER_URL)
+
+    socket.on('connect', () => {
+      setIsConnected(true)
+      setSocketId(socket.id)
+      console.log('Connected to socket server:', socket.id)
+    })
+
+    socket.on('disconnect', () => {
+      setIsConnected(false)
+      setSocketId('')
+      console.log('Disconnected from socket server')
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [])
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <main>
+      <h1>Socket.IO Connection Test</h1>
+      <p>Status: {isConnected ? 'Connected' : 'Disconnected'}</p>
+      <p>Socket ID: {socketId || 'Not connected yet'}</p>
+      <p>Server: {SOCKET_SERVER_URL}</p>
+    </main>
   )
 }
 
