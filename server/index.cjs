@@ -3,15 +3,18 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
+const path = require('path');
 const { Server } = require('socket.io');
 const Message = require('./models/message.model.cjs');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3010;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // 로컬 개발 시 REST/Socket CORS 정책을 동일하게 유지한다.
 const io = new Server(server, {
@@ -19,6 +22,37 @@ const io = new Server(server, {
     origin: FRONTEND_URL,
     methods: ['GET', 'POST'],
   },
+});
+
+// 소켓 연결 시 JWT를 handshake에서 검증한다.
+io.use((socket, next) => {
+  try {
+    const authToken = socket.handshake?.auth?.token || '';
+    const bearerHeader = String(socket.handshake?.headers?.authorization || '');
+    const bearerToken = bearerHeader.replace(/^Bearer\s+/i, '');
+    const token = authToken || bearerToken;
+
+    if (!token) {
+      return next(new Error('unauthorized'));
+    }
+
+    if (!JWT_SECRET) {
+      return next(new Error('server auth misconfigured'));
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = String(decoded.userId || decoded.sub || '').trim();
+    const nickname = String(decoded.nickname || 'unknown').trim();
+
+    if (!userId) {
+      return next(new Error('unauthorized'));
+    }
+
+    socket.user = { userId, nickname };
+    return next();
+  } catch (_error) {
+    return next(new Error('unauthorized'));
+  }
 });
 
 app.use(
@@ -59,7 +93,7 @@ app.get('/api/chatrooms/:id/messages', async (req, res) => {
       count: messages.length,
       messages: messages.reverse(),
     });
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ error: 'failed to fetch messages' });
   }
 });
@@ -93,8 +127,8 @@ io.on('connection', (socket) => {
 
     const messagePayload = {
       chatRoomId: roomId,
-      senderId: socket.id,
-      senderNickname: `user-${socket.id.slice(0, 5)}`,
+      senderId: socket.user.userId,
+      senderNickname: socket.user.nickname,
       type,
       text,
       timestamp: new Date(),
@@ -117,7 +151,7 @@ io.on('connection', (socket) => {
       };
 
       io.to(roomId).emit('receive_message', response);
-    } catch (error) {
+    } catch (_error) {
       socket.emit('error', { message: 'failed to process message' });
     }
   });

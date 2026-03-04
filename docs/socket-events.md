@@ -1,5 +1,9 @@
 # Socket Events
 
+## Auth
+- Socket 연결 시 `auth.token`(JWT) 필수
+- 인증 실패 시 `connect_error: unauthorized` 반환
+
 ## Client -> Server
 
 ### join_room
@@ -16,7 +20,7 @@ payload:
 {
   "roomId": "string",
   "text": "string",
-  "type": "text" 
+  "type": "text"
 }
 ```
 

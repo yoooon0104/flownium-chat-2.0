@@ -13,14 +13,46 @@ function App() {
   const [text, setText] = useState('')
   const [messages, setMessages] = useState([])
   const [errorMessage, setErrorMessage] = useState('')
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [historyError, setHistoryError] = useState('')
 
   const canSend = useMemo(() => {
     return !!socket && !!joinedRoomId && text.trim().length > 0
   }, [socket, joinedRoomId, text])
 
+  const loadMessageHistory = async (targetRoomId) => {
+    try {
+      setIsLoadingHistory(true)
+      setHistoryError('')
+
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/chatrooms/${targetRoomId}/messages?limit=50`)
+
+      if (res.status === 503) {
+        setMessages([])
+        setHistoryError('DB 미연결 상태입니다. 실시간 메시지만 사용됩니다.')
+        return
+      }
+
+      if (!res.ok) {
+        throw new Error('failed to load history')
+      }
+
+      const data = await res.json()
+      setMessages(Array.isArray(data.messages) ? data.messages : [])
+    } catch (_error) {
+      setHistoryError('메시지 히스토리 로드에 실패했습니다.')
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
   useEffect(() => {
-    // 최초 연결과 이벤트 수신을 확인하는 소켓 스모크 테스트.
-    const client = io(SOCKET_SERVER_URL)
+    // 로컬 저장소 토큰이 있으면 소켓 handshake auth에 포함한다.
+    const token = localStorage.getItem('accessToken')
+    const client = io(SOCKET_SERVER_URL, {
+      auth: token ? { token } : undefined,
+    })
+
     setSocket(client)
 
     client.on('connect', () => {
@@ -37,8 +69,13 @@ function App() {
       console.log('Disconnected from socket server')
     })
 
+    client.on('connect_error', (error) => {
+      setErrorMessage(error?.message || '소켓 인증에 실패했습니다.')
+    })
+
     client.on('room_joined', (payload) => {
       setJoinedRoomId(payload.roomId)
+      void loadMessageHistory(payload.roomId)
     })
 
     client.on('receive_message', (payload) => {
@@ -49,7 +86,6 @@ function App() {
       setErrorMessage(payload?.message || '알 수 없는 소켓 오류')
     })
 
-    // 컴포넌트 종료 시 소켓 연결을 정리한다.
     return () => {
       client.disconnect()
     }
@@ -97,6 +133,8 @@ function App() {
       {errorMessage && <p style={{ color: 'crimson' }}>Error: {errorMessage}</p>}
 
       <h2>3) 수신 메시지</h2>
+      {isLoadingHistory && <p>히스토리 불러오는 중...</p>}
+      {historyError && <p style={{ color: 'darkorange' }}>{historyError}</p>}
       {messages.length === 0 ? (
         <p>아직 수신된 메시지가 없습니다.</p>
       ) : (
