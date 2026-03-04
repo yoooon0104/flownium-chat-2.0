@@ -16,7 +16,7 @@ payload:
 {
   "roomId": "string",
   "text": "string",
-  "type": "text"
+  "type": "text" 
 }
 ```
 
@@ -45,6 +45,7 @@ payload:
   "chatRoomId": "string",
   "senderId": "string",
   "senderNickname": "string",
+  "type": "text",
   "text": "string",
   "timestamp": "ISO-8601 string"
 }
