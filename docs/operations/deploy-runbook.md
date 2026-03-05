@@ -52,6 +52,17 @@
 - `error.code` 응답 확인
   - `scripts/test-error-code.ps1`
   - `scripts/test-auth-me.ps1`
+  - `scripts/test-prod-ready.ps1` (배포 전 빠른 통합 점검)
+
+4. 빠른 통합 점검(권장)
+- 로컬/운영 공통으로 아래 스크립트를 먼저 실행한다.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test-prod-ready.ps1 -ApiBaseUrl "https://<api-domain>"
+```
+- 액세스 토큰까지 함께 검증하려면 아래처럼 실행한다.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test-prod-ready.ps1 -ApiBaseUrl "https://<api-domain>" -AccessToken "<ACCESS_TOKEN>"
+```
 
 ## 4) Redirect URI 최종 검증 (필수)
 

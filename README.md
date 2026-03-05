@@ -119,6 +119,7 @@ npm run dev
 
 - 에러 표준 검증: `scripts/test-error-code.ps1`
 - 인증 상태 검증(`/auth/me`): `scripts/test-auth-me.ps1`
+- 배포 전 빠른 통합 검증: `scripts/test-prod-ready.ps1`
 
 ## 문서 바로가기
 
