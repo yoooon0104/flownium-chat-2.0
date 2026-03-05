@@ -47,8 +47,8 @@ flownium-chat-2.0/
 ```env
 VITE_KAKAO_CLIENT_ID=
 VITE_KAKAO_REDIRECT_URI=http://localhost:5173
-# 운영 전환 시 사용 예정
-VITE_API_BASE_URL=
+# 기본값: http://localhost:3010 (미설정 시 fallback)
+VITE_API_BASE_URL=http://localhost:3010
 ```
 
 ### 서버 (`server/.env`)
@@ -69,6 +69,8 @@ KAKAO_REST_API_KEY=
 KAKAO_REDIRECT_URI=http://localhost:5173
 KAKAO_CLIENT_SECRET=
 ```
+
+프론트 환경변수는 .env.example을 복사해 .env로 사용하세요.
 
 ## 로컬 실행
 
@@ -131,6 +133,7 @@ npm run dev
 - [MVP2 화면 정의서](docs/planning/screen-spec.md)
 - [MVP2 오브젝트 정의서](docs/planning/object-spec.md)
 - [문서 인덱스](docs/README.md)
+
 
 
 
