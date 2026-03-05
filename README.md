@@ -117,13 +117,21 @@ npm run dev
 
 ## 문서
 
-- [프로젝트 개요](docs/project-overview.md)
-- [아키텍처](docs/architecture.md)
-- [API 명세](docs/api-spec.md)
-- [소켓 이벤트](docs/socket-events.md)
-- [데이터베이스 설계](docs/database-design.md)
-- [인증 흐름](docs/auth-flow.md)
-- [UI 계획](docs/ui-plan.md)
-- [WBS](docs/wbs.md)
-- [개발 규칙](docs/development-rules.md)
-- [환경변수 정책](docs/env-policy.md)
+- [프로젝트 개요](docs/common/project-overview.md)
+- [아키텍처](docs/common/architecture.md)
+- [API 명세](docs/common/api-spec.md)
+- [소켓 이벤트](docs/common/socket-events.md)
+- [데이터베이스 설계](docs/common/database-design.md)
+- [인증 흐름](docs/common/auth-flow.md)
+- [UI 계획](docs/common/ui-plan.md)
+- [WBS](docs/common/wbs.md)
+- [개발 규칙](docs/common/development-rules.md)
+- [환경변수 정책](docs/common/env-policy.md)
+- [MVP2 요구사항 정의서](docs/planning/requirements.md)
+- [MVP2 화면 정의서](docs/planning/screen-spec.md)
+- [MVP2 오브젝트 정의서](docs/planning/object-spec.md)
+- [문서 인덱스](docs/README.md)
+
+
+
+
