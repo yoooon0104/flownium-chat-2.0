@@ -213,7 +213,7 @@
   min-height: 0;
   position: relative;
 }
-`n.panel-header {
+.panel-header {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -469,7 +469,7 @@
   flex-direction: column;
   gap: 6px;
 }
-`n.participants-row {
+.participants-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -706,6 +706,8 @@
     bottom: 72px;
   }
 }
+
+
 
 
 
