@@ -65,7 +65,18 @@
 }
 ```
 
-## 6) 향후 보완 TODO
+## 6) 로고 에셋 경로 (초안)
+
+- `Light Wordmark`: `assets/branding/logo/flownium-wordmark-light.png`
+- `Dark Wordmark`: `assets/branding/logo/flownium-wordmark-dark.png`
+- `Icon`: `assets/branding/logo/flownium-icon.png`
+
+권장 규칙:
+1. 로그인/온보딩 라이트 배경: `Light Wordmark`
+2. 다크 배경 헤더/스플래시: `Dark Wordmark`
+3. 정사각 아이콘 슬롯(favicon/app-icon): `Icon`
+
+## 7) 향후 보완 TODO
 
 - 컴포넌트별 상태색(hover/active/disabled) 명시
 - 라이트 테마 확장 여부 결정

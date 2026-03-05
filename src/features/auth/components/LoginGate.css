@@ -1,32 +1,52 @@
 ﻿.auth-gate {
+  --brand-primary: #5b5cff;
+  --brand-secondary: #7a3cff;
+  --brand-accent: #00d4ff;
+  --brand-bg: #0b0f1a;
+  --brand-text: #f5f7ff;
+  --brand-subtext: #5f6b76;
   min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 20px;
   background:
-    radial-gradient(circle at 18% 8%, #fff8cc 0%, transparent 28%),
-    radial-gradient(circle at 95% 0%, #f7f8fb 0%, transparent 25%),
-    #f2f3f6;
+    radial-gradient(circle at 10% 5%, rgba(0, 212, 255, 0.14) 0%, transparent 28%),
+    radial-gradient(circle at 90% 0%, rgba(122, 60, 255, 0.2) 0%, transparent 30%),
+    linear-gradient(140deg, var(--brand-bg) 0%, #151a33 55%, #1b1d42 100%);
 }
 
 .auth-card {
   width: min(92vw, 420px);
-  border: 1px solid #e4e7ec;
+  border: 1px solid rgba(245, 247, 255, 0.14);
   border-radius: 16px;
-  background: #fff;
+  background: #ffffff;
   padding: 22px;
   display: grid;
   gap: 12px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
 }
 
-.auth-card h1 {
-  margin: 0;
-  font-size: 22px;
+/* 로고 영역은 가독성을 위해 흰색 박스로 고정한다. */
+.auth-brand-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 4px 6px;
+}
+
+.auth-brand-logo {
+  width: min(240px, 74vw);
+  height: auto;
+  display: block;
 }
 
 .auth-card p {
   margin: 0;
-  color: #68727d;
+  color: var(--brand-subtext);
   font-size: 14px;
 }
 
@@ -38,11 +58,12 @@
   height: 44px;
   border: none;
   border-radius: 10px;
-  background: #f8dc3d;
-  color: #2f2b00;
+  background: linear-gradient(92deg, var(--brand-primary) 0%, var(--brand-secondary) 72%);
+  color: var(--brand-text);
   font-weight: 800;
+  cursor: pointer;
 }
 
 .kakao-login-button:hover {
-  background: #e5c800;
+  background: linear-gradient(92deg, #4f51ff 0%, #6e2fff 72%);
 }

@@ -706,10 +706,122 @@
     bottom: 72px;
   }
 }
+/* 브랜딩 테마(라이트 모드): 배경은 그라데이션, 실제 동작 패널/모달은 흰색으로 유지한다. */
+.chat-app {
+  --bg: #f3f5fb;
+  --panel: #ffffff;
+  --panel-soft: #f7f8fc;
+  --text: #1f2430;
+  --muted: #6b7583;
+  --line: #dde2ee;
+  --brand: #5b5cff;
+  --brand-deep: #7a3cff;
+  --accent: #00d4ff;
+  --danger: #d63c4c;
+  --warn: #d08a00;
+  background:
+    radial-gradient(circle at 10% 6%, rgba(0, 212, 255, 0.12) 0%, transparent 28%),
+    radial-gradient(circle at 92% 0%, rgba(122, 60, 255, 0.18) 0%, transparent 28%),
+    linear-gradient(145deg, #eef2ff 0%, #f5f7ff 48%, #f3f5fb 100%);
+}
 
+.chat-app .room-panel,
+.chat-app .chat-panel,
+.chat-app .modal-card,
+.chat-app .user-menu-dropdown,
+.chat-app .participants-dropdown {
+  background: var(--panel);
+  border-color: var(--line);
+}
 
+.chat-app .panel-header,
+.chat-app .room-search,
+.chat-app .chat-header,
+.chat-app .composer {
+  border-color: var(--line);
+}
 
+.chat-app .room-search input,
+.chat-app .composer input,
+.chat-app .modal-card input {
+  background: var(--panel-soft);
+  border-color: #ccd4e2;
+  color: var(--text);
+}
 
+.chat-app .room-search input::placeholder,
+.chat-app .composer input::placeholder,
+.chat-app .modal-card input::placeholder {
+  color: #8892a2;
+}
 
+.chat-app .room-item:hover {
+  background: rgba(91, 92, 255, 0.08);
+}
 
+.chat-app .room-item.active {
+  background: linear-gradient(90deg, rgba(91, 92, 255, 0.14) 0%, rgba(122, 60, 255, 0.14) 100%);
+  border-color: rgba(91, 92, 255, 0.34);
+}
 
+.chat-app .kebab-button,
+.chat-app .participants-menu-button,
+.chat-app .back-button {
+  background: var(--panel-soft);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.chat-app .kebab-button:hover,
+.chat-app .participants-menu-button:hover,
+.chat-app .back-button:hover {
+  background: #eef1f8;
+}
+
+.chat-app .message-area {
+  background: linear-gradient(to bottom, #f9faff, #f5f7fc);
+}
+
+.chat-app .message-list li .bubble {
+  background: #ffffff;
+  border-color: #dfe4ee;
+  color: var(--text);
+}
+
+.chat-app .message-list li.mine .bubble {
+  background: linear-gradient(92deg, #5b5cff 0%, #7a3cff 100%);
+  border-color: rgba(91, 92, 255, 0.35);
+  color: #f5f7ff;
+}
+
+.chat-app .composer button,
+.chat-app .modal-actions button,
+.chat-app .profile-modal button,
+.chat-app .fab-create-room {
+  background: linear-gradient(92deg, #5b5cff 0%, #7a3cff 100%);
+  color: #f5f7ff;
+}
+
+.chat-app .composer button:hover,
+.chat-app .modal-actions button:hover,
+.chat-app .profile-modal button:hover,
+.chat-app .fab-create-room:hover {
+  background: linear-gradient(92deg, #4f51ff 0%, #6e2fff 100%);
+}
+
+.chat-app .modal-actions .secondary {
+  background: #edf1f7;
+  color: #445164;
+}
+
+.chat-app .participant-chip.online {
+  background: #e8f7ff;
+  color: #0e5f84;
+  border-color: #b8e8ff;
+}
+
+.chat-app .participant-chip.offline {
+  background: #f4f6fa;
+  color: #667285;
+  border-color: #dce2ec;
+}
