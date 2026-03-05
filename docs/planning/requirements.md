@@ -48,6 +48,9 @@ MVP2/3 확장은 아래 MVP1 완료 상태를 기준으로 진행한다.
 5. 운영 로그 기준 수립
 - `info/warn/error` 분류
 - 장애 판정 기준 문서화
+6. 브랜딩 자산/토큰 1차 적용
+- 로고 리소스 경로 및 사용 규칙 정리
+- 컬러 토큰(`assets/branding/usage-guide.md`) UI 연동 기준 확정
 
 ### Out of Scope
 
@@ -146,3 +149,5 @@ MVP2/3 확장은 아래 MVP1 완료 상태를 기준으로 진행한다.
 3. API 명세: `docs/common/api-spec.md`
 4. Socket 명세: `docs/common/socket-events.md`
 5. 작업 현황: `docs/common/wbs.md`
+
+
