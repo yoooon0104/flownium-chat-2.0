@@ -31,6 +31,24 @@
 - 내 정보 모달
 - 설정 모달(닉네임 변경)
 
+## 브랜딩/컬러 가이드
+
+브랜딩 기준 문서: `assets/branding/usage-guide.md`
+
+기본 토큰:
+- `Primary`: `#5B5CFF`
+- `Secondary`: `#7A3CFF`
+- `Accent`: `#00D4FF`
+- `Background`: `#0B0F1A`
+- `Surface`: `#12152A`
+- `Text`: `#F5F7FF`
+- `SubText`: `#9AA3B2`
+
+적용 원칙:
+1. `Primary`와 `Secondary` 역할을 분리한다.
+2. `Gradient`는 히어로/핵심 CTA 위주로 제한 사용한다.
+3. `SubText`는 작은 폰트에서 대비를 점검한다.
+
 ## 반응형 규칙
 
 - Desktop (`>= 1024px`): 2열(`320px / 1fr`)
