@@ -1,28 +1,29 @@
-﻿# Flownium Chat
+﻿# 프로젝트 개요
 
-## Project Goal
+## 프로젝트 목표
 
-Flownium Chat is a Kakao OAuth + JWT based real-time chat service.
-Current MVP target is group chat, not 1:1 chat.
+Flownium Chat은 Kakao OAuth + JWT 기반의 실시간 그룹 채팅 서비스입니다.
+현재 MVP의 핵심 목표는 1:1 채팅이 아니라 그룹 채팅입니다.
 
-## MVP Scope (Phase 1)
+## MVP 범위 (1차)
 
-- Kakao OAuth login
-- JWT access/refresh token auth
-- Group room create/list/join
-- Message save + real-time delivery
-- Room participants view (all members + online/offline)
-- Last message and last message time update
+- 카카오 OAuth 로그인
+- JWT Access/Refresh 인증
+- 그룹방 생성/목록/입장
+- 메시지 저장 + 실시간 전송
+- 참여자 목록 표시(전체 멤버 + online/offline)
+- 최근 메시지/최근 메시지 시간 갱신
+- 방 목록 검색 + FAB(+) 기반 방 생성 UX
 
-## Out of Scope (Next Phase)
+## 다음 단계(범위 밖)
 
-- Admin role / invite / kick policy
-- Forced leave policy
-- Advanced permission model
+- 관리자 권한 모델
+- 초대/강퇴/강제 퇴장 정책
+- 고급 권한 제어
 
-## Room Rules (Current)
+## 현재 방 규칙
 
-- Room ID is Mongo ObjectId string
-- Room creator is initial member
-- Join request adds user to memberIds if not present
-- Participant online state is socket presence based
+- 방 식별자는 Mongo ObjectId 문자열 사용
+- 방 생성 시 생성자만 초기 멤버로 등록
+- `join_room` 시 멤버가 아니면 자동 추가
+- online 상태는 소켓 메모리 presence 맵 기반

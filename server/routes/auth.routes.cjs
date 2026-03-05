@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const {
   hashToken,
   issueJwtTokens,
@@ -9,9 +9,11 @@ const {
   fetchKakaoUserProfile,
 } = require('../services/kakao.service.cjs');
 
+// 인증 관련 라우터를 의존성 주입 방식으로 생성한다.
 const createAuthRouter = ({ User, assertDbConnected, config, logger = console }) => {
   const router = express.Router();
 
+  // DB 사용자 문서를 클라이언트 응답 포맷으로 변환한다.
   const toClientUser = (userDoc) => ({
     id: String(userDoc._id),
     kakaoId: userDoc.kakaoId,
@@ -19,8 +21,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
     profileImage: userDoc.profileImage || '',
   });
 
-  // 카카오 OAuth callback code를 access token으로 교환하고,
-  // 카카오 사용자 정보를 바탕으로 User를 upsert한 뒤 JWT를 발급한다.
+  // 카카오 OAuth callback code를 처리해 사용자 upsert + JWT 발급을 수행한다.
   router.get('/kakao/callback', async (req, res) => {
     const code = String(req.query.code || '').trim();
 
@@ -82,7 +83,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
     }
   });
 
-  // refresh token을 검증하고 access/refresh token을 재발급한다.
+  // refresh token을 검증하고 access/refresh 토큰을 재발급한다.
   router.post('/refresh', async (req, res) => {
     const refreshToken = String(req.body?.refreshToken || '').trim();
 

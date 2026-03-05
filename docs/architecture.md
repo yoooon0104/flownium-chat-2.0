@@ -1,13 +1,13 @@
-﻿# Architecture
+﻿# 아키텍처
 
-## System Structure
+## 시스템 구조
 
-Client (React + Vite)
--> Socket.IO Client + REST fetch
--> Express + Socket.IO Server
+클라이언트(React + Vite)
+-> Socket.IO Client + REST 요청
+-> Express + Socket.IO 서버
 -> MongoDB
 
-## Communication Split
+## 통신 분리
 
 ### REST API
 - `GET /api/health`
@@ -25,18 +25,18 @@ Client (React + Vite)
 - `receive_message`
 - `error`
 
-## Group Chat Flow
+## 그룹 채팅 흐름
 
-1. User authenticates and gets access token.
-2. Client fetches room list with REST.
-3. Client joins selected room with `join_room`.
-4. Server ensures membership and joins socket room.
-5. Server emits `room_participants` using DB members + socket presence.
-6. Client sends message via `send_message`.
-7. Server stores message, updates room summary, broadcasts `receive_message`.
+1. 사용자가 인증 후 access token을 획득한다.
+2. 클라이언트가 REST로 방 목록을 조회한다.
+3. 사용자가 방을 선택하면 `join_room`을 보낸다.
+4. 서버는 멤버십을 확인/보정 후 소켓 room에 입장시킨다.
+5. 서버는 DB 멤버 + presence 맵 기준으로 `room_participants`를 전송한다.
+6. 사용자가 `send_message`를 전송하면 서버가 DB 저장 후 브로드캐스트한다.
+7. 서버는 방 요약(`lastMessage`, `lastMessageAt`)을 함께 갱신한다.
 
-## Current Constraints
+## 현재 제약
 
-- No admin/invite/kick model in this phase.
-- Membership is appended on `join_room`.
-- Presence state is in-memory and reset on server restart.
+- 관리자/초대/강퇴 정책은 이번 단계 범위 밖
+- 멤버십은 `join_room` 시 자동 추가
+- presence는 메모리 기반이라 서버 재시작 시 초기화

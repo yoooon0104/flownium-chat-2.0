@@ -33,6 +33,7 @@ const io = new Server(server, {
   },
 });
 
+// roomId -> (userId -> Set(socketId)) 구조로 온라인 상태를 관리한다.
 const roomPresence = new Map();
 
 const assertDbConnected = (res) => {
@@ -118,6 +119,7 @@ const collectJoinedRoomIds = (socket) => {
   return joinedRooms;
 };
 
+// 전체 멤버(ChatRoom.memberIds)와 현재 온라인 상태(roomPresence)를 합쳐 전송한다.
 const emitRoomParticipants = async (roomId) => {
   if (mongoose.connection.readyState !== 1) {
     return;
@@ -129,7 +131,9 @@ const emitRoomParticipants = async (roomId) => {
   }
 
   const memberIds = Array.isArray(room.memberIds) ? room.memberIds : [];
-  const users = await User.find({ _id: { $in: memberIds } })
+  // memberIds에 ObjectId 형식이 아닌 값이 섞여도 캐스팅 에러가 나지 않도록 필터링한다.
+  const objectIdMemberIds = memberIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  const users = await User.find({ _id: { $in: objectIdMemberIds } })
     .select({ _id: 1, nickname: 1 })
     .lean();
 
@@ -225,8 +229,14 @@ app.post('/api/chatrooms', requireAuth, async (req, res) => {
     res.status(201).json({
       room: toRoomResponse(room),
     });
-  } catch (_error) {
-    res.status(500).json({ error: 'failed to create chatroom' });
+  } catch (error) {
+    console.error('[chatrooms:create] failed', {
+      message: error.message,
+      code: error.code || null,
+      keyPattern: error.keyPattern || null,
+      keyValue: error.keyValue || null,
+    });
+    res.status(500).json({ error: error.message || 'failed to create chatroom' });
   }
 });
 
@@ -292,6 +302,7 @@ io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
   socket.on('join_room', async (payload = {}) => {
+    // 방 입장 시 멤버가 아니면 memberIds에 추가한 뒤 room_participants를 갱신한다.
     const roomId = String(payload.roomId || '').trim();
 
     if (!roomId) {
@@ -331,6 +342,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('send_message', async (payload = {}) => {
+    // 메시지 저장 후 채팅방 요약(lastMessage, lastMessageAt)을 함께 갱신한다.
     const roomId = String(payload.roomId || '').trim();
     const text = String(payload.text || '').trim();
     const type = payload.type === 'system' ? 'system' : 'text';
@@ -384,6 +396,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', async () => {
+    // 연결 종료 시 참여 중인 방들의 온라인 상태를 다시 계산해 브로드캐스트한다.
     const joinedRoomIds = collectJoinedRoomIds(socket);
     joinedRoomIds.forEach((roomId) => {
       removePresence(roomId, socket.user.userId, socket.id);
@@ -420,3 +433,5 @@ start().catch((error) => {
   console.error('Failed to start server:', error.message);
   process.exit(1);
 });
+
+

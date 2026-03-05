@@ -1,49 +1,49 @@
-﻿# API Specification
+﻿# API 명세
 
-Base URL: `/api`
+기본 경로: `/api`
 
-## Health
+## 상태 확인
 
 ### GET /health
-- Server health check
-- Response: `{ "ok": true }`
+- 서버 상태 확인
+- 응답: `{ "ok": true }`
 
-## Auth
+## 인증
 
 ### GET /auth/kakao/callback?code=
-- Exchange Kakao code and issue access/refresh tokens.
+- 카카오 인가 코드를 교환해 Access/Refresh 토큰을 발급합니다.
 
 ### POST /auth/refresh
-- Validate refresh token and rotate tokens.
+- Refresh 토큰 검증 후 Access/Refresh 토큰을 재발급합니다.
 
-Request:
+요청 예시:
 ```json
 {
   "refreshToken": "jwt"
 }
 ```
 
-## ChatRooms
+## 채팅방
 
-All chatroom APIs require `Authorization: Bearer <accessToken>`.
+모든 채팅방 API는 `Authorization: Bearer <accessToken>` 헤더가 필요합니다.
 
 ### POST /chatrooms
-- Create group room.
-- Creator is added as initial member.
+- 그룹방 생성
+- 생성자는 초기 멤버로 자동 등록
 
-Request:
+요청 예시:
 ```json
 {
-  "name": "Project Meeting"
+  "name": "프로젝트 회의방"
 }
 ```
 
-Response 201:
+응답 201:
 ```json
 {
   "room": {
     "id": "chatroomObjectId",
-    "name": "Project Meeting",
+    "name": "프로젝트 회의방",
     "isGroup": true,
     "memberIds": ["creatorUserId"],
     "lastMessage": "",
@@ -52,41 +52,41 @@ Response 201:
 }
 ```
 
-Errors:
+오류 코드:
 - `400` name is required
 - `401` unauthorized
 - `503` database is not connected
 - `500` failed to create chatroom
 
 ### GET /chatrooms
-- Get rooms where current user is a member.
-- Sort: `lastMessageAt desc`, then `createdAt desc`.
+- 현재 사용자가 참여 중인 방 목록 조회
+- 정렬: `lastMessageAt desc` -> `createdAt desc`
 
-Response 200:
+응답 200:
 ```json
 {
   "rooms": [
     {
       "id": "chatroomObjectId",
-      "name": "Project Meeting",
+      "name": "프로젝트 회의방",
       "isGroup": true,
       "memberIds": ["u1", "u2"],
-      "lastMessage": "hello",
+      "lastMessage": "안녕하세요",
       "lastMessageAt": "2026-03-05T10:00:00.000Z"
     }
   ]
 }
 ```
 
-## Messages
+## 메시지
 
 ### GET /chatrooms/:id/messages
-- Get room messages.
-- Auth required.
-- Current user must be room member.
-- Query: `limit` (default 50, max 100)
+- 방 메시지 히스토리 조회
+- 인증 필요
+- 현재 사용자가 해당 방 멤버여야 함
+- 쿼리: `limit` (기본 50, 최대 100)
 
-Response:
+응답 예시:
 ```json
 {
   "roomId": "chatroomObjectId",

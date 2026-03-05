@@ -1,10 +1,12 @@
-const crypto = require('crypto');
+﻿const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
+// 토큰 원문을 DB에 저장하지 않기 위해 SHA-256 해시 문자열로 변환한다.
 const hashToken = (token) => {
   return crypto.createHash('sha256').update(String(token)).digest('hex');
 };
 
+// 사용자 문서를 바탕으로 access/refresh JWT를 동시에 발급한다.
 const issueJwtTokens = (userDoc, config) => {
   const {
     JWT_SECRET,
@@ -42,6 +44,7 @@ const issueJwtTokens = (userDoc, config) => {
   return { accessToken, refreshToken };
 };
 
+// access 토큰의 구조와 타입을 검증한다.
 const verifyAccessToken = (token, jwtSecret) => {
   const decoded = jwt.verify(token, jwtSecret);
   const userId = String(decoded.userId || decoded.sub || '').trim();
@@ -55,6 +58,7 @@ const verifyAccessToken = (token, jwtSecret) => {
   return { userId, nickname };
 };
 
+// refresh 토큰은 tokenType=refresh인지 추가 검증한다.
 const verifyRefreshToken = (token, refreshSecret) => {
   const decoded = jwt.verify(token, refreshSecret);
   const userId = String(decoded.userId || '').trim();

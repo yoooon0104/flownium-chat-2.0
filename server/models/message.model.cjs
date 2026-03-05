@@ -1,7 +1,9 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 
+// 메시지 스키마: 채팅방 단위 대화 내역을 시간순으로 저장한다.
 const messageSchema = new mongoose.Schema(
   {
+    // ChatRoom의 ObjectId를 문자열로 저장한다.
     chatRoomId: {
       type: String,
       required: true,

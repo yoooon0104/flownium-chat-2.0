@@ -1,45 +1,45 @@
-﻿# Database Design
+﻿# 데이터베이스 설계
 
-MongoDB + Mongoose based design.
+MongoDB + Mongoose 기반 설계입니다.
 
-## User Schema
+## User 스키마
 
 - `kakaoId`: String, unique, required, index
 - `nickname`: String, required
 - `profileImage`: String
 - `lastLoginAt`: Date
-- `refreshTokenHash`: String (SHA-256 hash)
+- `refreshTokenHash`: String (SHA-256 해시)
 - `timestamps: true`
 
-## ChatRoom Schema
+## ChatRoom 스키마
 
-Collection: `chatrooms`
+컬렉션: `chatrooms`
 
 - `name`: String, required
-- `isGroup`: Boolean, default `true`
-- `memberIds`: `[String]`, default `[]`
-- `lastMessage`: String, default `""`
-- `lastMessageAt`: Date, default `null`
+- `isGroup`: Boolean, 기본값 `true`
+- `memberIds`: `[String]`, 기본값 `[]`
+- `lastMessage`: String, 기본값 `""`
+- `lastMessageAt`: Date, 기본값 `null`
 - `timestamps: true`
 
-Indexes:
-- `memberIds` index
-- `lastMessageAt` index
+인덱스:
+- `memberIds` 인덱스
+- `lastMessageAt` 인덱스
 
-## Message Schema
+## Message 스키마
 
-- `chatRoomId`: String, required, index (stores ChatRoom ObjectId string)
+- `chatRoomId`: String, required, index (ChatRoom ObjectId 문자열)
 - `senderId`: String
 - `senderNickname`: String, required
-- `type`: `text | system`, default `text`
+- `type`: `text | system`, 기본값 `text`
 - `text`: String, required
 - `timestamp`: Date, index
 - `timestamps: true`
 
-## Presence Design (Online)
+## Presence 설계 (online)
 
-- In-memory map managed by socket server
-- Key: `roomId`
-- Value: `Map<userId, Set<socketId>>`
-- `online = true` when set size > 0
-- Recalculated and emitted as `room_participants`
+- 소켓 서버 메모리 맵으로 관리
+- 키: `roomId`
+- 값: `Map<userId, Set<socketId>>`
+- `online = true` 조건: set 크기 > 0
+- 계산 결과를 `room_participants`로 전송
