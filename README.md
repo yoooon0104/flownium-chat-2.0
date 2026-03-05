@@ -1,28 +1,41 @@
 ﻿# Flownium Chat 2.0
 
-Flownium Chat 2.0은 **Kakao OAuth + JWT + Socket.IO** 기반의 실시간 그룹 채팅 프로젝트입니다.  
-현재 MVP1 구현 기준은 그룹방 생성/목록/입장, 실시간 메시지 송수신, 참여자 online/offline 표시, 카카오 온보딩 분기(`SIGNUP_REQUIRED`)입니다.
+<p align="left">
+  <img src="assets/branding/logo/flownium-wordmark-light.png" alt="Flownium" width="260" />
+</p>
 
-## 주요 기능
+Flownium Chat 2.0은 **카카오 로그인 기반의 실시간 그룹 채팅 서비스**입니다.  
+처음 보는 사람도 바로 이해할 수 있도록 요약하면,
 
-- 그룹방 생성/목록 조회/입장
-- 실시간 메시지 송수신 (`send_message`, `receive_message`)
-- 메시지 히스토리 조회 (`GET /api/chatrooms/:id/messages`)
-- 참여자 목록 표시 (`room_participants`, 전체 멤버 + online/offline)
-- 카카오 로그인 + 온보딩 분기
-  - 가입 완료 사용자: 즉시 로그인 (`LOGIN_SUCCESS`)
-  - 최초 사용자: 가입 의사 + 닉네임 입력 (`SIGNUP_REQUIRED`)
-- 우측 상단 플로팅 점3개 메뉴
-  - 내 정보
-  - 설정(닉네임 변경)
-  - 로그아웃
+- 카카오 계정으로 로그인하고
+- 채팅방을 만들거나 입장해
+- 실시간으로 대화를 주고받는 앱입니다.
+
+## Flownium이란?
+
+Flownium은 "대화 흐름(flow)을 끊지 않는 팀 커뮤니케이션"을 목표로 합니다.
+현재 버전은 **그룹 채팅 MVP**에 집중되어 있으며,
+친구 기반 1:1/그룹 확장은 MVP2에서 진행 중입니다.
+
+## 현재 제공 기능 (지금 기준)
+
+- 카카오 OAuth 로그인 + 온보딩 분기
+- JWT Access/Refresh 인증
+- 그룹 채팅방 생성/목록/입장
+- 실시간 메시지 송수신 (Socket.IO)
+- 메시지 히스토리 조회
+- 참여자 목록 + online/offline 상태 표시
+- 방 검색 + FAB(+) 생성 UX
+- 사용자 메뉴(내 정보/설정/로그아웃)
+- 표준 에러 응답(`error.code`, `error.message`)
+- 로그인 상태 확인 API(`/auth/me`)
 
 ## 기술 스택
 
-- 프론트엔드: React, Vite
-- 백엔드: Express, Socket.IO, Mongoose
-- 데이터베이스: MongoDB
-- 인증: JWT (Access/Refresh/Signup)
+- Frontend: React, Vite
+- Backend: Express, Socket.IO
+- Database: MongoDB (Mongoose)
+- Auth: Kakao OAuth + JWT
 
 ## 프로젝트 구조
 
@@ -37,6 +50,7 @@ flownium-chat-2.0/
     models/
     routes/
     services/
+    utils/
   docs/
 ```
 
@@ -47,7 +61,7 @@ flownium-chat-2.0/
 ```env
 VITE_KAKAO_CLIENT_ID=
 VITE_KAKAO_REDIRECT_URI=http://localhost:5173
-# 기본값: http://localhost:3010 (미설정 시 fallback)
+# 미설정 시 http://localhost:3010 fallback
 VITE_API_BASE_URL=http://localhost:3010
 ```
 
@@ -70,9 +84,9 @@ KAKAO_REDIRECT_URI=http://localhost:5173
 KAKAO_CLIENT_SECRET=
 ```
 
-프론트 환경변수는 `.env.example`을 복사해 `.env`로 사용하세요.
+- 프론트는 `.env.example`을 복사해 `.env`로 사용
+- 배포 전에는 `docs/operations/deploy-runbook.md`의 Redirect URI 체크리스트 확인
 
-배포 전에는 `docs/operations/deploy-runbook.md`의 Redirect URI 체크리스트를 먼저 확인하세요.
 ## 로컬 실행
 
 1. 루트 의존성 설치
@@ -101,39 +115,20 @@ npm run dev
 - 프론트: `http://localhost:5173`
 - 서버 헬스체크: `http://localhost:3010/api/health`
 
-## 테스트 포인트
+## 검증 스크립트
 
-1. 카카오 로그인
-- 기존 사용자: 바로 채팅 UI 진입
-- 신규 사용자: 온보딩 화면에서 닉네임/동의 후 진입
+- 에러 표준 검증: `scripts/test-error-code.ps1`
+- 인증 상태 검증(`/auth/me`): `scripts/test-auth-me.ps1`
 
-2. 사용자 메뉴
-- 우측 상단 플로팅 메뉴 열림/닫힘
-- 내 정보/설정/로그아웃 동작
+## 문서 바로가기
 
-3. 방 생성/입장
-- FAB(+) -> 방 생성 모달 -> 생성 후 자동 입장
-
-4. 메시지/참여자
-- Enter keyup 또는 전송 버튼 송신
-- 참여자 메뉴 online/offline 반영
-
-## 문서
-
+- [문서 인덱스](docs/README.md)
 - [프로젝트 개요](docs/common/project-overview.md)
 - [아키텍처](docs/common/architecture.md)
 - [API 명세](docs/common/api-spec.md)
 - [소켓 이벤트](docs/common/socket-events.md)
-- [데이터베이스 설계](docs/common/database-design.md)
 - [인증 흐름](docs/common/auth-flow.md)
 - [UI 계획](docs/common/ui-plan.md)
 - [WBS](docs/common/wbs.md)
-- [개발 규칙](docs/common/development-rules.md)
-- [환경변수 정책](docs/common/env-policy.md)
-- [MVP2 요구사항 정의서](docs/planning/requirements.md)
-- [MVP2 화면 정의서](docs/planning/screen-spec.md)
-- [MVP2 오브젝트 정의서](docs/planning/object-spec.md)
-- [문서 인덱스](docs/README.md)
 - [배포 런북](docs/operations/deploy-runbook.md)
 - [운영 로그 기준](docs/operations/ops-log-policy.md)
-
