@@ -15,7 +15,8 @@ import SettingsModal from '../features/user/components/SettingsModal'
 import { createChatApi } from '../services/api/chatApi'
 import { createChatSocketClient } from '../services/socket/chatSocketClient'
 
-const API_BASE_URL = 'http://localhost:3010'
+// 배포 환경에서는 VITE_API_BASE_URL을 사용하고, 미설정 시 로컬 기본값으로 동작한다.
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3010').replace(/\/$/, '')
 
 // 토큰 payload에서 사용자 식별자를 복구해 초기 렌더 fallback으로 사용한다.
 const parseJwtPayload = (token) => {
@@ -338,3 +339,4 @@ function AppShell() {
 }
 
 export default AppShell
+
