@@ -1,4 +1,4 @@
-const dotenv = require('dotenv');
+﻿const dotenv = require('dotenv');
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -7,16 +7,15 @@ const path = require('path');
 const { Server } = require('socket.io');
 const Message = require('./models/message.model.cjs');
 const User = require('./models/user.model.cjs');
+const ChatRoom = require('./models/chatroom.model.cjs');
 const createAuthRouter = require('./routes/auth.routes.cjs');
 const { verifyAccessToken } = require('./services/auth.service.cjs');
 
-// 실행 위치와 무관하게 server/.env를 항상 읽도록 절대 경로 기준으로 로드한다.
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const server = http.createServer(app);
 
-// 환경변수가 없을 때도 로컬 개발이 가능하도록 안전한 기본값을 둔다.
 const PORT = process.env.PORT || 3010;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -27,13 +26,14 @@ const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY;
 const KAKAO_REDIRECT_URI = process.env.KAKAO_REDIRECT_URI;
 const KAKAO_CLIENT_SECRET = process.env.KAKAO_CLIENT_SECRET || '';
 
-// REST와 Socket 모두 동일한 origin 정책을 적용해 CORS 불일치를 방지한다.
 const io = new Server(server, {
   cors: {
     origin: FRONTEND_URL,
     methods: ['GET', 'POST'],
   },
 });
+
+const roomPresence = new Map();
 
 const assertDbConnected = (res) => {
   if (mongoose.connection.readyState !== 1) {
@@ -43,11 +43,118 @@ const assertDbConnected = (res) => {
   return true;
 };
 
-// 소켓 연결 단계에서 JWT를 검증한다.
-// 실패하면 connection 자체를 차단해 이후 이벤트 처리로 진입하지 못하게 한다.
+const toRoomResponse = (roomDoc) => ({
+  id: String(roomDoc._id),
+  name: roomDoc.name,
+  isGroup: Boolean(roomDoc.isGroup),
+  memberIds: Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds : [],
+  lastMessage: roomDoc.lastMessage || '',
+  lastMessageAt: roomDoc.lastMessageAt ? new Date(roomDoc.lastMessageAt).toISOString() : null,
+});
+
+const extractBearerToken = (req) => {
+  const raw = String(req.headers.authorization || '').trim();
+  return raw.replace(/^Bearer\s+/i, '').trim();
+};
+
+const requireAuth = (req, res, next) => {
+  try {
+    const token = extractBearerToken(req);
+    if (!token) {
+      res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+
+    if (!JWT_SECRET) {
+      res.status(500).json({ error: 'server auth misconfigured' });
+      return;
+    }
+
+    req.user = verifyAccessToken(token, JWT_SECRET);
+    next();
+  } catch (_error) {
+    res.status(401).json({ error: 'unauthorized' });
+  }
+};
+
+const addPresence = (roomId, userId, socketId) => {
+  if (!roomPresence.has(roomId)) {
+    roomPresence.set(roomId, new Map());
+  }
+
+  const userSockets = roomPresence.get(roomId);
+  if (!userSockets.has(userId)) {
+    userSockets.set(userId, new Set());
+  }
+
+  userSockets.get(userId).add(socketId);
+};
+
+const removePresence = (roomId, userId, socketId) => {
+  const userSockets = roomPresence.get(roomId);
+  if (!userSockets) return;
+
+  const socketSet = userSockets.get(userId);
+  if (!socketSet) return;
+
+  socketSet.delete(socketId);
+
+  if (socketSet.size === 0) {
+    userSockets.delete(userId);
+  }
+
+  if (userSockets.size === 0) {
+    roomPresence.delete(roomId);
+  }
+};
+
+const collectJoinedRoomIds = (socket) => {
+  const joinedRooms = [];
+  socket.rooms.forEach((roomId) => {
+    if (roomId !== socket.id) {
+      joinedRooms.push(roomId);
+    }
+  });
+  return joinedRooms;
+};
+
+const emitRoomParticipants = async (roomId) => {
+  if (mongoose.connection.readyState !== 1) {
+    return;
+  }
+
+  const room = await ChatRoom.findById(roomId).lean();
+  if (!room) {
+    return;
+  }
+
+  const memberIds = Array.isArray(room.memberIds) ? room.memberIds : [];
+  const users = await User.find({ _id: { $in: memberIds } })
+    .select({ _id: 1, nickname: 1 })
+    .lean();
+
+  const userById = new Map(users.map((u) => [String(u._id), u]));
+  const onlineMap = roomPresence.get(String(room._id)) || new Map();
+
+  const participants = memberIds.map((memberId) => {
+    const found = userById.get(memberId);
+    const online = Boolean(onlineMap.get(memberId)?.size);
+
+    return {
+      userId: memberId,
+      nickname: found?.nickname || memberId,
+      online,
+    };
+  });
+
+  io.to(String(room._id)).emit('room_participants', {
+    roomId: String(room._id),
+    participants,
+  });
+};
+
 io.use((socket, next) => {
   try {
-    // 우선순위: handshake.auth.token -> Authorization Bearer 헤더.
     const authToken = socket.handshake?.auth?.token || '';
     const bearerHeader = String(socket.handshake?.headers?.authorization || '');
     const bearerToken = bearerHeader.replace(/^Bearer\s+/i, '');
@@ -74,7 +181,6 @@ app.use(
 );
 app.use(express.json());
 
-// 인증 라우트는 분리해 index.cjs 비대화를 방지한다.
 app.use(
   '/auth',
   createAuthRouter({
@@ -93,14 +199,56 @@ app.use(
   })
 );
 
-// 서버 기동/헬스체크 확인용 최소 엔드포인트.
 app.get('/api/health', (_req, res) => {
   res.status(200).json({ ok: true });
 });
 
-// 채팅방 메시지 히스토리 조회 API.
-// 최신 limit개를 조회한 뒤 UI 표시를 위해 오름차순으로 되돌려 반환한다.
-app.get('/api/chatrooms/:id/messages', async (req, res) => {
+app.post('/api/chatrooms', requireAuth, async (req, res) => {
+  const name = String(req.body?.name || '').trim();
+
+  if (!name) {
+    res.status(400).json({ error: 'name is required' });
+    return;
+  }
+
+  if (!assertDbConnected(res)) {
+    return;
+  }
+
+  try {
+    const room = await ChatRoom.create({
+      name,
+      isGroup: true,
+      memberIds: [req.user.userId],
+    });
+
+    res.status(201).json({
+      room: toRoomResponse(room),
+    });
+  } catch (_error) {
+    res.status(500).json({ error: 'failed to create chatroom' });
+  }
+});
+
+app.get('/api/chatrooms', requireAuth, async (req, res) => {
+  if (!assertDbConnected(res)) {
+    return;
+  }
+
+  try {
+    const rooms = await ChatRoom.find({ memberIds: req.user.userId })
+      .sort({ lastMessageAt: -1, createdAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      rooms: rooms.map(toRoomResponse),
+    });
+  } catch (_error) {
+    res.status(500).json({ error: 'failed to fetch chatrooms' });
+  }
+});
+
+app.get('/api/chatrooms/:id/messages', requireAuth, async (req, res) => {
   const roomId = String(req.params.id || '').trim();
   const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
 
@@ -114,6 +262,17 @@ app.get('/api/chatrooms/:id/messages', async (req, res) => {
   }
 
   try {
+    const room = await ChatRoom.findById(roomId).lean();
+    if (!room) {
+      res.status(404).json({ error: 'chatroom not found' });
+      return;
+    }
+
+    if (!room.memberIds.includes(req.user.userId)) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+
     const messages = await Message.find({ chatRoomId: roomId })
       .sort({ timestamp: -1 })
       .limit(limit)
@@ -132,8 +291,7 @@ app.get('/api/chatrooms/:id/messages', async (req, res) => {
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
-  // 클라이언트를 room에 입장시키고, 입장 확인 이벤트를 해당 클라이언트에 돌려준다.
-  socket.on('join_room', (payload = {}) => {
+  socket.on('join_room', async (payload = {}) => {
     const roomId = String(payload.roomId || '').trim();
 
     if (!roomId) {
@@ -141,11 +299,37 @@ io.on('connection', (socket) => {
       return;
     }
 
-    socket.join(roomId);
-    socket.emit('room_joined', { roomId });
+    if (mongoose.connection.readyState !== 1) {
+      socket.emit('error', { message: 'database is not connected' });
+      return;
+    }
+
+    try {
+      const room = await ChatRoom.findById(roomId);
+      if (!room) {
+        socket.emit('error', { message: 'chatroom not found' });
+        return;
+      }
+
+      if (!room.memberIds.includes(socket.user.userId)) {
+        room.memberIds.push(socket.user.userId);
+        await room.save();
+      }
+
+      socket.join(roomId);
+      addPresence(roomId, socket.user.userId, socket.id);
+
+      socket.emit('room_joined', {
+        roomId,
+        room: toRoomResponse(room),
+      });
+
+      await emitRoomParticipants(roomId);
+    } catch (_error) {
+      socket.emit('error', { message: 'failed to join room' });
+    }
   });
 
-  // 메시지를 수신해 DB에 저장한 뒤 같은 room의 모든 클라이언트에 브로드캐스트한다.
   socket.on('send_message', async (payload = {}) => {
     const roomId = String(payload.roomId || '').trim();
     const text = String(payload.text || '').trim();
@@ -156,38 +340,63 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const messagePayload = {
-      chatRoomId: roomId,
-      senderId: socket.user.userId,
-      senderNickname: socket.user.nickname,
-      type,
-      text,
-      timestamp: new Date(),
-    };
+    if (mongoose.connection.readyState !== 1) {
+      socket.emit('error', { message: 'database is not connected' });
+      return;
+    }
 
     try {
-      // DB 연결 상태면 영속 저장, 미연결 상태면 메모리 payload만으로 실시간 송신을 유지한다.
-      const message =
-        mongoose.connection.readyState === 1
-          ? await Message.create(messagePayload)
-          : messagePayload;
+      const room = await ChatRoom.findById(roomId);
+      if (!room) {
+        socket.emit('error', { message: 'chatroom not found' });
+        return;
+      }
 
-      const response = {
+      if (!room.memberIds.includes(socket.user.userId)) {
+        socket.emit('error', { message: 'forbidden' });
+        return;
+      }
+
+      const message = await Message.create({
+        chatRoomId: roomId,
+        senderId: socket.user.userId,
+        senderNickname: socket.user.nickname,
+        type,
+        text,
+        timestamp: new Date(),
+      });
+
+      room.lastMessage = message.text;
+      room.lastMessageAt = message.timestamp;
+      await room.save();
+
+      io.to(roomId).emit('receive_message', {
         chatRoomId: message.chatRoomId,
         senderId: message.senderId,
         senderNickname: message.senderNickname,
         type: message.type,
         text: message.text,
         timestamp: new Date(message.timestamp).toISOString(),
-      };
-
-      io.to(roomId).emit('receive_message', response);
+      });
     } catch (_error) {
       socket.emit('error', { message: 'failed to process message' });
     }
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
+    const joinedRoomIds = collectJoinedRoomIds(socket);
+    joinedRoomIds.forEach((roomId) => {
+      removePresence(roomId, socket.user.userId, socket.id);
+    });
+
+    for (const roomId of joinedRoomIds) {
+      try {
+        await emitRoomParticipants(roomId);
+      } catch (_error) {
+        // Ignore broadcast failures during disconnect cleanup.
+      }
+    }
+
     console.log(`Socket disconnected: ${socket.id}`);
   });
 });
@@ -195,8 +404,6 @@ io.on('connection', (socket) => {
 async function start() {
   const { MONGODB_URI } = process.env;
 
-  // 초기 단계 테스트를 위해 DB 설정이 없어도 서버는 기동한다.
-  // 단, 히스토리 조회/API 인증 관련 기능은 DB 미연결 시 제약이 있다.
   if (MONGODB_URI) {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
