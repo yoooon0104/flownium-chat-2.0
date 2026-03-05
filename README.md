@@ -133,6 +133,9 @@ npm run dev
 - [MVP2 화면 정의서](docs/planning/screen-spec.md)
 - [MVP2 오브젝트 정의서](docs/planning/object-spec.md)
 - [문서 인덱스](docs/README.md)
+- [배포 런북](docs/operations/deploy-runbook.md)
+- [운영 로그 기준](docs/operations/ops-log-policy.md)
+
 
 
 

@@ -22,6 +22,7 @@
 - 인증 흐름: `docs/common/auth-flow.md`
 - UI 계획: `docs/common/ui-plan.md`
 - 작업 현황: `docs/common/wbs.md`
+- 운영 런북: `docs/operations/deploy-runbook.md`, `docs/operations/ops-log-policy.md`
 
 ## common
 
