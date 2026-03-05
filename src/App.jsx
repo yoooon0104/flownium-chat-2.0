@@ -395,9 +395,10 @@ function App() {
             <button
               type="button"
               className="back-button"
+              aria-label="채팅 목록으로 이동"
               onClick={() => setIsMobileChatView(false)}
             >
-              Rooms
+              ←
             </button>
 
             <div className="chat-header-main">
@@ -518,3 +519,4 @@ function App() {
 }
 
 export default App
+
