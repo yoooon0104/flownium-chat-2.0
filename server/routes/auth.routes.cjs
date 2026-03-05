@@ -27,6 +27,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
   const toClientUser = (userDoc) => ({
     id: String(userDoc._id),
     kakaoId: userDoc.kakaoId,
+    email: userDoc.email || '',
     nickname: userDoc.nickname,
     profileImage: userDoc.profileImage || '',
   });
@@ -82,6 +83,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
       // 가입이 완료된 사용자는 즉시 로그인 처리하고 최신 로그인 시점만 갱신한다.
       if (existingUser && existingUser.signupCompletedAt) {
         existingUser.lastLoginAt = new Date();
+        existingUser.email = kakaoUser.email || existingUser.email || '';
         // 1차 정책: 프로필 이미지는 카카오 원본을 우선 반영한다.
         existingUser.profileImage = kakaoUser.profileImage || existingUser.profileImage || '';
         await existingUser.save();
@@ -92,6 +94,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
       const signupToken = issueSignupToken(
         {
           kakaoId: kakaoUser.kakaoId,
+          email: kakaoUser.email,
           profileImage: kakaoUser.profileImage,
           kakaoNickname: kakaoUser.nickname,
         },
@@ -103,6 +106,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
         signupToken,
         kakaoProfile: {
           kakaoId: kakaoUser.kakaoId,
+          email: kakaoUser.email || '',
           nickname: kakaoUser.nickname,
           profileImage: kakaoUser.profileImage || '',
         },
@@ -137,7 +141,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
     }
 
     try {
-      const { kakaoId, profileImage, kakaoNickname } = verifySignupToken(signupToken, config.JWT_SIGNUP_SECRET);
+      const { kakaoId, email, profileImage, kakaoNickname } = verifySignupToken(signupToken, config.JWT_SIGNUP_SECRET);
       const nickname = validateNickname(req.body?.nickname || kakaoNickname);
       const now = new Date();
 
@@ -145,6 +149,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
         { kakaoId },
         {
           $set: {
+            email: String(email || '').trim().toLowerCase(),
             nickname,
             profileImage: profileImage || '',
             lastLoginAt: now,
@@ -198,6 +203,33 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
       await respondLoginSuccess(res, user);
     } catch (_error) {
       sendError(res, 401, 'INVALID_REFRESH_TOKEN', 'invalid refresh token');
+    }
+  });
+
+  // 현재 인증 사용자의 프로필 정보를 조회한다.
+  router.get('/me', async (req, res) => {
+    const accessToken = extractBearerToken(req);
+    if (!accessToken) {
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+      return;
+    }
+
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const auth = verifyAccessToken(accessToken, config.JWT_SECRET);
+      const user = await User.findById(auth.userId);
+
+      if (!user) {
+        sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
+        return;
+      }
+
+      res.status(200).json({ user: toClientUser(user) });
+    } catch (_error) {
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
     }
   });
 

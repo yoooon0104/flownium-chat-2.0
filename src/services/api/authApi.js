@@ -33,6 +33,17 @@ export const createAuthApi = (apiBaseUrl) => {
     return { ok: response.ok, status: response.status, body }
   }
 
+  const getMe = async (accessToken) => {
+    const response = await fetch(`${apiBaseUrl}/auth/me`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
   const updateProfile = async (payload, accessToken) => {
     const response = await fetch(`${apiBaseUrl}/auth/profile`, {
       method: 'PATCH',
@@ -50,6 +61,7 @@ export const createAuthApi = (apiBaseUrl) => {
     getKakaoCallback,
     refresh,
     completeSignup,
+    getMe,
     updateProfile,
   }
 }

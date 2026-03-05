@@ -5,6 +5,7 @@ export const UserProfile = {
     return {
       id: String(safe.id || ''),
       kakaoId: String(safe.kakaoId || ''),
+      email: String(safe.email || '').trim().toLowerCase(),
       nickname: String(safe.nickname || '').trim(),
       profileImage: String(safe.profileImage || '').trim(),
     }
