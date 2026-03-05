@@ -3,47 +3,49 @@
 ## 시스템 구조
 
 클라이언트(React + Vite)
--> LoginGate + 채팅 UI(App)
+-> `AppShell` (조립 전용)
+-> `features/*` hooks/components
+-> `services/*` (REST/Socket)
 -> Express + Socket.IO 서버
 -> MongoDB
 
-## 통신 분리
+## 프론트 계층
 
-### REST API
-- `GET /api/health`
-- `POST /api/chatrooms`
-- `GET /api/chatrooms`
-- `GET /api/chatrooms/:id/messages`
-- `GET /auth/kakao/callback`
-- `POST /auth/refresh`
+1. `app/`
+- `AppShell.jsx`: 화면 분기/조합
 
-### WebSocket
-- `join_room`
-- `room_joined`
-- `room_participants`
-- `send_message`
-- `receive_message`
-- `error`
+2. `features/`
+- `auth`: LoginGate, SignupOnboarding, useKakaoAuth
+- `chat`: RoomPanel, ChatPanel, useChatRooms/useChatMessages/useChatSocket
+- `user`: UserMenu, ProfileModal, SettingsModal
+
+3. `domain/`
+- `AuthSession`: 토큰 로드/저장/삭제
+- `UserProfile`: 사용자 정규화/표기 규칙
+
+4. `services/`
+- `api/authApi`, `api/chatApi`
+- `socket/chatSocketClient`
+
+## 백엔드 구조
+
+- `server/index.cjs`: 서버 엔트리 + 소켓 이벤트
+- `routes/auth.routes.cjs`: 카카오/온보딩/refresh/profile
+- `routes/chatroom.routes.cjs`: chatroom REST
+- `services/auth.service.cjs`: JWT/해시/signup 토큰 검증
+- `services/kakao.service.cjs`: 카카오 외부 API 연동
 
 ## 인증/채팅 흐름
 
-1. 로그인 게이트에서 카카오 인가 URL로 이동
-2. 콜백 `code`를 프론트가 직접 읽어 `/auth/kakao/callback` 호출
-3. access/refresh 토큰 저장 후 채팅 UI 진입
-4. REST는 `fetchWithAuth`를 통해 401 발생 시 refresh 후 1회 재시도
-5. Socket은 `auth.token`으로 연결, unauthorized 시 refresh 후 재연결
-6. 실패 시 세션 정리 후 로그인 게이트로 복귀
-
-## 그룹 채팅 흐름
-
-1. 클라이언트가 REST로 방 목록 조회
-2. 사용자가 방 선택 시 `join_room` 전송
-3. 서버는 멤버십 확인/보정 후 room 입장
-4. 서버는 `room_participants`를 전송
-5. 메시지 전송 시 DB 저장 + room 요약 갱신 + 브로드캐스트
+1. 카카오 로그인
+2. `/auth/kakao/callback` 결과 분기(`LOGIN_SUCCESS`/`SIGNUP_REQUIRED`)
+3. 온보딩 완료 시 `/auth/signup/complete`
+4. 토큰 저장 후 REST/Socket 인증 시작
+5. 채팅방 조회/입장/메시지 송수신
+6. `room_participants`로 전체 멤버 + 온라인 상태 표시
 
 ## 현재 제약
 
-- 관리자/초대/강퇴 정책은 다음 단계
-- 멤버십은 `join_room` 시 자동 추가
-- presence는 메모리 기반이므로 서버 재시작 시 초기화
+- 프로필 이미지는 카카오 원본 우선(업로드/편집은 다음 단계)
+- 관리자/초대/강퇴 정책 미구현
+- presence는 메모리 기반(서버 재시작 시 초기화)

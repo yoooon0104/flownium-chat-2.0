@@ -1,20 +1,68 @@
 ﻿# API 명세
 
-기본 경로: `/api`
+기본 경로: `/api` (인증 관련은 `/auth`)
 
 ## 상태 확인
 
-### GET /health
+### GET /api/health
 - 서버 상태 확인
 - 응답: `{ "ok": true }`
 
 ## 인증
 
 ### GET /auth/kakao/callback?code=
-- 카카오 인가 코드를 교환해 Access/Refresh 토큰을 발급합니다.
+- 카카오 인가 코드를 교환합니다.
+- 응답 분기:
+
+1) 가입 완료 사용자
+```json
+{
+  "resultType": "LOGIN_SUCCESS",
+  "user": {
+    "id": "userId",
+    "kakaoId": "kakaoId",
+    "nickname": "닉네임",
+    "profileImage": ""
+  },
+  "accessToken": "jwt",
+  "refreshToken": "jwt"
+}
+```
+
+2) 최초 사용자(가입 필요)
+```json
+{
+  "resultType": "SIGNUP_REQUIRED",
+  "signupToken": "jwt",
+  "kakaoProfile": {
+    "kakaoId": "kakaoId",
+    "nickname": "kakao-nickname",
+    "profileImage": ""
+  }
+}
+```
+
+### POST /auth/signup/complete
+- 최초 로그인 사용자의 가입 의사 + 닉네임 설정 완료
+
+요청:
+```json
+{
+  "signupToken": "jwt",
+  "nickname": "사용자닉네임",
+  "agreedToTerms": true
+}
+```
+
+응답: `LOGIN_SUCCESS` 구조와 동일
+
+오류 코드:
+- `400` signupToken/동의/닉네임 검증 실패
+- `401` invalid signup token
+- `503` database is not connected
 
 ### POST /auth/refresh
-- Refresh 토큰 검증 후 Access/Refresh 토큰을 재발급합니다.
+- Refresh 토큰 검증 후 Access/Refresh 토큰 재발급
 
 요청 예시:
 ```json
@@ -23,83 +71,42 @@
 }
 ```
 
-## 채팅방
+### PATCH /auth/profile
+- 현재 인증 사용자 프로필 수정 (1차: 닉네임)
+- 헤더: `Authorization: Bearer <accessToken>`
 
-모든 채팅방 API는 `Authorization: Bearer <accessToken>` 헤더가 필요합니다.
-
-### POST /chatrooms
-- 그룹방 생성
-- 생성자는 초기 멤버로 자동 등록
-
-요청 예시:
+요청:
 ```json
 {
-  "name": "프로젝트 회의방"
+  "nickname": "새닉네임"
 }
 ```
 
-응답 201:
+응답:
 ```json
 {
-  "room": {
-    "id": "chatroomObjectId",
-    "name": "프로젝트 회의방",
-    "isGroup": true,
-    "memberIds": ["creatorUserId"],
-    "lastMessage": "",
-    "lastMessageAt": null
+  "user": {
+    "id": "userId",
+    "kakaoId": "kakaoId",
+    "nickname": "새닉네임",
+    "profileImage": ""
   }
 }
 ```
 
-오류 코드:
-- `400` name is required
-- `401` unauthorized
-- `503` database is not connected
-- `500` failed to create chatroom
+## 채팅방
 
-### GET /chatrooms
+모든 채팅방 API는 `Authorization: Bearer <accessToken>` 헤더가 필요합니다.
+
+### POST /api/chatrooms
+- 그룹방 생성
+- 생성자는 초기 멤버로 자동 등록
+
+### GET /api/chatrooms
 - 현재 사용자가 참여 중인 방 목록 조회
 - 정렬: `lastMessageAt desc` -> `createdAt desc`
 
-응답 200:
-```json
-{
-  "rooms": [
-    {
-      "id": "chatroomObjectId",
-      "name": "프로젝트 회의방",
-      "isGroup": true,
-      "memberIds": ["u1", "u2"],
-      "lastMessage": "안녕하세요",
-      "lastMessageAt": "2026-03-05T10:00:00.000Z"
-    }
-  ]
-}
-```
-
-## 메시지
-
-### GET /chatrooms/:id/messages
+### GET /api/chatrooms/:id/messages
 - 방 메시지 히스토리 조회
-- 인증 필요
 - 현재 사용자가 해당 방 멤버여야 함
 - 쿼리: `limit` (기본 50, 최대 100)
-
-응답 예시:
-```json
-{
-  "roomId": "chatroomObjectId",
-  "count": 2,
-  "messages": [
-    {
-      "chatRoomId": "chatroomObjectId",
-      "senderId": "user-id",
-      "senderNickname": "tester",
-      "type": "text",
-      "text": "hello",
-      "timestamp": "2026-03-05T12:00:00.000Z"
-    }
-  ]
-}
-```

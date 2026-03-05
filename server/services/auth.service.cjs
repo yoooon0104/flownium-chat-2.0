@@ -44,6 +44,25 @@ const issueJwtTokens = (userDoc, config) => {
   return { accessToken, refreshToken };
 };
 
+// 최초 로그인 사용자를 온보딩 단계로 넘기기 위한 signup 토큰을 발급한다.
+const issueSignupToken = (payload, config) => {
+  const { JWT_SIGNUP_SECRET, SIGNUP_TOKEN_EXPIRES_IN = '10m' } = config;
+  if (!JWT_SIGNUP_SECRET) {
+    throw new Error('JWT signup secret is not configured');
+  }
+
+  return jwt.sign(
+    {
+      tokenType: 'signup',
+      kakaoId: String(payload.kakaoId || '').trim(),
+      profileImage: String(payload.profileImage || '').trim(),
+      kakaoNickname: String(payload.kakaoNickname || '').trim(),
+    },
+    JWT_SIGNUP_SECRET,
+    { expiresIn: SIGNUP_TOKEN_EXPIRES_IN }
+  );
+};
+
 // access 토큰의 구조와 타입을 검증한다.
 const verifyAccessToken = (token, jwtSecret) => {
   const decoded = jwt.verify(token, jwtSecret);
@@ -71,9 +90,38 @@ const verifyRefreshToken = (token, refreshSecret) => {
   return { userId };
 };
 
+// signup 토큰은 tokenType=signup인지 추가 검증한다.
+const verifySignupToken = (token, signupSecret) => {
+  const decoded = jwt.verify(token, signupSecret);
+  const kakaoId = String(decoded.kakaoId || '').trim();
+  const tokenType = String(decoded.tokenType || '').trim();
+
+  if (!kakaoId || tokenType !== 'signup') {
+    throw new Error('invalid signup token');
+  }
+
+  return {
+    kakaoId,
+    profileImage: String(decoded.profileImage || '').trim(),
+    kakaoNickname: String(decoded.kakaoNickname || '').trim(),
+  };
+};
+
+// 닉네임 입력값을 공통 규칙으로 검증/정규화한다.
+const validateNickname = (rawNickname) => {
+  const nickname = String(rawNickname || '').trim();
+  if (nickname.length < 2 || nickname.length > 20) {
+    throw new Error('nickname must be between 2 and 20 characters');
+  }
+  return nickname;
+};
+
 module.exports = {
   hashToken,
   issueJwtTokens,
+  issueSignupToken,
   verifyAccessToken,
   verifyRefreshToken,
+  verifySignupToken,
+  validateNickname,
 };

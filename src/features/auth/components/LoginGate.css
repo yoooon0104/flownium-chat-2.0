@@ -4,19 +4,19 @@
   place-items: center;
   padding: 20px;
   background:
-    radial-gradient(circle at 10% 10%, #fff8cc 0%, transparent 28%),
+    radial-gradient(circle at 18% 8%, #fff8cc 0%, transparent 28%),
     radial-gradient(circle at 95% 0%, #f7f8fb 0%, transparent 25%),
     #f2f3f6;
 }
 
 .auth-card {
-  width: min(92vw, 380px);
+  width: min(92vw, 420px);
   border: 1px solid #e4e7ec;
   border-radius: 16px;
   background: #fff;
-  padding: 18px;
+  padding: 22px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .auth-card h1 {
@@ -26,8 +26,8 @@
 
 .auth-card p {
   margin: 0;
-  font-size: 14px;
   color: #68727d;
+  font-size: 14px;
 }
 
 .auth-error {
@@ -35,12 +35,12 @@
 }
 
 .kakao-login-button {
-  height: 40px;
+  height: 44px;
   border: none;
   border-radius: 10px;
   background: #f8dc3d;
   color: #2f2b00;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .kakao-login-button:hover {

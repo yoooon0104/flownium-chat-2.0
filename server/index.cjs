@@ -9,6 +9,7 @@ const Message = require('./models/message.model.cjs');
 const User = require('./models/user.model.cjs');
 const ChatRoom = require('./models/chatroom.model.cjs');
 const createAuthRouter = require('./routes/auth.routes.cjs');
+const createChatroomRouter = require('./routes/chatroom.routes.cjs');
 const { verifyAccessToken } = require('./services/auth.service.cjs');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -17,11 +18,13 @@ const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3010;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
+const JWT_SIGNUP_SECRET = process.env.JWT_SIGNUP_SECRET || JWT_SECRET;
 const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN || '1h';
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '14d';
+const SIGNUP_TOKEN_EXPIRES_IN = process.env.SIGNUP_TOKEN_EXPIRES_IN || '10m';
 const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY;
 const KAKAO_REDIRECT_URI = process.env.KAKAO_REDIRECT_URI;
 const KAKAO_CLIENT_SECRET = process.env.KAKAO_CLIENT_SECRET || '';
@@ -29,7 +32,7 @@ const KAKAO_CLIENT_SECRET = process.env.KAKAO_CLIENT_SECRET || '';
 const io = new Server(server, {
   cors: {
     origin: FRONTEND_URL,
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'PATCH'],
   },
 });
 
@@ -193,8 +196,10 @@ app.use(
     config: {
       JWT_SECRET,
       JWT_REFRESH_SECRET,
+      JWT_SIGNUP_SECRET,
       ACCESS_TOKEN_EXPIRES_IN,
       REFRESH_TOKEN_EXPIRES_IN,
+      SIGNUP_TOKEN_EXPIRES_IN,
       KAKAO_REST_API_KEY,
       KAKAO_REDIRECT_URI,
       KAKAO_CLIENT_SECRET,
@@ -203,99 +208,18 @@ app.use(
   })
 );
 
+app.use(
+  '/api',
+  createChatroomRouter({
+    ChatRoom,
+    Message,
+    requireAuth,
+    assertDbConnected,
+  })
+);
+
 app.get('/api/health', (_req, res) => {
   res.status(200).json({ ok: true });
-});
-
-app.post('/api/chatrooms', requireAuth, async (req, res) => {
-  const name = String(req.body?.name || '').trim();
-
-  if (!name) {
-    res.status(400).json({ error: 'name is required' });
-    return;
-  }
-
-  if (!assertDbConnected(res)) {
-    return;
-  }
-
-  try {
-    const room = await ChatRoom.create({
-      name,
-      isGroup: true,
-      memberIds: [req.user.userId],
-    });
-
-    res.status(201).json({
-      room: toRoomResponse(room),
-    });
-  } catch (error) {
-    console.error('[chatrooms:create] failed', {
-      message: error.message,
-      code: error.code || null,
-      keyPattern: error.keyPattern || null,
-      keyValue: error.keyValue || null,
-    });
-    res.status(500).json({ error: error.message || 'failed to create chatroom' });
-  }
-});
-
-app.get('/api/chatrooms', requireAuth, async (req, res) => {
-  if (!assertDbConnected(res)) {
-    return;
-  }
-
-  try {
-    const rooms = await ChatRoom.find({ memberIds: req.user.userId })
-      .sort({ lastMessageAt: -1, createdAt: -1 })
-      .lean();
-
-    res.status(200).json({
-      rooms: rooms.map(toRoomResponse),
-    });
-  } catch (_error) {
-    res.status(500).json({ error: 'failed to fetch chatrooms' });
-  }
-});
-
-app.get('/api/chatrooms/:id/messages', requireAuth, async (req, res) => {
-  const roomId = String(req.params.id || '').trim();
-  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
-
-  if (!roomId) {
-    res.status(400).json({ error: 'roomId is required' });
-    return;
-  }
-
-  if (!assertDbConnected(res)) {
-    return;
-  }
-
-  try {
-    const room = await ChatRoom.findById(roomId).lean();
-    if (!room) {
-      res.status(404).json({ error: 'chatroom not found' });
-      return;
-    }
-
-    if (!room.memberIds.includes(req.user.userId)) {
-      res.status(403).json({ error: 'forbidden' });
-      return;
-    }
-
-    const messages = await Message.find({ chatRoomId: roomId })
-      .sort({ timestamp: -1 })
-      .limit(limit)
-      .lean();
-
-    res.status(200).json({
-      roomId,
-      count: messages.length,
-      messages: messages.reverse(),
-    });
-  } catch (_error) {
-    res.status(500).json({ error: 'failed to fetch messages' });
-  }
 });
 
 io.on('connection', (socket) => {
@@ -433,5 +357,3 @@ start().catch((error) => {
   console.error('Failed to start server:', error.message);
   process.exit(1);
 });
-
-
