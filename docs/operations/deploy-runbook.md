@@ -133,3 +133,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\test-prod-ready.ps1 -ApiBaseU
 2. 반영 커밋/PR
 3. 검증 결과
 4. 이슈/롤백 여부
+
+## 10) 최근 실행 기록
+
+### Deploy Record (Local Dry Run)
+- 일시: 2026-03-05
+- 환경(Prod/Local): Local
+- 프론트 도메인: `http://localhost:5173`
+- 백엔드 도메인: `http://localhost:3010`
+- 반영 브랜치/커밋: `feat/mvp2a-live-deploy-validation` / `64cd3ea`
+- 체크리스트 결과:
+  - `scripts/test-prod-ready.ps1 -ApiBaseUrl "http://localhost:3010"` PASS
+  - `/api/health` PASS
+  - 무인증 `/api/chatrooms` -> `error.code=UNAUTHORIZED` PASS
+  - `/auth/me`는 토큰 미입력으로 SKIP
+- Redirect URI 검증 결과: 운영값 미검증(로컬 기준만 확인)
+- 이슈/대응: 없음
