@@ -112,6 +112,24 @@ const removePresence = (roomId, userId, socketId) => {
   }
 };
 
+
+// 과거 스키마에서 남은 roomKey 유니크 인덱스를 제거해 E11000 충돌을 방지한다.
+const dropLegacyChatRoomIndexIfExists = async () => {
+  try {
+    const indexes = await ChatRoom.collection.indexes();
+    const hasLegacyRoomKeyIndex = indexes.some((index) => index.name === 'roomKey_1');
+
+    if (hasLegacyRoomKeyIndex) {
+      await ChatRoom.collection.dropIndex('roomKey_1');
+      console.log('Dropped legacy index: chatrooms.roomKey_1');
+    }
+  } catch (error) {
+    const knownNoIndexError = error?.codeName === 'IndexNotFound' || error?.code === 27;
+    if (!knownNoIndexError) {
+      console.warn('Failed to drop legacy roomKey index:', error.message);
+    }
+  }
+};
 const collectJoinedRoomIds = (socket) => {
   const joinedRooms = [];
   socket.rooms.forEach((roomId) => {
@@ -344,6 +362,7 @@ async function start() {
   if (MONGODB_URI) {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
+    await dropLegacyChatRoomIndexIfExists();
   } else {
     console.log('MONGODB_URI not set. Starting without database connection.');
   }
@@ -357,3 +376,4 @@ start().catch((error) => {
   console.error('Failed to start server:', error.message);
   process.exit(1);
 });
+

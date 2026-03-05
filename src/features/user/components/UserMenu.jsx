@@ -1,7 +1,7 @@
 ﻿import { useEffect, useRef } from 'react'
 
 // 우측 상단 점3개 메뉴: 내 정보/설정/로그아웃 진입점.
-function UserMenu({ isOpen, onToggle, onOpenProfile, onOpenSettings, onLogout }) {
+function UserMenu({ isOpen, onToggle, onOpenProfile, onOpenSettings, onLogout, isFloating = false }) {
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -29,7 +29,7 @@ function UserMenu({ isOpen, onToggle, onOpenProfile, onOpenSettings, onLogout })
   }, [isOpen, onToggle])
 
   return (
-    <div className="user-menu" ref={menuRef}>
+    <div className={`user-menu ${isFloating ? 'floating' : ''}`} ref={menuRef}>
       <button type="button" className="kebab-button" onClick={() => onToggle(!isOpen)} aria-label="사용자 메뉴">
         ⋮
       </button>

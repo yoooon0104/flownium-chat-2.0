@@ -12,7 +12,6 @@ import { useChatSocket } from '../features/chat/hooks/useChatSocket'
 import UserMenu from '../features/user/components/UserMenu'
 import ProfileModal from '../features/user/components/ProfileModal'
 import SettingsModal from '../features/user/components/SettingsModal'
-import { UserProfile } from '../domain/user/UserProfile'
 import { createChatApi } from '../services/api/chatApi'
 import { createChatSocketClient } from '../services/socket/chatSocketClient'
 
@@ -164,7 +163,6 @@ function AppShell() {
 
   const {
     isConnected,
-    socketId,
     joinRoom: emitJoinRoom,
     sendMessage,
     setCurrentRoom,
@@ -257,43 +255,23 @@ function AppShell() {
 
   return (
     <main className="chat-app">
-      <header className="top-bar">
-        <div className="brand-wrap">
-          <strong className="brand-name">Flownium Talk</strong>
-          <span className={`status-badge ${isConnected ? 'online' : 'offline'}`}>
-            {isConnected ? 'Connected' : 'Disconnected'}
-          </span>
-        </div>
-
-        <div className="meta-wrap">
-          <div className="profile-chip">
-            {currentUser?.profileImage ? (
-              <img src={currentUser.profileImage} alt="profile" />
-            ) : (
-              <span>{UserProfile.getInitial(currentUser)}</span>
-            )}
-            <strong>{UserProfile.getDisplayName(currentUser)}</strong>
-          </div>
-          <span className="dot">•</span>
-          <span>{socketId || 'No Socket'}</span>
-          <UserMenu
-            isOpen={isUserMenuOpen}
-            onToggle={setIsUserMenuOpen}
-            onOpenProfile={() => {
-              setIsUserMenuOpen(false)
-              setIsProfileModalOpen(true)
-            }}
-            onOpenSettings={() => {
-              setIsUserMenuOpen(false)
-              setIsSettingsModalOpen(true)
-            }}
-            onLogout={() => {
-              disconnectSocket()
-              handleLogout()
-            }}
-          />
-        </div>
-      </header>
+      <UserMenu
+        isOpen={isUserMenuOpen}
+        onToggle={setIsUserMenuOpen}
+        isFloating
+        onOpenProfile={() => {
+          setIsUserMenuOpen(false)
+          setIsProfileModalOpen(true)
+        }}
+        onOpenSettings={() => {
+          setIsUserMenuOpen(false)
+          setIsSettingsModalOpen(true)
+        }}
+        onLogout={() => {
+          disconnectSocket()
+          handleLogout()
+        }}
+      />
 
       <section className="chat-layout">
         <RoomPanel
@@ -360,4 +338,3 @@ function AppShell() {
 }
 
 export default AppShell
-

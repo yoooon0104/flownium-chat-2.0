@@ -35,45 +35,13 @@
 .top-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   max-width: 1240px;
   margin: 0 auto 14px;
   padding: 14px 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel);
-}
-
-.brand-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.brand-name {
-  font-size: 18px;
-  letter-spacing: 0.2px;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.status-badge.online {
-  color: #15562b;
-  background: #d9f3e0;
-}
-
-.status-badge.offline {
-  color: #7a2a2a;
-  background: #f8dede;
 }
 
 .meta-wrap {
@@ -118,6 +86,24 @@
 
 .user-menu {
   position: relative;
+}
+.user-menu.floating {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: 12px;
+  z-index: 80;
+}
+
+.user-menu.floating .kebab-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
+}
+
+.user-menu.floating .user-menu-dropdown {
+  top: calc(100% + 8px);
+  right: 0;
 }
 
 .kebab-button {
@@ -202,10 +188,6 @@
   color: var(--muted);
 }
 
-.dot {
-  color: #bdc4cc;
-}
-
 .chat-layout {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -231,11 +213,10 @@
   min-height: 0;
   position: relative;
 }
-
-.panel-header {
+`n.panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 14px;
   border-bottom: 1px solid var(--line);
 }
@@ -488,8 +469,7 @@
   flex-direction: column;
   gap: 6px;
 }
-
-.participants-row {
+`n.participants-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -673,6 +653,10 @@
 }
 
 @media (max-width: 767px) {
+  .user-menu.floating {
+    top: max(10px, env(safe-area-inset-top));
+    right: 10px;
+  }
   .chat-app {
     padding: 10px;
   }
@@ -722,3 +706,8 @@
     bottom: 72px;
   }
 }
+
+
+
+
+
