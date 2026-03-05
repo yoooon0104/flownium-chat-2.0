@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import './App.css'
 
-const SOCKET_SERVER_URL = 'http://localhost:3010'
+const API_BASE_URL = 'http://localhost:3010'
 
-// JWT payload를 빠르게 확인하기 위한 유틸 함수.
-// 현재 UI에서는 "내 메시지 판별(userId)"과 "닉네임 표시"에 사용한다.
 const parseJwtPayload = (token) => {
   try {
     if (!token) return null
@@ -14,71 +12,94 @@ const parseJwtPayload = (token) => {
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
     const decoded = atob(normalized)
     return JSON.parse(decoded)
-  } catch (_error) {
+  } catch {
     return null
   }
 }
 
+const toTimeLabel = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
 function App() {
   const messagesEndRef = useRef(null)
-  // socket 인스턴스를 상태로 관리하면 이벤트 핸들러/버튼 로직에서 재사용하기 쉽다.
+  const currentRoomRef = useRef('')
+
   const [socket, setSocket] = useState(null)
-  // 연결 상태는 상단 배지, 버튼 활성화, 에러 메시지 해석에 사용한다.
   const [isConnected, setIsConnected] = useState(false)
   const [socketId, setSocketId] = useState('')
-  // 사용자가 입장할 room id 입력값.
-  const [roomIdInput, setRoomIdInput] = useState('room-1')
-  // 서버에서 room_joined를 받은 실제 입장 room id.
-  const [joinedRoomId, setJoinedRoomId] = useState('')
-  // 메시지 입력창 값.
-  const [text, setText] = useState('')
-  // 현재 room 기준 메시지 목록(히스토리 + 실시간 수신 누적).
-  const [messages, setMessages] = useState([])
-  // 소켓 인증/이벤트 관련 일반 에러.
   const [errorMessage, setErrorMessage] = useState('')
-  // 히스토리 API 호출 상태/에러.
+
+  const [rooms, setRooms] = useState([])
+  const [roomsLoading, setRoomsLoading] = useState(false)
+  const [roomNameInput, setRoomNameInput] = useState('')
+
+  const [joinedRoomId, setJoinedRoomId] = useState('')
+  const [messages, setMessages] = useState([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [historyError, setHistoryError] = useState('')
-  // 모바일에서 "방 목록 화면 / 대화 화면" 전환 제어용.
+
+  const [participants, setParticipants] = useState([])
+
+  const [text, setText] = useState('')
   const [isMobileChatView, setIsMobileChatView] = useState(false)
 
-  // 좌측 방 목록에 보여줄 후보 room id를 만든다.
-  // Set을 사용해 중복 room id가 생기지 않도록 보장한다.
-  const roomCandidates = useMemo(() => {
-    const roomSet = new Set()
-    if (joinedRoomId) {
-      roomSet.add(joinedRoomId)
-    }
-    roomSet.add('room-1')
+  const authPayload = useMemo(() => {
+    const token = localStorage.getItem('accessToken')
+    return parseJwtPayload(token)
+  }, [])
 
-    messages.forEach((msg) => {
-      const id = String(msg.chatRoomId || '').trim()
-      if (id) {
-        roomSet.add(id)
-      }
-    })
+  const displayName = useMemo(() => authPayload?.nickname || 'Guest', [authPayload])
+  const currentUserId = useMemo(() => authPayload?.userId || authPayload?.sub || '', [authPayload])
 
-    return Array.from(roomSet)
-  }, [joinedRoomId, messages])
-
-  // 메시지 전송 버튼/엔터 전송 가능 여부.
-  // 소켓 연결 + room 입장 + 입력값 존재 조건을 모두 만족해야 전송할 수 있다.
   const canSend = useMemo(() => {
     return !!socket && !!joinedRoomId && text.trim().length > 0
   }, [socket, joinedRoomId, text])
 
-  // 방 입장 직후 과거 메시지를 가져온다.
-  // 503(DB 미연결)은 기능상 허용 상태라 사용자에게 안내만 띄우고 앱은 계속 동작한다.
-  const loadMessageHistory = async (targetRoomId) => {
+  const getAuthHeaders = useCallback(() => {
+    const token = localStorage.getItem('accessToken')
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  }, [])
+
+  const fetchRooms = useCallback(async () => {
+    try {
+      setRoomsLoading(true)
+      const res = await fetch(`${API_BASE_URL}/api/chatrooms`, {
+        headers: {
+          ...getAuthHeaders(),
+        },
+      })
+
+      if (!res.ok) {
+        throw new Error('failed to load rooms')
+      }
+
+      const data = await res.json()
+      setRooms(Array.isArray(data.rooms) ? data.rooms : [])
+    } catch {
+      setErrorMessage('Failed to load chat rooms.')
+    } finally {
+      setRoomsLoading(false)
+    }
+  }, [getAuthHeaders])
+
+  const loadMessageHistory = useCallback(async (roomId) => {
     try {
       setIsLoadingHistory(true)
       setHistoryError('')
+      setMessages([])
 
-      const res = await fetch(`${SOCKET_SERVER_URL}/api/chatrooms/${targetRoomId}/messages?limit=50`)
+      const res = await fetch(`${API_BASE_URL}/api/chatrooms/${roomId}/messages?limit=50`, {
+        headers: {
+          ...getAuthHeaders(),
+        },
+      })
 
       if (res.status === 503) {
-        setMessages([])
-        setHistoryError('DB 미연결 상태입니다. 실시간 메시지만 사용됩니다.')
+        setHistoryError('Database is not connected.')
         return
       }
 
@@ -88,79 +109,56 @@ function App() {
 
       const data = await res.json()
       setMessages(Array.isArray(data.messages) ? data.messages : [])
-    } catch (_error) {
-      setHistoryError('메시지 히스토리 로드에 실패했습니다.')
+    } catch {
+      setHistoryError('Failed to load message history.')
     } finally {
       setIsLoadingHistory(false)
     }
-  }
+  }, [getAuthHeaders])
 
-  useEffect(() => {
-    // 로컬 저장소 토큰이 있으면 소켓 handshake auth에 포함한다.
-    // 서버의 io.use JWT 검증 로직과 맞물리는 핵심 부분.
-    const token = localStorage.getItem('accessToken')
-    const client = io(SOCKET_SERVER_URL, {
-      auth: token ? { token } : undefined,
-    })
+  const createRoom = useCallback(async () => {
+    const roomName = roomNameInput.trim()
+    if (!roomName) return
 
-    setSocket(client)
-
-    client.on('connect', () => {
-      // 정상 연결 시 상태를 갱신하고 이전 에러를 정리한다.
-      setIsConnected(true)
-      setSocketId(client.id)
+    try {
       setErrorMessage('')
-    })
+      const res = await fetch(`${API_BASE_URL}/api/chatrooms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ name: roomName }),
+      })
 
-    client.on('disconnect', () => {
-      // 연결이 끊기면 room/모바일 뷰 상태를 초기화해 UI 불일치를 방지한다.
-      setIsConnected(false)
-      setSocketId('')
-      setJoinedRoomId('')
-      setIsMobileChatView(false)
-    })
+      if (!res.ok) {
+        throw new Error('failed to create room')
+      }
 
-    client.on('connect_error', (error) => {
-      // JWT 미설정/만료/서버 비밀키 문제는 connect_error로 들어온다.
-      setErrorMessage(error?.message || '소켓 인증에 실패했습니다.')
-    })
+      const data = await res.json()
+      const createdRoomId = data?.room?.id
 
-    client.on('room_joined', (payload) => {
-      // 방 입장이 확인되면 상세 화면으로 전환하고 히스토리를 로드한다.
-      setJoinedRoomId(payload.roomId)
-      setIsMobileChatView(true)
-      void loadMessageHistory(payload.roomId)
-    })
+      setRoomNameInput('')
+      await fetchRooms()
 
-    client.on('receive_message', (payload) => {
-      setMessages((prev) => [...prev, payload])
-    })
-
-    client.on('error', (payload) => {
-      // 커스텀 이벤트 에러(roomId 누락 등) 표시.
-      setErrorMessage(payload?.message || '알 수 없는 소켓 오류')
-    })
-
-    // 컴포넌트 해제 시 연결을 반드시 정리해 중복 소켓/리스너 누수를 막는다.
-    return () => {
-      client.disconnect()
+      if (createdRoomId && socket) {
+        socket.emit('join_room', { roomId: createdRoomId })
+      }
+    } catch {
+      setErrorMessage('Failed to create chat room.')
     }
-  }, [])
+  }, [fetchRooms, getAuthHeaders, roomNameInput, socket])
 
-  // 방 입장 요청.
-  // 입력값 공백을 방지하고, 유효할 때만 join_room 이벤트를 보낸다.
-  const handleJoinRoom = () => {
-    if (!socket) return
-    const nextRoomId = roomIdInput.trim()
-    if (!nextRoomId) return
+  const joinRoom = useCallback((roomId) => {
+    if (!socket || !roomId) return
 
     setErrorMessage('')
-    socket.emit('join_room', { roomId: nextRoomId })
-  }
+    setParticipants([])
+    currentRoomRef.current = roomId
+    socket.emit('join_room', { roomId })
+  }, [socket])
 
-  // 메시지 전송 요청.
-  // 서버 저장/브로드캐스트는 send_message 이벤트에서 처리된다.
-  const handleSendMessage = () => {
+  const handleSendMessage = useCallback(() => {
     if (!canSend) return
 
     socket.emit('send_message', {
@@ -169,36 +167,82 @@ function App() {
       type: 'text',
     })
     setText('')
-  }
+  }, [canSend, joinedRoomId, socket, text])
 
-  // 요구사항: Enter key up 시 전송.
-  // keydown이 아닌 keyup으로 처리해 사용자의 요청 동작과 정확히 맞춘다.
-  const handleComposerKeyUp = (event) => {
+  const handleComposerKeyUp = useCallback((event) => {
     if (event.key === 'Enter') {
       handleSendMessage()
     }
-  }
+  }, [handleSendMessage])
 
-  // JWT payload에서 닉네임/사용자 식별자를 계산한다.
-  // 내 메시지 말풍선 정렬 판별(isMine)에 사용된다.
-  const authPayload = useMemo(() => {
+  useEffect(() => {
+    currentRoomRef.current = joinedRoomId
+  }, [joinedRoomId])
+
+  useEffect(() => {
     const token = localStorage.getItem('accessToken')
-    return parseJwtPayload(token)
-  }, [])
+    const client = io(API_BASE_URL, {
+      auth: token ? { token } : undefined,
+    })
 
-  const displayName = useMemo(() => {
-    return authPayload?.nickname || '게스트'
-  }, [authPayload])
+    setSocket(client)
 
-  const currentUserId = useMemo(() => {
-    return authPayload?.userId || authPayload?.sub || ''
-  }, [authPayload])
+    client.on('connect', () => {
+      setIsConnected(true)
+      setSocketId(client.id)
+      setErrorMessage('')
+      void fetchRooms()
+    })
 
-  // 메시지 목록이 갱신되면 마지막 메시지로 자동 스크롤한다.
+    client.on('disconnect', () => {
+      setIsConnected(false)
+      setSocketId('')
+      setParticipants([])
+      setIsMobileChatView(false)
+    })
+
+    client.on('connect_error', (error) => {
+      setErrorMessage(error?.message || 'Socket connection failed.')
+    })
+
+    client.on('room_joined', (payload) => {
+      const nextRoomId = String(payload?.roomId || '').trim()
+      if (!nextRoomId) return
+
+      setJoinedRoomId(nextRoomId)
+      setIsMobileChatView(true)
+      void loadMessageHistory(nextRoomId)
+      void fetchRooms()
+    })
+
+    client.on('room_participants', (payload) => {
+      if (String(payload?.roomId || '') !== currentRoomRef.current) return
+      setParticipants(Array.isArray(payload?.participants) ? payload.participants : [])
+    })
+
+    client.on('receive_message', (payload) => {
+      if (payload?.chatRoomId !== currentRoomRef.current) return
+      setMessages((prev) => [...prev, payload])
+      void fetchRooms()
+    })
+
+    client.on('error', (payload) => {
+      setErrorMessage(payload?.message || 'Unknown socket error')
+    })
+
+    return () => {
+      client.disconnect()
+    }
+  }, [fetchRooms, loadMessageHistory])
+
   useEffect(() => {
     if (!messagesEndRef.current) return
     messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, joinedRoomId, isLoadingHistory])
+
+  const activeRoom = useMemo(() => {
+    return rooms.find((room) => room.id === joinedRoomId) || null
+  }, [rooms, joinedRoomId])
 
   return (
     <main className="chat-app">
@@ -219,45 +263,40 @@ function App() {
       <section className="chat-layout">
         <aside className={`room-panel ${isMobileChatView ? 'mobile-hidden' : ''}`}>
           <div className="panel-header">
-            <h2>채팅</h2>
-            <button type="button" className="ghost-button" disabled>
-              새 채팅
-            </button>
+            <h2>Rooms</h2>
           </div>
 
-          <div className="join-form">
+          <div className="create-form">
             <input
-              value={roomIdInput}
-              onChange={(e) => setRoomIdInput(e.target.value)}
-              placeholder="room id 입력"
+              value={roomNameInput}
+              onChange={(e) => setRoomNameInput(e.target.value)}
+              onKeyUp={(e) => e.key === 'Enter' && createRoom()}
+              placeholder="New group room name"
             />
-            <button type="button" onClick={handleJoinRoom} disabled={!isConnected || !roomIdInput.trim()}>
-              입장
+            <button type="button" onClick={createRoom} disabled={!roomNameInput.trim()}>
+              Create
             </button>
           </div>
 
           <ul className="room-list">
-            {roomCandidates.map((room) => {
-              const isActive = room === joinedRoomId
+            {roomsLoading && <li className="state-item">Loading rooms...</li>}
+            {!roomsLoading && rooms.length === 0 && <li className="state-item">No rooms yet.</li>}
+
+            {rooms.map((room) => {
+              const isActive = room.id === joinedRoomId
               return (
-                <li key={room}>
+                <li key={room.id}>
                   <button
                     type="button"
                     className={`room-item ${isActive ? 'active' : ''}`}
-                    onClick={() => {
-                      setRoomIdInput(room)
-                      if (room !== joinedRoomId) {
-                        socket?.emit('join_room', { roomId: room })
-                      } else {
-                        setIsMobileChatView(true)
-                      }
-                    }}
+                    onClick={() => joinRoom(room.id)}
                   >
-                    <span className="avatar">{room.slice(0, 2).toUpperCase()}</span>
+                    <span className="avatar">{room.name.slice(0, 2).toUpperCase()}</span>
                     <span className="room-main">
-                      <strong>{room}</strong>
-                      <small>{isActive ? '현재 입장 중' : '입장 가능'}</small>
+                      <strong>{room.name}</strong>
+                      <small>{room.lastMessage || 'No messages yet'}</small>
                     </span>
+                    <span className="room-time">{toTimeLabel(room.lastMessageAt)}</span>
                   </button>
                 </li>
               )
@@ -272,21 +311,33 @@ function App() {
               className="back-button"
               onClick={() => setIsMobileChatView(false)}
             >
-              목록
+              Rooms
             </button>
-            <div>
-              <h3>{joinedRoomId || '방을 선택하세요'}</h3>
-              <p>{joinedRoomId ? '대화 중' : '좌측에서 방을 선택하거나 입장하세요'}</p>
+
+            <div className="chat-header-main">
+              <h3>{activeRoom?.name || 'Select a room'}</h3>
+              <p>{joinedRoomId ? `Room ID: ${joinedRoomId}` : 'Choose a room from left panel.'}</p>
+            </div>
+
+            <div className="participant-list">
+              {participants.map((participant) => {
+                const isMe = participant.userId === currentUserId
+                return (
+                  <span key={participant.userId} className={`participant-chip ${participant.online ? 'online' : 'offline'}`}>
+                    {participant.nickname}{isMe ? ' (me)' : ''}
+                  </span>
+                )
+              })}
             </div>
           </div>
 
           <div className="message-area">
             {errorMessage && <p className="error-text">Error: {errorMessage}</p>}
-            {isLoadingHistory && <p className="muted-text">히스토리 불러오는 중...</p>}
+            {isLoadingHistory && <p className="muted-text">Loading history...</p>}
             {historyError && <p className="warn-text">{historyError}</p>}
 
             {messages.length === 0 ? (
-              <p className="muted-text">아직 수신된 메시지가 없습니다.</p>
+              <p className="muted-text">No messages.</p>
             ) : (
               <ul className="message-list">
                 {messages.map((msg, idx) => {
@@ -309,11 +360,11 @@ function App() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyUp={handleComposerKeyUp}
-              placeholder={joinedRoomId ? '메시지를 입력하세요' : '먼저 방에 입장하세요'}
+              placeholder={joinedRoomId ? 'Type a message' : 'Join a room first'}
               disabled={!joinedRoomId}
             />
             <button type="button" onClick={handleSendMessage} disabled={!canSend}>
-              전송
+              Send
             </button>
           </div>
         </section>
