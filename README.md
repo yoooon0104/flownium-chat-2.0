@@ -70,8 +70,9 @@ KAKAO_REDIRECT_URI=http://localhost:5173
 KAKAO_CLIENT_SECRET=
 ```
 
-프론트 환경변수는 .env.example을 복사해 .env로 사용하세요.
+프론트 환경변수는 `.env.example`을 복사해 `.env`로 사용하세요.
 
+배포 전에는 `docs/operations/deploy-runbook.md`의 Redirect URI 체크리스트를 먼저 확인하세요.
 ## 로컬 실행
 
 1. 루트 의존성 설치
@@ -135,9 +136,4 @@ npm run dev
 - [문서 인덱스](docs/README.md)
 - [배포 런북](docs/operations/deploy-runbook.md)
 - [운영 로그 기준](docs/operations/ops-log-policy.md)
-
-
-
-
-
 

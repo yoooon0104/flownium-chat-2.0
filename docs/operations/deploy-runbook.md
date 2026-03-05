@@ -53,7 +53,21 @@
   - `scripts/test-error-code.ps1`
   - `scripts/test-auth-me.ps1`
 
-## 4) 배포 절차
+## 4) Redirect URI 최종 검증 (필수)
+
+1. 환경변수 일치
+- 프론트 `VITE_KAKAO_REDIRECT_URI`
+- 서버 `KAKAO_REDIRECT_URI`
+- 카카오 콘솔 Redirect URI
+
+2. 기대 결과
+- 세 값이 완전히 동일해야 함(프로토콜/도메인/포트 포함)
+
+3. 실패 증상
+- 카카오 로그인 후 callback 오류
+- `KAKAO_LOGIN_FAILED` 또는 인증 화면 재진입 반복
+
+## 5) 배포 절차
 
 1. Render(백엔드) 배포
 - 환경변수 주입 확인
@@ -66,7 +80,7 @@
 3. 카카오 최종 검증
 - 운영 Redirect URI와 앱 도메인 일치 확인
 
-## 5) 배포 후 검증
+## 6) 배포 후 검증
 
 1. API
 - `GET /api/health` -> 200
@@ -80,14 +94,28 @@
 - CORS 에러 없음
 - 인증 에러 표준(`error.code`) 출력 확인
 
-## 6) 롤백 절차
+## 7) 롤백 절차
 
 1. Vercel: 이전 배포 버전으로 즉시 롤백
 2. Render: 이전 배포 버전으로 즉시 롤백
 3. 장애 기록 작성
 - `docs/operations/ops-log-policy.md` 기준으로 이슈 기록
 
-## 7) 릴리즈 기록 규칙
+## 8) 배포 실행 기록 템플릿
+
+```md
+### Deploy Record
+- 일시:
+- 환경(Prod/Local):
+- 프론트 도메인:
+- 백엔드 도메인:
+- 반영 브랜치/커밋:
+- 체크리스트 결과:
+- Redirect URI 검증 결과:
+- 이슈/대응:
+```
+
+## 9) 릴리즈 기록 규칙
 
 - 배포 완료 시 `docs/releases/` 또는 Notion `CHANGELOG_DB`에 아래를 기록한다.
 1. 배포 시각
