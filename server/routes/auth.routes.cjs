@@ -12,6 +12,7 @@ const {
   exchangeKakaoAccessToken,
   fetchKakaoUserProfile,
 } = require('../services/kakao.service.cjs');
+const { sendError } = require('../utils/error-response.cjs');
 
 // 인증 관련 라우터를 의존성 주입 방식으로 생성한다.
 const createAuthRouter = ({ User, assertDbConnected, config, logger = console }) => {
@@ -49,17 +50,17 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
     const code = String(req.query.code || '').trim();
 
     if (!code) {
-      res.status(400).json({ error: 'code is required' });
+      sendError(res, 400, 'INVALID_REQUEST', 'code is required');
       return;
     }
 
     if (!config.KAKAO_REST_API_KEY || !config.KAKAO_REDIRECT_URI) {
-      res.status(500).json({ error: 'kakao oauth config is missing' });
+      sendError(res, 500, 'SERVER_MISCONFIGURED', 'kakao oauth config is missing');
       return;
     }
 
     if (!config.JWT_SIGNUP_SECRET) {
-      res.status(500).json({ error: 'signup auth config is missing' });
+      sendError(res, 500, 'SERVER_MISCONFIGURED', 'signup auth config is missing');
       return;
     }
 
@@ -112,7 +113,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
         status: error.status || null,
         body: error.body || null,
       });
-      res.status(502).json({ error: 'failed to complete kakao login' });
+      sendError(res, 502, 'KAKAO_LOGIN_FAILED', 'failed to complete kakao login');
     }
   });
 
@@ -122,12 +123,12 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
     const agreedToTerms = req.body?.agreedToTerms === true;
 
     if (!signupToken) {
-      res.status(400).json({ error: 'signupToken is required' });
+      sendError(res, 400, 'INVALID_REQUEST', 'signupToken is required');
       return;
     }
 
     if (!agreedToTerms) {
-      res.status(400).json({ error: 'agreedToTerms must be true' });
+      sendError(res, 400, 'TERMS_NOT_AGREED', 'agreedToTerms must be true');
       return;
     }
 
@@ -163,11 +164,11 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
     } catch (error) {
       const message = String(error.message || '').toLowerCase();
       if (message.includes('nickname must be between')) {
-        res.status(400).json({ error: 'nickname must be between 2 and 20 characters' });
+        sendError(res, 400, 'INVALID_NICKNAME', 'nickname must be between 2 and 20 characters');
         return;
       }
 
-      res.status(401).json({ error: 'invalid signup token' });
+      sendError(res, 401, 'INVALID_SIGNUP_TOKEN', 'invalid signup token');
     }
   });
 
@@ -176,7 +177,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
     const refreshToken = String(req.body?.refreshToken || '').trim();
 
     if (!refreshToken) {
-      res.status(400).json({ error: 'refreshToken is required' });
+      sendError(res, 400, 'INVALID_REQUEST', 'refreshToken is required');
       return;
     }
 
@@ -190,13 +191,13 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
       const user = await User.findOne({ _id: userId, refreshTokenHash });
 
       if (!user) {
-        res.status(401).json({ error: 'refresh token is not recognized' });
+        sendError(res, 401, 'INVALID_REFRESH_TOKEN', 'refresh token is not recognized');
         return;
       }
 
       await respondLoginSuccess(res, user);
     } catch (_error) {
-      res.status(401).json({ error: 'invalid refresh token' });
+      sendError(res, 401, 'INVALID_REFRESH_TOKEN', 'invalid refresh token');
     }
   });
 
@@ -204,7 +205,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
   router.patch('/profile', async (req, res) => {
     const accessToken = extractBearerToken(req);
     if (!accessToken) {
-      res.status(401).json({ error: 'unauthorized' });
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
       return;
     }
 
@@ -218,7 +219,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
 
       const user = await User.findById(auth.userId);
       if (!user) {
-        res.status(404).json({ error: 'user not found' });
+        sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
         return;
       }
 
@@ -230,11 +231,11 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
     } catch (error) {
       const message = String(error.message || '').toLowerCase();
       if (message.includes('nickname must be between')) {
-        res.status(400).json({ error: 'nickname must be between 2 and 20 characters' });
+        sendError(res, 400, 'INVALID_NICKNAME', 'nickname must be between 2 and 20 characters');
         return;
       }
 
-      res.status(401).json({ error: 'unauthorized' });
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
     }
   });
 

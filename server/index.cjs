@@ -11,6 +11,7 @@ const ChatRoom = require('./models/chatroom.model.cjs');
 const createAuthRouter = require('./routes/auth.routes.cjs');
 const createChatroomRouter = require('./routes/chatroom.routes.cjs');
 const { verifyAccessToken } = require('./services/auth.service.cjs');
+const { sendError } = require('./utils/error-response.cjs');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -41,7 +42,7 @@ const roomPresence = new Map();
 
 const assertDbConnected = (res) => {
   if (mongoose.connection.readyState !== 1) {
-    res.status(503).json({ error: 'database is not connected' });
+    sendError(res, 503, 'DB_NOT_CONNECTED', 'database is not connected');
     return false;
   }
   return true;
@@ -65,20 +66,28 @@ const requireAuth = (req, res, next) => {
   try {
     const token = extractBearerToken(req);
     if (!token) {
-      res.status(401).json({ error: 'unauthorized' });
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
       return;
     }
 
     if (!JWT_SECRET) {
-      res.status(500).json({ error: 'server auth misconfigured' });
+      sendError(res, 500, 'SERVER_MISCONFIGURED', 'server auth misconfigured');
       return;
     }
 
     req.user = verifyAccessToken(token, JWT_SECRET);
     next();
   } catch (_error) {
-    res.status(401).json({ error: 'unauthorized' });
+    sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
   }
+};
+
+const emitSocketError = (socket, code, message, details) => {
+  const payload = { code, message };
+  if (typeof details !== 'undefined') {
+    payload.details = details;
+  }
+  socket.emit('error', payload);
 };
 
 const addPresence = (roomId, userId, socketId) => {
@@ -248,19 +257,19 @@ io.on('connection', (socket) => {
     const roomId = String(payload.roomId || '').trim();
 
     if (!roomId) {
-      socket.emit('error', { message: 'roomId is required' });
+      emitSocketError(socket, 'INVALID_REQUEST', 'roomId is required');
       return;
     }
 
     if (mongoose.connection.readyState !== 1) {
-      socket.emit('error', { message: 'database is not connected' });
+      emitSocketError(socket, 'DB_NOT_CONNECTED', 'database is not connected');
       return;
     }
 
     try {
       const room = await ChatRoom.findById(roomId);
       if (!room) {
-        socket.emit('error', { message: 'chatroom not found' });
+        emitSocketError(socket, 'ROOM_NOT_FOUND', 'chatroom not found');
         return;
       }
 
@@ -279,7 +288,7 @@ io.on('connection', (socket) => {
 
       await emitRoomParticipants(roomId);
     } catch (_error) {
-      socket.emit('error', { message: 'failed to join room' });
+      emitSocketError(socket, 'ROOM_JOIN_FAILED', 'failed to join room');
     }
   });
 
@@ -290,24 +299,24 @@ io.on('connection', (socket) => {
     const type = payload.type === 'system' ? 'system' : 'text';
 
     if (!roomId || !text) {
-      socket.emit('error', { message: 'roomId and text are required' });
+      emitSocketError(socket, 'INVALID_REQUEST', 'roomId and text are required');
       return;
     }
 
     if (mongoose.connection.readyState !== 1) {
-      socket.emit('error', { message: 'database is not connected' });
+      emitSocketError(socket, 'DB_NOT_CONNECTED', 'database is not connected');
       return;
     }
 
     try {
       const room = await ChatRoom.findById(roomId);
       if (!room) {
-        socket.emit('error', { message: 'chatroom not found' });
+        emitSocketError(socket, 'ROOM_NOT_FOUND', 'chatroom not found');
         return;
       }
 
       if (!room.memberIds.includes(socket.user.userId)) {
-        socket.emit('error', { message: 'forbidden' });
+        emitSocketError(socket, 'FORBIDDEN', 'forbidden');
         return;
       }
 
@@ -333,7 +342,7 @@ io.on('connection', (socket) => {
         timestamp: new Date(message.timestamp).toISOString(),
       });
     } catch (_error) {
-      socket.emit('error', { message: 'failed to process message' });
+      emitSocketError(socket, 'MESSAGE_PROCESS_FAILED', 'failed to process message');
     }
   });
 
@@ -376,4 +385,3 @@ start().catch((error) => {
   console.error('Failed to start server:', error.message);
   process.exit(1);
 });
-

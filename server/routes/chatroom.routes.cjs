@@ -1,4 +1,5 @@
 ﻿const express = require('express');
+const { sendError } = require('../utils/error-response.cjs');
 
 // ChatRoom REST API를 생성한다. 인증/DB 체크는 상위에서 주입받는다.
 const createChatroomRouter = ({ ChatRoom, Message, requireAuth, assertDbConnected }) => {
@@ -18,7 +19,7 @@ const createChatroomRouter = ({ ChatRoom, Message, requireAuth, assertDbConnecte
     const name = String(req.body?.name || '').trim();
 
     if (!name) {
-      res.status(400).json({ error: 'name is required' });
+      sendError(res, 400, 'INVALID_REQUEST', 'name is required');
       return;
     }
 
@@ -35,7 +36,7 @@ const createChatroomRouter = ({ ChatRoom, Message, requireAuth, assertDbConnecte
 
       res.status(201).json({ room: toRoomResponse(room) });
     } catch (error) {
-      res.status(500).json({ error: error.message || 'failed to create chatroom' });
+      sendError(res, 500, 'CHATROOM_CREATE_FAILED', error.message || 'failed to create chatroom');
     }
   });
 
@@ -52,7 +53,7 @@ const createChatroomRouter = ({ ChatRoom, Message, requireAuth, assertDbConnecte
 
       res.status(200).json({ rooms: rooms.map(toRoomResponse) });
     } catch (_error) {
-      res.status(500).json({ error: 'failed to fetch chatrooms' });
+      sendError(res, 500, 'CHATROOM_FETCH_FAILED', 'failed to fetch chatrooms');
     }
   });
 
@@ -62,7 +63,7 @@ const createChatroomRouter = ({ ChatRoom, Message, requireAuth, assertDbConnecte
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
 
     if (!roomId) {
-      res.status(400).json({ error: 'roomId is required' });
+      sendError(res, 400, 'INVALID_REQUEST', 'roomId is required');
       return;
     }
 
@@ -73,12 +74,12 @@ const createChatroomRouter = ({ ChatRoom, Message, requireAuth, assertDbConnecte
     try {
       const room = await ChatRoom.findById(roomId).lean();
       if (!room) {
-        res.status(404).json({ error: 'chatroom not found' });
+        sendError(res, 404, 'ROOM_NOT_FOUND', 'chatroom not found');
         return;
       }
 
       if (!room.memberIds.includes(req.user.userId)) {
-        res.status(403).json({ error: 'forbidden' });
+        sendError(res, 403, 'FORBIDDEN', 'forbidden');
         return;
       }
 
@@ -93,7 +94,7 @@ const createChatroomRouter = ({ ChatRoom, Message, requireAuth, assertDbConnecte
         messages: messages.reverse(),
       });
     } catch (_error) {
-      res.status(500).json({ error: 'failed to fetch messages' });
+      sendError(res, 500, 'MESSAGE_FETCH_FAILED', 'failed to fetch messages');
     }
   });
 

@@ -1,5 +1,11 @@
 ﻿import { useCallback, useMemo, useState } from 'react'
 
+const resolveErrorMessage = (body, fallback) => {
+  if (body?.error?.message) return String(body.error.message)
+  if (typeof body?.error === 'string') return body.error
+  return fallback
+}
+
 // 방 목록 조회/검색/생성 책임을 하나의 훅으로 분리한다.
 export const useChatRooms = ({ chatApi }) => {
   const [rooms, setRooms] = useState([])
@@ -13,7 +19,7 @@ export const useChatRooms = ({ chatApi }) => {
     setRoomsLoading(true)
     const { ok, body } = await chatApi.getRooms()
     if (!ok) {
-      setErrorMessage('채팅방 목록을 불러오지 못했습니다.')
+      setErrorMessage(resolveErrorMessage(body, '채팅방 목록을 불러오지 못했습니다.'))
       setRoomsLoading(false)
       return
     }
@@ -28,7 +34,7 @@ export const useChatRooms = ({ chatApi }) => {
 
     const { ok, body } = await chatApi.createRoom(normalized)
     if (!ok) {
-      setErrorMessage(body?.error || 'Failed to create chat room.')
+      setErrorMessage(resolveErrorMessage(body, 'Failed to create chat room.'))
       return { ok: false, roomId: '' }
     }
 

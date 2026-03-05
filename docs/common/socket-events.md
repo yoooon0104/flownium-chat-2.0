@@ -81,8 +81,15 @@
 ```
 
 ### error
+MVP2-A 1차 표준:
+
 ```json
 {
-  "message": "string"
+  "code": "ROOM_NOT_FOUND",
+  "message": "chatroom not found",
+  "details": {}
 }
 ```
+
+- `details`는 선택 필드입니다.
+- 주요 코드: `INVALID_REQUEST`, `DB_NOT_CONNECTED`, `ROOM_NOT_FOUND`, `FORBIDDEN`, `ROOM_JOIN_FAILED`, `MESSAGE_PROCESS_FAILED`

@@ -85,7 +85,9 @@ export const useChatSocket = ({
     })
 
     client.on('error', (payload) => {
-      onError?.(payload?.message || 'Unknown socket error')
+      const code = String(payload?.code || '').trim()
+      const message = String(payload?.message || 'Unknown socket error')
+      onError?.(code ? `${message} (${code})` : message)
     })
 
     return () => {

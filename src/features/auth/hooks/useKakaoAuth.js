@@ -6,6 +6,12 @@ import { createAuthApi } from '../../../services/api/authApi'
 const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_REST_API_KEY || import.meta.env.VITE_KAKAO_CLIENT_ID || ''
 const KAKAO_REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI || `${window.location.origin}`
 
+const resolveErrorMessage = (body, fallback) => {
+  if (body?.error?.message) return String(body.error.message)
+  if (typeof body?.error === 'string') return body.error
+  return fallback
+}
+
 // 인증 상태와 온보딩 분기를 훅으로 묶어 AppShell이 화면 조합에만 집중하도록 만든다.
 export const useKakaoAuth = (apiBaseUrl) => {
   const callbackHandledRef = useRef(false)
@@ -70,7 +76,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
   const completeSignup = useCallback(async (payload) => {
     const { ok, body } = await authApi.completeSignup(payload)
     if (!ok || !body?.accessToken || !body?.refreshToken) {
-      const message = body?.error || '회원가입 처리에 실패했습니다.'
+      const message = resolveErrorMessage(body, '회원가입 처리에 실패했습니다.')
       setError(message)
       throw new Error(message)
     }
@@ -104,7 +110,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
       }
     }
 
-    throw new Error(first.body?.error || '프로필 업데이트에 실패했습니다.')
+    throw new Error(resolveErrorMessage(first.body, '프로필 업데이트에 실패했습니다.'))
   }, [accessToken, authApi, refreshAccessToken])
 
   const startKakaoLogin = useCallback(() => {
@@ -133,7 +139,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
         setError('')
         const { ok, body } = await authApi.getKakaoCallback(code)
         if (!ok || !body) {
-          throw new Error(body?.error || '카카오 로그인 처리에 실패했습니다.')
+          throw new Error(resolveErrorMessage(body, '카카오 로그인 처리에 실패했습니다.'))
         }
 
         // 가입 완료 사용자는 즉시 세션을 저장하고 채팅 화면으로 이동한다.
