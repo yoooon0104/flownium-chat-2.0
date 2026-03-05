@@ -15,9 +15,10 @@
 - [x] 인증 온보딩 분기 도입 (`LOGIN_SUCCESS` / `SIGNUP_REQUIRED`)
 - [x] `POST /auth/signup/complete` 구현
 - [x] `PATCH /auth/profile` 닉네임 변경 API 구현
-- [x] 우측 상단 점3개 사용자 메뉴 구현 (`내 정보`/`설정`/`로그아웃`)
+- [x] 우측 상단 플로팅 사용자 메뉴 구현 (`내 정보`/`설정`/`로그아웃`)
 - [x] 프론트 구조 분리 (`app/features/domain/services`)
 - [x] 채팅 REST 라우트 분리 (`routes/chatroom.routes.cjs`)
+- [x] 서버 시작 시 레거시 `roomKey_1` 인덱스 자동 정리 로직 적용
 
 ## 2) 진행 중
 
@@ -26,14 +27,15 @@
 
 ## 3) 다음 작업
 
+- [ ] 배포 환경 전환(프론트/백엔드/DB)
+- [ ] 프론트 `API_BASE_URL` 환경변수 전환 (`VITE_API_BASE_URL`)
 - [ ] 프로필 이미지 편집(업로드/URL 변경) 기능
 - [ ] 관리자 권한/초대/강퇴 정책 설계
 - [ ] `leave_room` 이벤트 및 REST API 설계
-- [ ] 메시지 커서 기반 페이지네이션
-- [ ] 에러 코드 표준화 (`error.code`)
 
 ## 4) 백로그
 
+- [ ] 메시지 커서 기반 페이지네이션
+- [ ] 에러 코드 표준화 (`error.code`)
 - [ ] E2E 테스트 스크립트 구축
-- [ ] 배포 체크리스트 고도화
 - [ ] 메시지 암호화 전략 확정 및 적용 계획
