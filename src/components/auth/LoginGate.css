@@ -1,0 +1,48 @@
+﻿.auth-gate {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 10% 10%, #fff8cc 0%, transparent 28%),
+    radial-gradient(circle at 95% 0%, #f7f8fb 0%, transparent 25%),
+    #f2f3f6;
+}
+
+.auth-card {
+  width: min(92vw, 380px);
+  border: 1px solid #e4e7ec;
+  border-radius: 16px;
+  background: #fff;
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.auth-card p {
+  margin: 0;
+  font-size: 14px;
+  color: #68727d;
+}
+
+.auth-error {
+  color: #d63c4c;
+}
+
+.kakao-login-button {
+  height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: #f8dc3d;
+  color: #2f2b00;
+  font-weight: 700;
+}
+
+.kakao-login-button:hover {
+  background: #e5c800;
+}

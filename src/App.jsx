@@ -1,5 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
+import LoginGate from './components/auth/LoginGate.jsx'
+import { useKakaoAuth } from './hooks/useKakaoAuth.js'
 import './App.css'
 
 // 로컬 개발 기준 API/Socket 엔드포인트.
@@ -19,6 +21,15 @@ const parseJwtPayload = (token) => {
   }
 }
 
+// JSON 파싱 실패를 null로 처리해 호출부 예외 분기를 단순화한다.
+const parseJsonSafe = async (response) => {
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
 // 방 목록 우측의 마지막 메시지 시간을 시:분 형식으로 표기한다.
 const toTimeLabel = (value) => {
   if (!value) return ''
@@ -31,6 +42,18 @@ function App() {
   const messagesEndRef = useRef(null)
   const currentRoomRef = useRef('')
   const participantsMenuRef = useRef(null)
+  const socketRef = useRef(null)
+
+  const {
+    accessToken,
+    authUser,
+    authError,
+    isAuthInitializing,
+    refreshAccessToken,
+    fetchWithAuth,
+    startKakaoLogin,
+    clearAuthSession,
+  } = useKakaoAuth(API_BASE_URL)
 
   const [socket, setSocket] = useState(null)
   const [isConnected, setIsConnected] = useState(false)
@@ -55,13 +78,15 @@ function App() {
   const [text, setText] = useState('')
   const [isMobileChatView, setIsMobileChatView] = useState(false)
 
-  const authPayload = useMemo(() => {
-    const token = localStorage.getItem('accessToken')
-    return parseJwtPayload(token)
-  }, [])
+  const authPayload = useMemo(() => parseJwtPayload(accessToken), [accessToken])
 
-  const displayName = useMemo(() => authPayload?.nickname || 'Guest', [authPayload])
-  const currentUserId = useMemo(() => authPayload?.userId || authPayload?.sub || '', [authPayload])
+  const displayName = useMemo(() => {
+    return authUser?.nickname || authPayload?.nickname || '게스트'
+  }, [authPayload, authUser])
+
+  const currentUserId = useMemo(() => {
+    return authUser?.id || authPayload?.userId || authPayload?.sub || ''
+  }, [authPayload, authUser])
 
   const canSend = useMemo(() => {
     return !!socket && !!joinedRoomId && text.trim().length > 0
@@ -79,47 +104,37 @@ function App() {
     })
   }, [rooms, searchKeyword])
 
-  // 로컬 스토리지 accessToken을 REST Authorization 헤더에 붙이는 헬퍼.
-  const getAuthHeaders = useCallback(() => {
-    const token = localStorage.getItem('accessToken')
-    return token ? { Authorization: `Bearer ${token}` } : {}
-  }, [])
-
   // 현재 사용자 기준 참여 방 목록을 가져온다.
   const fetchRooms = useCallback(async () => {
+    if (!accessToken) return
+
     try {
       setRoomsLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/chatrooms`, {
-        headers: {
-          ...getAuthHeaders(),
-        },
-      })
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/chatrooms`)
 
       if (!res.ok) {
         throw new Error('failed to load rooms')
       }
 
-      const data = await res.json()
-      setRooms(Array.isArray(data.rooms) ? data.rooms : [])
+      const data = await parseJsonSafe(res)
+      setRooms(Array.isArray(data?.rooms) ? data.rooms : [])
     } catch {
-      setErrorMessage('Failed to load chat rooms.')
+      setErrorMessage('채팅방 목록을 불러오지 못했습니다.')
     } finally {
       setRoomsLoading(false)
     }
-  }, [getAuthHeaders])
+  }, [accessToken, fetchWithAuth])
 
   // 방 입장 시 최근 메시지 히스토리를 불러온다.
   const loadMessageHistory = useCallback(async (roomId) => {
+    if (!accessToken) return
+
     try {
       setIsLoadingHistory(true)
       setHistoryError('')
       setMessages([])
 
-      const res = await fetch(`${API_BASE_URL}/api/chatrooms/${roomId}/messages?limit=50`, {
-        headers: {
-          ...getAuthHeaders(),
-        },
-      })
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/chatrooms/${roomId}/messages?limit=50`)
 
       if (res.status === 503) {
         setHistoryError('Database is not connected.')
@@ -130,14 +145,14 @@ function App() {
         throw new Error('failed to load history')
       }
 
-      const data = await res.json()
-      setMessages(Array.isArray(data.messages) ? data.messages : [])
+      const data = await parseJsonSafe(res)
+      setMessages(Array.isArray(data?.messages) ? data.messages : [])
     } catch {
       setHistoryError('Failed to load message history.')
     } finally {
       setIsLoadingHistory(false)
     }
-  }, [getAuthHeaders])
+  }, [accessToken, fetchWithAuth])
 
   // 방 생성 API 호출 성공 시 목록 갱신 + 자동 입장을 수행한다.
   const createRoom = useCallback(async (roomName) => {
@@ -146,11 +161,10 @@ function App() {
 
     try {
       setErrorMessage('')
-      const res = await fetch(`${API_BASE_URL}/api/chatrooms`, {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/chatrooms`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeaders(),
         },
         body: JSON.stringify({ name: normalizedRoomName }),
       })
@@ -159,7 +173,7 @@ function App() {
         throw new Error('failed to create room')
       }
 
-      const data = await res.json()
+      const data = await parseJsonSafe(res)
       const createdRoomId = data?.room?.id
 
       await fetchRooms()
@@ -173,7 +187,7 @@ function App() {
       setErrorMessage('Failed to create chat room.')
       return false
     }
-  }, [fetchRooms, getAuthHeaders, socket])
+  }, [fetchRooms, fetchWithAuth, socket])
 
   // FAB -> 모달 -> 생성 확인 버튼 흐름으로 방을 추가한다.
   const handleCreateRoomSubmit = useCallback(async () => {
@@ -183,6 +197,28 @@ function App() {
     setIsCreateRoomModalOpen(false)
     setNewRoomName('')
   }, [createRoom, newRoomName])
+
+  const handleLogout = useCallback(() => {
+    // 최신 소켓 인스턴스를 ref로 참조해 로그아웃 시점의 stale state 문제를 피한다.
+    if (socketRef.current) {
+      socketRef.current.disconnect()
+      socketRef.current = null
+      setSocket(null)
+    }
+
+    clearAuthSession('')
+    setRooms([])
+    setMessages([])
+    setParticipants([])
+    setJoinedRoomId('')
+    setSocketId('')
+    setIsConnected(false)
+    setIsParticipantsMenuOpen(false)
+    setIsCreateRoomModalOpen(false)
+    setIsMobileChatView(false)
+    setErrorMessage('')
+    setHistoryError('')
+  }, [clearAuthSession])
 
   // 사용자가 목록에서 방을 클릭했을 때 서버에 입장 이벤트를 보낸다.
   const joinRoom = useCallback((roomId) => {
@@ -252,12 +288,15 @@ function App() {
   }, [isCreateRoomModalOpen])
 
   useEffect(() => {
-    // 소켓 연결/이벤트 바인딩은 앱 생명주기 동안 1회만 유지한다.
-    const token = localStorage.getItem('accessToken')
+    if (!accessToken || isAuthInitializing) return
+
+    // 소켓 연결/이벤트 바인딩은 로그인 상태에서만 유지한다.
     const client = io(API_BASE_URL, {
-      auth: token ? { token } : undefined,
+      autoConnect: true,
+      auth: { token: accessToken },
     })
 
+    socketRef.current = client
     setSocket(client)
 
     client.on('connect', () => {
@@ -277,7 +316,21 @@ function App() {
     })
 
     client.on('connect_error', (error) => {
-      setErrorMessage(error?.message || 'Socket connection failed.')
+      const message = String(error?.message || 'Socket connection failed.')
+      if (message.includes('unauthorized')) {
+        void (async () => {
+          const refreshed = await refreshAccessToken()
+          if (!refreshed) {
+            handleLogout()
+            return
+          }
+          client.auth = { token: localStorage.getItem('accessToken') || '' }
+          client.connect()
+        })()
+        return
+      }
+
+      setErrorMessage(message)
     })
 
     client.on('room_joined', (payload) => {
@@ -309,8 +362,12 @@ function App() {
 
     return () => {
       client.disconnect()
+      if (socketRef.current === client) {
+        socketRef.current = null
+      }
+      setSocket(null)
     }
-  }, [fetchRooms, loadMessageHistory])
+  }, [accessToken, fetchRooms, isAuthInitializing, loadMessageHistory, refreshAccessToken, handleLogout])
 
   useEffect(() => {
     // 메시지가 추가되면 마지막 항목으로 자동 스크롤한다.
@@ -321,6 +378,16 @@ function App() {
   const activeRoom = useMemo(() => {
     return rooms.find((room) => room.id === joinedRoomId) || null
   }, [rooms, joinedRoomId])
+
+  if (!accessToken || isAuthInitializing) {
+    return (
+      <LoginGate
+        isLoading={isAuthInitializing}
+        authError={authError}
+        onStartKakaoLogin={startKakaoLogin}
+      />
+    )
+  }
 
   return (
     <main className="chat-app">
@@ -335,6 +402,9 @@ function App() {
           <span>{displayName}</span>
           <span className="dot">•</span>
           <span>{socketId || 'No Socket'}</span>
+          <button type="button" className="logout-button" onClick={handleLogout}>
+            로그아웃
+          </button>
         </div>
       </header>
 
