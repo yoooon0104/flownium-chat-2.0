@@ -1,7 +1,8 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* 전역 폰트/렌더링 품질 설정 */
 :root {
   font-family: "Segoe UI", "Noto Sans KR", system-ui, -apple-system, sans-serif;
   line-height: 1.5;
@@ -12,6 +13,7 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* 전체 레이아웃 계산을 단순화하기 위한 기본 박스모델 */
 * {
   box-sizing: border-box;
 }

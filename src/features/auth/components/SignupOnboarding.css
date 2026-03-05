@@ -1,0 +1,96 @@
+﻿.onboarding-wrap {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 15% 8%, #fff8cc 0%, transparent 28%),
+    radial-gradient(circle at 95% 0%, #f7f8fb 0%, transparent 25%),
+    #f2f3f6;
+}
+
+.onboarding-card {
+  width: min(92vw, 440px);
+  border: 1px solid #e4e7ec;
+  border-radius: 16px;
+  background: #fff;
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.onboarding-card h1 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.onboarding-card p {
+  margin: 0;
+  color: #68727d;
+}
+
+.onboarding-profile-preview {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f5f8;
+  font-weight: 700;
+}
+
+.onboarding-profile-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.onboarding-field {
+  display: grid;
+  gap: 6px;
+}
+
+.onboarding-field input {
+  height: 40px;
+  border: 1px solid #d5dbe3;
+  border-radius: 10px;
+  padding: 0 12px;
+}
+
+.onboarding-checkbox {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.onboarding-error {
+  color: #d63c4c;
+}
+
+.onboarding-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.onboarding-actions button {
+  height: 40px;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  background: #f8dc3d;
+  color: #2f2b00;
+}
+
+.onboarding-actions .secondary {
+  background: #edf1f5;
+  color: #4c5968;
+}
+
+.onboarding-actions button:disabled {
+  background: #ebeef2;
+  color: #9aa2ac;
+}

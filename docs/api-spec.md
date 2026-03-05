@@ -1,73 +1,112 @@
-# API Specification
+﻿# API 명세
 
-Base URL: `/api`
+기본 경로: `/api` (인증 관련은 `/auth`)
 
-## Health
+## 상태 확인
 
-### GET /health
+### GET /api/health
 - 서버 상태 확인
-- Response: `{ "ok": true }`
+- 응답: `{ "ok": true }`
 
-## Auth
+## 인증
 
 ### GET /auth/kakao/callback?code=
-- 카카오 OAuth callback code를 서버에서 처리
-- 카카오 사용자 정보 조회 후 User upsert
-- Access/Refresh 토큰 발급
+- 카카오 인가 코드를 교환합니다.
+- 응답 분기:
 
-Response:
+1) 가입 완료 사용자
 ```json
 {
+  "resultType": "LOGIN_SUCCESS",
   "user": {
-    "id": "user-id",
-    "kakaoId": "123456789",
-    "nickname": "tester",
-    "profileImage": "https://..."
+    "id": "userId",
+    "kakaoId": "kakaoId",
+    "nickname": "닉네임",
+    "profileImage": ""
   },
   "accessToken": "jwt",
   "refreshToken": "jwt"
 }
 ```
 
-### POST /auth/refresh
-- refresh token 검증 후 access/refresh 재발급
+2) 최초 사용자(가입 필요)
+```json
+{
+  "resultType": "SIGNUP_REQUIRED",
+  "signupToken": "jwt",
+  "kakaoProfile": {
+    "kakaoId": "kakaoId",
+    "nickname": "kakao-nickname",
+    "profileImage": ""
+  }
+}
+```
 
-Request:
+### POST /auth/signup/complete
+- 최초 로그인 사용자의 가입 의사 + 닉네임 설정 완료
+
+요청:
+```json
+{
+  "signupToken": "jwt",
+  "nickname": "사용자닉네임",
+  "agreedToTerms": true
+}
+```
+
+응답: `LOGIN_SUCCESS` 구조와 동일
+
+오류 코드:
+- `400` signupToken/동의/닉네임 검증 실패
+- `401` invalid signup token
+- `503` database is not connected
+
+### POST /auth/refresh
+- Refresh 토큰 검증 후 Access/Refresh 토큰 재발급
+
+요청 예시:
 ```json
 {
   "refreshToken": "jwt"
 }
 ```
 
-## Messages
+### PATCH /auth/profile
+- 현재 인증 사용자 프로필 수정 (1차: 닉네임)
+- 헤더: `Authorization: Bearer <accessToken>`
 
-### GET /chatrooms/:id/messages
-- 채팅방 메시지 히스토리 조회
-- Query: `limit` (기본 50, 최대 100)
-- DB 미연결 시 `503` 반환
-
-Response:
+요청:
 ```json
 {
-  "roomId": "room-1",
-  "count": 2,
-  "messages": [
-    {
-      "chatRoomId": "room-1",
-      "senderId": "user-id",
-      "senderNickname": "tester",
-      "type": "text",
-      "text": "hello",
-      "timestamp": "2026-03-04T12:00:00.000Z"
-    }
-  ]
+  "nickname": "새닉네임"
 }
 ```
 
-## Planned APIs
+응답:
+```json
+{
+  "user": {
+    "id": "userId",
+    "kakaoId": "kakaoId",
+    "nickname": "새닉네임",
+    "profileImage": ""
+  }
+}
+```
 
-- `GET /chatrooms`
-- `POST /chatrooms`
-- `GET /chatrooms/:id`
-- `GET /users/me`
-- `GET /users/search?keyword=`
+## 채팅방
+
+모든 채팅방 API는 `Authorization: Bearer <accessToken>` 헤더가 필요합니다.
+
+### POST /api/chatrooms
+- 그룹방 생성
+- 생성자는 초기 멤버로 자동 등록
+
+### GET /api/chatrooms
+- 현재 사용자가 참여 중인 방 목록 조회
+- 정렬: `lastMessageAt desc` -> `createdAt desc`
+
+### GET /api/chatrooms/:id/messages
+- 방 메시지 히스토리 조회
+- 현재 사용자가 해당 방 멤버여야 함
+- 쿼리: `limit` (기본 50, 최대 100)

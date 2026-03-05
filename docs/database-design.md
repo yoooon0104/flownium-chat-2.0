@@ -1,46 +1,45 @@
-# Database Design
+﻿# 데이터베이스 설계
 
-MongoDB + Mongoose 기반 설계
+MongoDB + Mongoose 기반 설계입니다.
 
-## User Schema (현재 구현)
+## User 스키마
 
 - `kakaoId`: String, unique, required, index
 - `nickname`: String, required
 - `profileImage`: String
 - `lastLoginAt`: Date
-- `refreshTokenHash`: String (SHA-256 hash)
+- `refreshTokenHash`: String (SHA-256 해시)
 - `timestamps: true`
 
-## Message Schema (현재 구현)
+## ChatRoom 스키마
 
-- `chatRoomId`: String, required, index
-- `senderId`: String, required
+컬렉션: `chatrooms`
+
+- `name`: String, required
+- `isGroup`: Boolean, 기본값 `true`
+- `memberIds`: `[String]`, 기본값 `[]`
+- `lastMessage`: String, 기본값 `""`
+- `lastMessageAt`: Date, 기본값 `null`
+- `timestamps: true`
+
+인덱스:
+- `memberIds` 인덱스
+- `lastMessageAt` 인덱스
+
+## Message 스키마
+
+- `chatRoomId`: String, required, index (ChatRoom ObjectId 문자열)
+- `senderId`: String
 - `senderNickname`: String, required
 - `type`: `text | system`, 기본값 `text`
 - `text`: String, required
 - `timestamp`: Date, index
 - `timestamps: true`
 
-## Planned Schema
+## Presence 설계 (online)
 
-### ChatRoom
-- `participants: [ObjectId]`
-- `roomKey: String (unique)`
-- `isAnonymous: Boolean`
-- `isTimed: Boolean`
-- `expiresAt: Date`
-- `isGroup: Boolean`
-- `ownerId: ObjectId`
-- `lastMessage: String`
-- `lastMessageAt: Date`
-- `timestamps: true`
-
-### roomKey Rule
-- 1:1 채팅은 participants 2명의 ID를 정렬 후 `:`로 결합
-- 예: `sortedIds.join(':')`
-- `roomKey` unique index 적용
-
-## TTL Policy (Timed Room)
-
-- `expiresAt`에 TTL index 적용
-- `expireAfterSeconds = 0`
+- 소켓 서버 메모리 맵으로 관리
+- 키: `roomId`
+- 값: `Map<userId, Set<socketId>>`
+- `online = true` 조건: set 크기 > 0
+- 계산 결과를 `room_participants`로 전송

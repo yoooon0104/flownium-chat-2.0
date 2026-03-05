@@ -1,3 +1,4 @@
+﻿// 외부 API 실패를 공통 포맷으로 전달하기 위한 에러 생성 헬퍼.
 const createHttpError = (message, status, body) => {
   const error = new Error(message);
   error.status = status;
@@ -5,6 +6,7 @@ const createHttpError = (message, status, body) => {
   return error;
 };
 
+// 인가 코드를 카카오 access token으로 교환한다.
 const exchangeKakaoAccessToken = async (payload) => {
   const { code, restApiKey, redirectUri, clientSecret } = payload;
 
@@ -35,6 +37,7 @@ const exchangeKakaoAccessToken = async (payload) => {
   return response.json();
 };
 
+// 카카오 사용자 정보를 가져와 내부 사용자 스키마 형식으로 정규화한다.
 const fetchKakaoUserProfile = async (accessToken) => {
   const response = await fetch('https://kapi.kakao.com/v2/user/me', {
     headers: {

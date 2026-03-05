@@ -1,53 +1,51 @@
-# Architecture
+﻿# 아키텍처
 
-## System Structure
+## 시스템 구조
 
-Client (React + Vite)
-  -> Socket.IO Client
-  -> Express + Socket.IO Server
-  -> MongoDB (Atlas)
+클라이언트(React + Vite)
+-> `AppShell` (조립 전용)
+-> `features/*` hooks/components
+-> `services/*` (REST/Socket)
+-> Express + Socket.IO 서버
+-> MongoDB
 
-## Communication Policy
+## 프론트 계층
 
-### REST API
-- 채팅방 목록 조회
-- 채팅방 생성
-- 메시지 히스토리 조회
-- 사용자 인증 처리
-- 헬스체크: `GET /api/health` -> `{ "ok": true }`
-- 카카오 콜백: `GET /auth/kakao/callback`
-- 토큰 재발급: `POST /auth/refresh`
+1. `app/`
+- `AppShell.jsx`: 화면 분기/조합
 
-### WebSocket (Socket.IO)
-- 실시간 메시지 송수신
-- `join_room`
-- `send_message`
-- `receive_message`
-- `room_joined`
-- `error`
+2. `features/`
+- `auth`: LoginGate, SignupOnboarding, useKakaoAuth
+- `chat`: RoomPanel, ChatPanel, useChatRooms/useChatMessages/useChatSocket
+- `user`: UserMenu, ProfileModal, SettingsModal
 
-## Authentication Flow
+3. `domain/`
+- `AuthSession`: 토큰 로드/저장/삭제
+- `UserProfile`: 사용자 정규화/표기 규칙
 
-1. 카카오 로그인 -> 서버 callback 처리
-2. JWT Access/Refresh Token 발급
-3. REST 요청 시 Authorization Header 사용
-4. Socket 연결 시 handshake에서 JWT Access Token 검증
+4. `services/`
+- `api/authApi`, `api/chatApi`
+- `socket/chatSocketClient`
 
-## Deployment Structure
+## 백엔드 구조
 
-- Frontend: Vercel
-- Backend: Render or Railway
-- Database: MongoDB Atlas
+- `server/index.cjs`: 서버 엔트리 + 소켓 이벤트
+- `routes/auth.routes.cjs`: 카카오/온보딩/refresh/profile
+- `routes/chatroom.routes.cjs`: chatroom REST
+- `services/auth.service.cjs`: JWT/해시/signup 토큰 검증
+- `services/kakao.service.cjs`: 카카오 외부 API 연동
 
-모든 URL은 환경변수 기반으로 관리한다.
-하드코딩을 금지한다.
+## 인증/채팅 흐름
 
-## Current Local Stage (2026-03-04)
+1. 카카오 로그인
+2. `/auth/kakao/callback` 결과 분기(`LOGIN_SUCCESS`/`SIGNUP_REQUIRED`)
+3. 온보딩 완료 시 `/auth/signup/complete`
+4. 토큰 저장 후 REST/Socket 인증 시작
+5. 채팅방 조회/입장/메시지 송수신
+6. `room_participants`로 전체 멤버 + 온라인 상태 표시
 
-- 소켓 기본 연결 테스트 완료
-- `join_room`, `send_message`, `receive_message` 최소 이벤트 구현 완료
-- 메시지 DB 저장 및 히스토리 조회 API 구현 완료
-- Socket handshake JWT 인증 적용 완료
-- 카카오 OAuth callback + refresh API(백엔드) 구현 완료
-- 카카오톡형 2단 레이아웃 UI 1차 적용 완료
-- DB 미설정 환경에서도 서버 기동 가능 (로컬 스모크 테스트용)
+## 현재 제약
+
+- 프로필 이미지는 카카오 원본 우선(업로드/편집은 다음 단계)
+- 관리자/초대/강퇴 정책 미구현
+- presence는 메모리 기반(서버 재시작 시 초기화)

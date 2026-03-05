@@ -1,52 +1,39 @@
-# WBS (Work Breakdown Status)
+﻿# WBS (작업 분해 현황)
 
-기준일: 2026-03-04
+업데이트: 2026-03-05
 
-## 1) 완료 (Done)
+## 1) 완료
 
-- [x] Express + Socket.IO 서버 기본 부트스트랩
-- [x] 헬스체크 API (`GET /api/health`)
-- [x] Socket 기본 이벤트 구현 (`join_room`, `send_message`, `receive_message`)
-- [x] 메시지 저장 모델 구현 (`Message`)
-- [x] 메시지 히스토리 API 구현 (`GET /api/chatrooms/:id/messages`)
-- [x] Socket JWT handshake 인증 구현
-- [x] 카카오 OAuth callback API 구현 (`GET /auth/kakao/callback`)
-- [x] JWT refresh API 구현 (`POST /auth/refresh`)
-- [x] `User` 모델 구현
-- [x] refresh token 해시 저장 적용 (`refreshTokenHash`)
-- [x] auth 라우트/서비스 분리 (`routes/auth.routes.cjs`, `services/*`)
-- [x] 카카오 실패 상세 로그 보강 (status/body)
-- [x] 프론트에서 room 입장 후 히스토리 로드 구현
-- [x] UI 1차 레이아웃 전환 (카카오톡형 2단 구조)
-- [x] 작은 창에서 전송 버튼 고정 + 메시지 영역 스크롤 구조 수정
-- [x] 문서 동기화 프로세스 정착 (변경 시 docs 동시 업데이트)
+- [x] Express + Socket.IO 서버 기본 구성
+- [x] Socket handshake JWT 인증 적용
+- [x] Message/ChatRoom 모델 및 그룹채팅 REST/Socket 구현
+- [x] `room_participants` (전체 멤버 + online/offline) 구현
+- [x] 방 목록 검색 + FAB(+) + 방 생성 모달 UI 적용
+- [x] 모바일 채팅 헤더 아이콘(←) 뒤로가기 UX 적용
+- [x] 카카오 로그인 게이트 + 현재 페이지 콜백 처리 구현
+- [x] 소켓 재연결 루프 안정화
+- [x] 인증 온보딩 분기 도입 (`LOGIN_SUCCESS` / `SIGNUP_REQUIRED`)
+- [x] `POST /auth/signup/complete` 구현
+- [x] `PATCH /auth/profile` 닉네임 변경 API 구현
+- [x] 우측 상단 점3개 사용자 메뉴 구현 (`내 정보`/`설정`/`로그아웃`)
+- [x] 프론트 구조 분리 (`app/features/domain/services`)
+- [x] 채팅 REST 라우트 분리 (`routes/chatroom.routes.cjs`)
 
-## 2) 진행중 (In Progress)
+## 2) 진행 중
 
-- [ ] 테스트용 방 목록을 실제 ChatRoom API 연동으로 전환
-- [ ] 컴포넌트 분리 (`RoomListPanel`, `ChatPanel`, `MessageComposer`)
+- [ ] 카카오 실로그인 기반 2인 E2E 검증
+- [ ] 설정 모달 UX 다듬기(에러 문구/로딩 상태)
 
-## 3) 다음 작업 (Next)
+## 3) 다음 작업
 
-- [ ] `ChatRoom` 모델 구현
-- [ ] 채팅방 API 구현
-- [ ] `POST /api/chatrooms` (roomKey 기반 중복 방지)
-- [ ] `GET /api/chatrooms`
-- [ ] 프론트 room 목록 API 연동
-- [ ] 프론트 구조 분리 (`socketClient`, `chatApi`, `useChatSocket`)
-- [ ] CSS 2차 정리 (hover/active/skeleton/접근성)
+- [ ] 프로필 이미지 편집(업로드/URL 변경) 기능
+- [ ] 관리자 권한/초대/강퇴 정책 설계
+- [ ] `leave_room` 이벤트 및 REST API 설계
+- [ ] 메시지 커서 기반 페이지네이션
+- [ ] 에러 코드 표준화 (`error.code`)
 
-## 4) 백로그 (Backlog)
+## 4) 백로그
 
-- [ ] JWT 인증을 REST/Socket 공통 미들웨어 구조로 정리
-- [ ] 메시지 페이징 커서 방식 고도화 (`before`, `limit`)
-- [ ] 에러 코드 표준화 (`error.code`, `error.message`)
-- [ ] E2E 테스트 시나리오 추가
-- [ ] 메시지 암호화 전략 확정 (전송/저장/키관리)
-- [ ] 배포 환경 체크리스트 문서화 (Vercel/Render/Railway)
-
-## 5) 운영 규칙
-
-- 기능 변경 시 관련 `docs/*.md`를 같은 작업에서 함께 업데이트한다.
-- 중간/대규모 기능은 변경안을 먼저 공유하고 검토 후 구현한다.
-- 이 문서는 작업 상태가 바뀔 때마다 즉시 갱신한다.
+- [ ] E2E 테스트 스크립트 구축
+- [ ] 배포 체크리스트 고도화
+- [ ] 메시지 암호화 전략 확정 및 적용 계획
