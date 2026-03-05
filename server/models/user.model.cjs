@@ -10,6 +10,14 @@ const userSchema = new mongoose.Schema(
       index: true,
       trim: true,
     },
+    // 카카오 계정 이메일(동의 범위에 따라 비어 있을 수 있음)
+    email: {
+      type: String,
+      default: '',
+      trim: true,
+      lowercase: true,
+      index: true,
+    },
     nickname: {
       type: String,
       required: true,

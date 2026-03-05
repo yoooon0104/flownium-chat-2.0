@@ -60,6 +60,7 @@ const fetchKakaoUserProfile = async (accessToken) => {
 
   return {
     kakaoId,
+    email: String(profile?.kakao_account?.email || '').trim().toLowerCase(),
     nickname:
       profile?.kakao_account?.profile?.nickname ||
       profile?.properties?.nickname ||

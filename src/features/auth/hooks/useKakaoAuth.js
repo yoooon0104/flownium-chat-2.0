@@ -130,40 +130,68 @@ export const useKakaoAuth = (apiBaseUrl) => {
       const params = new URLSearchParams(window.location.search)
       const code = String(params.get('code') || '').trim()
 
-      if (!code) {
-        setIsInitializing(false)
-        return
-      }
-
       try {
         setError('')
-        const { ok, body } = await authApi.getKakaoCallback(code)
-        if (!ok || !body) {
-          throw new Error(resolveErrorMessage(body, '카카오 로그인 처리에 실패했습니다.'))
+
+        if (code) {
+          const { ok, body } = await authApi.getKakaoCallback(code)
+          if (!ok || !body) {
+            throw new Error(resolveErrorMessage(body, '카카오 로그인 처리에 실패했습니다.'))
+          }
+
+          // 가입 완료 사용자는 즉시 세션을 저장하고 채팅 화면으로 이동한다.
+          if (body.resultType === 'LOGIN_SUCCESS') {
+            saveSession(body)
+          } else if (body.resultType === 'SIGNUP_REQUIRED') {
+            AuthSession.clear()
+            setAccessToken('')
+            setRefreshToken('')
+            setUser(null)
+            setPendingSignup({
+              signupToken: String(body.signupToken || ''),
+              kakaoId: String(body?.kakaoProfile?.kakaoId || ''),
+              email: String(body?.kakaoProfile?.email || ''),
+              nickname: String(body?.kakaoProfile?.nickname || ''),
+              profileImage: String(body?.kakaoProfile?.profileImage || ''),
+            })
+          } else {
+            throw new Error('지원하지 않는 인증 응답입니다.')
+          }
+
+          // 콜백 처리 완료 후 주소창 query를 제거한다.
+          window.history.replaceState({}, document.title, window.location.pathname)
+          return
         }
 
-        // 가입 완료 사용자는 즉시 세션을 저장하고 채팅 화면으로 이동한다.
-        if (body.resultType === 'LOGIN_SUCCESS') {
-          saveSession(body)
-        } else if (body.resultType === 'SIGNUP_REQUIRED') {
-          AuthSession.clear()
-          setAccessToken('')
-          setRefreshToken('')
-          setUser(null)
-          setPendingSignup({
-            signupToken: String(body.signupToken || ''),
-            kakaoId: String(body?.kakaoProfile?.kakaoId || ''),
-            nickname: String(body?.kakaoProfile?.nickname || ''),
-            profileImage: String(body?.kakaoProfile?.profileImage || ''),
-          })
-        } else {
-          throw new Error('지원하지 않는 인증 응답입니다.')
+        // 콜백 코드가 없는 일반 진입에서는 /auth/me로 사용자 상태를 복원한다.
+        const token = AuthSession.load().accessToken
+        if (!token) {
+          return
         }
 
-        // 콜백 처리 완료 후 주소창 query를 제거한다.
-        window.history.replaceState({}, document.title, window.location.pathname)
+        const me = await authApi.getMe(token)
+        if (me.ok && me.body?.user) {
+          setUser(UserProfile.normalize(me.body.user))
+          return
+        }
+
+        if (me.status === 401) {
+          const refreshed = await refreshAccessToken()
+          if (!refreshed) {
+            return
+          }
+
+          const retriedToken = AuthSession.load().accessToken
+          const retried = await authApi.getMe(retriedToken)
+          if (retried.ok && retried.body?.user) {
+            setUser(UserProfile.normalize(retried.body.user))
+            return
+          }
+        }
+
+        clearSession(resolveErrorMessage(me.body, '세션 정보를 불러오지 못했습니다. 다시 로그인해주세요.'))
       } catch (nextError) {
-        console.error('[kakao:callback] failed', nextError)
+        console.error('[auth:init] failed', nextError)
         clearSession(nextError.message || '카카오 로그인 처리에 실패했습니다.')
       } finally {
         setIsInitializing(false)
@@ -171,7 +199,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     }
 
     void run()
-  }, [authApi, clearSession, saveSession])
+  }, [authApi, clearSession, refreshAccessToken, saveSession])
 
   return {
     authState: {
@@ -190,3 +218,4 @@ export const useKakaoAuth = (apiBaseUrl) => {
     clearSession,
   }
 }
+

@@ -38,6 +38,7 @@ MVP2-A 1차 표준:
   "user": {
     "id": "userId",
     "kakaoId": "kakaoId",
+    "email": "user@example.com",
     "nickname": "닉네임",
     "profileImage": ""
   },
@@ -53,6 +54,7 @@ MVP2-A 1차 표준:
   "signupToken": "jwt",
   "kakaoProfile": {
     "kakaoId": "kakaoId",
+    "email": "user@example.com",
     "nickname": "kakao-nickname",
     "profileImage": ""
   }
@@ -100,6 +102,28 @@ MVP2-A 1차 표준:
 - `401 INVALID_REFRESH_TOKEN`
 - `503 DB_NOT_CONNECTED`
 
+### GET /auth/me
+- 현재 인증 사용자 프로필 조회
+- 헤더: `Authorization: Bearer <accessToken>`
+
+응답:
+```json
+{
+  "user": {
+    "id": "userId",
+    "kakaoId": "kakaoId",
+    "email": "user@example.com",
+    "nickname": "닉네임",
+    "profileImage": ""
+  }
+}
+```
+
+대표 오류:
+- `401 UNAUTHORIZED`
+- `404 USER_NOT_FOUND`
+- `503 DB_NOT_CONNECTED`
+
 ### PATCH /auth/profile
 - 현재 인증 사용자 프로필 수정 (1차: 닉네임)
 - 헤더: `Authorization: Bearer <accessToken>`
@@ -117,6 +141,7 @@ MVP2-A 1차 표준:
   "user": {
     "id": "userId",
     "kakaoId": "kakaoId",
+    "email": "user@example.com",
     "nickname": "새닉네임",
     "profileImage": ""
   }
