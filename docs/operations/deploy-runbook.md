@@ -1,0 +1,96 @@
+﻿# Deploy Runbook (MVP2-A)
+
+업데이트: 2026-03-05
+
+## 1) 목적
+
+본 문서는 MVP2-A 배포 전환 시점에 팀이 동일 절차로 점검/배포/검증/롤백을 수행하도록 기준을 고정한다.
+
+대상 아키텍처:
+- Frontend: Vercel
+- Backend: Render
+- DB: MongoDB Atlas
+
+## 2) 사전 준비
+
+1. 도메인/엔드포인트 확정
+- 프론트: `https://<app-domain>`
+- 백엔드: `https://<api-domain>`
+
+2. 카카오 콘솔 설정
+- Redirect URI
+  - 운영: `https://<app-domain>`
+  - 로컬: `http://localhost:5173`
+
+3. 환경변수 준비
+- 프론트(`Vercel`)
+  - `VITE_API_BASE_URL=https://<api-domain>`
+  - `VITE_KAKAO_CLIENT_ID=<KAKAO_REST_API_KEY>`
+  - `VITE_KAKAO_REDIRECT_URI=https://<app-domain>`
+- 백엔드(`Render`)
+  - `FRONTEND_URL=https://<app-domain>`
+  - `MONGODB_URI=<atlas-uri>`
+  - `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_SIGNUP_SECRET`
+  - `KAKAO_REST_API_KEY`, `KAKAO_REDIRECT_URI`, `KAKAO_CLIENT_SECRET(optional)`
+
+## 3) 배포 전 체크리스트 (필수)
+
+1. 코드 품질
+- `npm run lint`
+- `npm run build`
+- `node --check server/index.cjs`
+
+2. 기능 회귀
+- 카카오 로그인(기존 사용자)
+- 카카오 로그인(신규 사용자 온보딩)
+- 방 생성(FAB) -> 자동 입장
+- 2탭 메시지 송수신
+- 참여자 online/offline 반영
+
+3. 인증/에러 표준
+- `/auth/me` 정상 조회
+- `error.code` 응답 확인
+  - `scripts/test-error-code.ps1`
+  - `scripts/test-auth-me.ps1`
+
+## 4) 배포 절차
+
+1. Render(백엔드) 배포
+- 환경변수 주입 확인
+- 배포 후 `/api/health` 확인
+
+2. Vercel(프론트) 배포
+- 환경변수 주입 확인
+- 빌드 로그 오류 확인
+
+3. 카카오 최종 검증
+- 운영 Redirect URI와 앱 도메인 일치 확인
+
+## 5) 배포 후 검증
+
+1. API
+- `GET /api/health` -> 200
+- `GET /auth/me` -> 200 (유효 토큰)
+
+2. Socket
+- connect/disconnect 루프 없음
+- join/send 흐름 정상
+
+3. 브라우저 콘솔
+- CORS 에러 없음
+- 인증 에러 표준(`error.code`) 출력 확인
+
+## 6) 롤백 절차
+
+1. Vercel: 이전 배포 버전으로 즉시 롤백
+2. Render: 이전 배포 버전으로 즉시 롤백
+3. 장애 기록 작성
+- `docs/operations/ops-log-policy.md` 기준으로 이슈 기록
+
+## 7) 릴리즈 기록 규칙
+
+- 배포 완료 시 `docs/releases/` 또는 Notion `CHANGELOG_DB`에 아래를 기록한다.
+1. 배포 시각
+2. 반영 커밋/PR
+3. 검증 결과
+4. 이슈/롤백 여부
