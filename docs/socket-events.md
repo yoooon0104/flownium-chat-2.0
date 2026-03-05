@@ -1,62 +1,86 @@
-# Socket Events
+﻿# Socket Events
 
 ## Auth
-- Socket 연결 시 `auth.token`(JWT) 필수
-- 인증 실패 시 `connect_error: unauthorized` 반환
+
+- Socket connection requires access JWT via `auth.token`.
+- Invalid token returns `connect_error: unauthorized`.
 
 ## Client -> Server
 
 ### join_room
-payload:
 ```json
 {
-  "roomId": "string"
+  "roomId": "chatroomObjectId"
 }
 ```
 
+Behavior:
+1. Validate room exists.
+2. If user not in `memberIds`, add user.
+3. Join socket room.
+4. Emit `room_joined`.
+5. Emit `room_participants`.
+
 ### send_message
-payload:
 ```json
 {
-  "roomId": "string",
-  "text": "string",
+  "roomId": "chatroomObjectId",
+  "text": "message text",
   "type": "text"
 }
 ```
 
-### leave_room (예정)
-payload:
-```json
-{
-  "roomId": "string"
-}
-```
+Behavior:
+- Save message in DB.
+- Update room `lastMessage`, `lastMessageAt`.
+- Broadcast `receive_message`.
 
 ## Server -> Client
 
 ### room_joined
-payload:
 ```json
 {
-  "roomId": "string"
+  "roomId": "chatroomObjectId",
+  "room": {
+    "id": "chatroomObjectId",
+    "name": "Project Meeting",
+    "isGroup": true,
+    "memberIds": ["u1", "u2"],
+    "lastMessage": "",
+    "lastMessageAt": null
+  }
 }
 ```
 
-### receive_message
-payload:
+### room_participants
 ```json
 {
-  "chatRoomId": "string",
-  "senderId": "string",
-  "senderNickname": "string",
+  "roomId": "chatroomObjectId",
+  "participants": [
+    { "userId": "u1", "nickname": "alice", "online": true },
+    { "userId": "u2", "nickname": "bob", "online": false }
+  ]
+}
+```
+
+Rule:
+- Members list comes from `ChatRoom.memberIds`.
+- Online flag comes from in-memory socket presence map.
+- Re-emitted on room join and disconnect.
+
+### receive_message
+```json
+{
+  "chatRoomId": "chatroomObjectId",
+  "senderId": "u1",
+  "senderNickname": "alice",
   "type": "text",
-  "text": "string",
-  "timestamp": "ISO-8601 string"
+  "text": "hello",
+  "timestamp": "2026-03-05T10:00:00.000Z"
 }
 ```
 
 ### error
-payload:
 ```json
 {
   "message": "string"

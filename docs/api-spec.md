@@ -1,36 +1,20 @@
-# API Specification
+﻿# API Specification
 
 Base URL: `/api`
 
 ## Health
 
 ### GET /health
-- 서버 상태 확인
+- Server health check
 - Response: `{ "ok": true }`
 
 ## Auth
 
 ### GET /auth/kakao/callback?code=
-- 카카오 OAuth callback code를 서버에서 처리
-- 카카오 사용자 정보 조회 후 User upsert
-- Access/Refresh 토큰 발급
-
-Response:
-```json
-{
-  "user": {
-    "id": "user-id",
-    "kakaoId": "123456789",
-    "nickname": "tester",
-    "profileImage": "https://..."
-  },
-  "accessToken": "jwt",
-  "refreshToken": "jwt"
-}
-```
+- Exchange Kakao code and issue access/refresh tokens.
 
 ### POST /auth/refresh
-- refresh token 검증 후 access/refresh 재발급
+- Validate refresh token and rotate tokens.
 
 Request:
 ```json
@@ -39,35 +23,83 @@ Request:
 }
 ```
 
-## Messages
+## ChatRooms
 
-### GET /chatrooms/:id/messages
-- 채팅방 메시지 히스토리 조회
-- Query: `limit` (기본 50, 최대 100)
-- DB 미연결 시 `503` 반환
+All chatroom APIs require `Authorization: Bearer <accessToken>`.
 
-Response:
+### POST /chatrooms
+- Create group room.
+- Creator is added as initial member.
+
+Request:
 ```json
 {
-  "roomId": "room-1",
-  "count": 2,
-  "messages": [
+  "name": "Project Meeting"
+}
+```
+
+Response 201:
+```json
+{
+  "room": {
+    "id": "chatroomObjectId",
+    "name": "Project Meeting",
+    "isGroup": true,
+    "memberIds": ["creatorUserId"],
+    "lastMessage": "",
+    "lastMessageAt": null
+  }
+}
+```
+
+Errors:
+- `400` name is required
+- `401` unauthorized
+- `503` database is not connected
+- `500` failed to create chatroom
+
+### GET /chatrooms
+- Get rooms where current user is a member.
+- Sort: `lastMessageAt desc`, then `createdAt desc`.
+
+Response 200:
+```json
+{
+  "rooms": [
     {
-      "chatRoomId": "room-1",
-      "senderId": "user-id",
-      "senderNickname": "tester",
-      "type": "text",
-      "text": "hello",
-      "timestamp": "2026-03-04T12:00:00.000Z"
+      "id": "chatroomObjectId",
+      "name": "Project Meeting",
+      "isGroup": true,
+      "memberIds": ["u1", "u2"],
+      "lastMessage": "hello",
+      "lastMessageAt": "2026-03-05T10:00:00.000Z"
     }
   ]
 }
 ```
 
-## Planned APIs
+## Messages
 
-- `GET /chatrooms`
-- `POST /chatrooms`
-- `GET /chatrooms/:id`
-- `GET /users/me`
-- `GET /users/search?keyword=`
+### GET /chatrooms/:id/messages
+- Get room messages.
+- Auth required.
+- Current user must be room member.
+- Query: `limit` (default 50, max 100)
+
+Response:
+```json
+{
+  "roomId": "chatroomObjectId",
+  "count": 2,
+  "messages": [
+    {
+      "chatRoomId": "chatroomObjectId",
+      "senderId": "user-id",
+      "senderNickname": "tester",
+      "type": "text",
+      "text": "hello",
+      "timestamp": "2026-03-05T12:00:00.000Z"
+    }
+  ]
+}
+```

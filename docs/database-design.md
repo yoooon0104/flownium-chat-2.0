@@ -1,8 +1,8 @@
-# Database Design
+﻿# Database Design
 
-MongoDB + Mongoose 기반 설계
+MongoDB + Mongoose based design.
 
-## User Schema (현재 구현)
+## User Schema
 
 - `kakaoId`: String, unique, required, index
 - `nickname`: String, required
@@ -11,36 +11,35 @@ MongoDB + Mongoose 기반 설계
 - `refreshTokenHash`: String (SHA-256 hash)
 - `timestamps: true`
 
-## Message Schema (현재 구현)
+## ChatRoom Schema
 
-- `chatRoomId`: String, required, index
-- `senderId`: String, required
+Collection: `chatrooms`
+
+- `name`: String, required
+- `isGroup`: Boolean, default `true`
+- `memberIds`: `[String]`, default `[]`
+- `lastMessage`: String, default `""`
+- `lastMessageAt`: Date, default `null`
+- `timestamps: true`
+
+Indexes:
+- `memberIds` index
+- `lastMessageAt` index
+
+## Message Schema
+
+- `chatRoomId`: String, required, index (stores ChatRoom ObjectId string)
+- `senderId`: String
 - `senderNickname`: String, required
-- `type`: `text | system`, 기본값 `text`
+- `type`: `text | system`, default `text`
 - `text`: String, required
 - `timestamp`: Date, index
 - `timestamps: true`
 
-## Planned Schema
+## Presence Design (Online)
 
-### ChatRoom
-- `participants: [ObjectId]`
-- `roomKey: String (unique)`
-- `isAnonymous: Boolean`
-- `isTimed: Boolean`
-- `expiresAt: Date`
-- `isGroup: Boolean`
-- `ownerId: ObjectId`
-- `lastMessage: String`
-- `lastMessageAt: Date`
-- `timestamps: true`
-
-### roomKey Rule
-- 1:1 채팅은 participants 2명의 ID를 정렬 후 `:`로 결합
-- 예: `sortedIds.join(':')`
-- `roomKey` unique index 적용
-
-## TTL Policy (Timed Room)
-
-- `expiresAt`에 TTL index 적용
-- `expireAfterSeconds = 0`
+- In-memory map managed by socket server
+- Key: `roomId`
+- Value: `Map<userId, Set<socketId>>`
+- `online = true` when set size > 0
+- Recalculated and emitted as `room_participants`
