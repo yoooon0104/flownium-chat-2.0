@@ -209,13 +209,16 @@ function AppShell() {
   // - 그 외에는 방 목록만 다시 받아 unread 배지만 갱신
   // 이렇게 나누면 현재 방에서는 숫자가 즉시 줄고, 다른 방에서는 목록 배지만 늘어난다.
   const handleSocketReceiveMessage = useCallback((message) => {
-    appendMessage(message)
-
     void (async () => {
-      if (message?.senderId && message.senderId !== currentUser?.id && message?.chatRoomId === joinedRoomId) {
-        await markRoomRead(message.chatRoomId)
+      if (message?.chatRoomId === joinedRoomId) {
+        appendMessage(message)
+
+        if (message?.senderId && message.senderId !== currentUser?.id) {
+          await markRoomRead(message.chatRoomId)
+        }
         return
       }
+
       await fetchRooms()
     })()
   }, [appendMessage, currentUser?.id, fetchRooms, joinedRoomId, markRoomRead])
@@ -223,6 +226,14 @@ function AppShell() {
   const handleSocketParticipants = useCallback((nextParticipants) => {
     setParticipants(nextParticipants)
   }, [])
+
+  const handleSocketNotificationCreated = useCallback(() => {
+    void fetchNotifications()
+  }, [fetchNotifications])
+
+  const handleSocketNotificationRead = useCallback(() => {
+    void fetchNotifications()
+  }, [fetchNotifications])
 
   const handleSocketError = useCallback((message) => {
     setErrorMessage(message)
@@ -243,6 +254,8 @@ function AppShell() {
     onRoomJoined: handleSocketRoomJoined,
     onReceiveMessage: handleSocketReceiveMessage,
     onRoomParticipants: handleSocketParticipants,
+    onNotificationCreated: handleSocketNotificationCreated,
+    onNotificationRead: handleSocketNotificationRead,
     onError: handleSocketError,
   })
 
@@ -536,4 +549,5 @@ function AppShell() {
 }
 
 export default AppShell
+
 
