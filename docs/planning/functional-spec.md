@@ -130,11 +130,7 @@
 - 방 초대 이벤트
 - 읽음 처리 대상 알림 ID
 
-### 처리
-- 알림 생성
-- 읽음 처리
-- 소켓 이벤트 전파
-- 친구 요청 수락/거절 액션 처리
+### 처리`r`n- 알림 생성`r`n- 읽음 처리`r`n- 소켓 이벤트 전파`r`n- 친구 요청 수락/거절 액션 처리`r`n- Desktop/Tablet은 드롭다운 허브로 처리`r`n- Mobile은 별도 알림 화면으로 전환 처리
 
 ### 출력
 - unread count
@@ -178,3 +174,4 @@
 - API 명세: `docs/common/api-spec.md`
 - 소켓 명세: `docs/common/socket-events.md`
 - WBS: `docs/common/wbs.md`
+

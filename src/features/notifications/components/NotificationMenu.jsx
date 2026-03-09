@@ -7,11 +7,12 @@ const toCreatedLabel = (value) => {
   return date.toLocaleString()
 }
 
-// 알림 메뉴는 친구 요청과 방 초대를 친구 목록 본문과 분리해서 보여준다.
-// Friends 탭은 친구 탐색에만 집중시키고, 처리성 액션은 벨 허브에서 모은다.
+// 알림 메뉴는 데스크톱에서는 드롭다운으로 유지하고, 모바일에서는 전용 화면으로 넘긴다.
 function NotificationMenu({
+  isMobile,
   isOpen,
   onToggle,
+  onOpenMobileScreen,
   unreadCount,
   notificationsLoading,
   notifications,
@@ -24,7 +25,7 @@ function NotificationMenu({
   const menuRef = useRef(null)
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || isMobile) return
 
     const handleOutside = (event) => {
       if (!menuRef.current?.contains(event.target)) {
@@ -44,16 +45,27 @@ function NotificationMenu({
       window.removeEventListener('mousedown', handleOutside)
       window.removeEventListener('keydown', handleEscape)
     }
-  }, [isOpen, onToggle])
+  }, [isMobile, isOpen, onToggle])
 
   return (
     <div className="notification-menu" ref={menuRef}>
-      <button type="button" className="notification-button" aria-label="알림 메뉴" onClick={() => onToggle(!isOpen)}>
+      <button
+        type="button"
+        className="notification-button"
+        aria-label="알림 메뉴"
+        onClick={() => {
+          if (isMobile) {
+            onOpenMobileScreen()
+            return
+          }
+          onToggle(!isOpen)
+        }}
+      >
         <span className="notification-button-icon">🔔</span>
         {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
       </button>
 
-      {isOpen && (
+      {!isMobile && isOpen && (
         <section className="notification-dropdown" role="dialog" aria-label="알림 목록">
           <header className="notification-header">
             <strong>알림 허브</strong>
