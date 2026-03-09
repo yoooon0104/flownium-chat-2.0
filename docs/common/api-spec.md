@@ -1,4 +1,4 @@
-﻿# API 명세
+# API 명세
 
 기본 경로: `/api` (인증 관련은 `/auth`)
 
@@ -154,16 +154,154 @@ MVP2-A 1차 표준:
 - `404 USER_NOT_FOUND`
 - `503 DB_NOT_CONNECTED`
 
-## 채팅방
+## 친구
 
-모든 채팅방 API는 `Authorization: Bearer <accessToken>` 헤더가 필요합니다.
+모든 친구/알림/채팅방 API는 `Authorization: Bearer <accessToken>` 헤더가 필요합니다.
 
-### POST /api/chatrooms
-- 그룹방 생성
-- 생성자는 초기 멤버로 자동 등록
+### GET /api/friends/search?keyword=
+- 이메일/닉네임 기준 사용자 검색
+- 자기 자신 제외
+- 검색 결과에 현재 친구 상태 포함
+
+응답 예시:
+```json
+{
+  "keyword": "kim",
+  "results": [
+    {
+      "user": {
+        "id": "userId",
+        "email": "friend@example.com",
+        "nickname": "kim",
+        "profileImage": ""
+      },
+      "friendship": {
+        "id": "friendshipId",
+        "status": "pending",
+        "requesterId": "u1",
+        "addresseeId": "u2"
+      }
+    }
+  ]
+}
+```
+
+대표 오류:
+- `500 FRIEND_SEARCH_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+### GET /api/friends
+- 현재 사용자 친구 관계 목록 조회
+- 반환 그룹:
+  - `accepted`
+  - `pendingReceived`
+  - `pendingSent`
+
+대표 오류:
+- `500 FRIEND_LIST_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+### POST /api/friends/request
+- 친구 요청 생성
+
+요청:
+```json
+{
+  "targetUserId": "userId"
+}
+```
 
 대표 오류:
 - `400 INVALID_REQUEST`
+- `404 USER_NOT_FOUND`
+- `403 FRIEND_REQUEST_BLOCKED`
+- `409 ALREADY_FRIENDS`
+- `409 FRIEND_REQUEST_PENDING`
+- `409 FRIEND_REQUEST_ALREADY_RECEIVED`
+- `500 FRIEND_REQUEST_FAILED`
+
+### PATCH /api/friends/request/:id
+- 친구 요청 상태 변경
+- `action`: `accept | reject | block`
+
+요청:
+```json
+{
+  "action": "accept"
+}
+```
+
+대표 오류:
+- `400 INVALID_REQUEST`
+- `403 FORBIDDEN`
+- `404 FRIEND_REQUEST_NOT_FOUND`
+- `409 INVALID_FRIEND_REQUEST_STATE`
+- `500 FRIEND_REQUEST_UPDATE_FAILED`
+
+## 알림
+
+### GET /api/notifications
+- 현재 사용자 알림 목록 조회
+- 최신순 최대 100건 반환
+
+응답 예시:
+```json
+{
+  "unreadCount": 2,
+  "notifications": [
+    {
+      "id": "notificationId",
+      "type": "friend_request",
+      "payload": {},
+      "isRead": false,
+      "createdAt": "2026-03-09T10:00:00.000Z",
+      "readAt": null
+    }
+  ]
+}
+```
+
+대표 오류:
+- `500 NOTIFICATION_FETCH_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+### PATCH /api/notifications/:id/read
+- 현재 사용자 알림 읽음 처리
+
+대표 오류:
+- `400 INVALID_REQUEST`
+- `404 NOTIFICATION_NOT_FOUND`
+- `500 NOTIFICATION_UPDATE_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+## 채팅방
+
+### POST /api/chatrooms
+- 채팅방 생성
+- 현재 프론트 호환을 위해 기존 `{ "name": "방이름" }` 그룹 생성도 지원
+- 신규 규칙:
+  - `memberUserIds.length === 1`: 기존 2인 방 재사용 또는 새 1:1 방 생성
+  - `memberUserIds.length >= 2`: 모든 대상이 친구여야 하며 `name` 필수, 새 그룹방 생성
+
+신규 요청 예시:
+```json
+{
+  "memberUserIds": ["userId-1"]
+}
+```
+
+```json
+{
+  "memberUserIds": ["userId-1", "userId-2"],
+  "name": "프로젝트 회의방"
+}
+```
+
+대표 오류:
+- `400 INVALID_REQUEST`
+- `400 INVALID_ROOM_NAME`
+- `403 FRIENDSHIP_REQUIRED`
+- `404 USER_NOT_FOUND`
 - `500 CHATROOM_CREATE_FAILED`
 - `503 DB_NOT_CONNECTED`
 

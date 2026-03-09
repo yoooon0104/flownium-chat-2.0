@@ -1,9 +1,10 @@
-﻿# 소켓 이벤트 명세
+# 소켓 이벤트 명세
 
 ## 인증
 
 - 소켓 연결 시 `auth.token`으로 access JWT를 전달해야 합니다.
 - 토큰이 유효하지 않으면 `connect_error: unauthorized`가 반환됩니다.
+- 소켓 연결 직후 서버는 사용자 전용 room(`user:<userId>`)에 자동 참여시켜 알림 이벤트를 전달합니다.
 
 ## 클라이언트 -> 서버
 
@@ -16,7 +17,7 @@
 
 동작:
 1. 방 존재 여부 확인
-2. 멤버가 아니면 `memberIds`에 추가
+2. 현재 사용자가 이미 방 멤버인지 검증
 3. 소켓 room 입장
 4. `room_joined` 전송
 5. `room_participants` 전송
@@ -77,6 +78,34 @@
   "type": "text",
   "text": "hello",
   "timestamp": "2026-03-05T10:00:00.000Z"
+}
+```
+
+### notification_created
+```json
+{
+  "notification": {
+    "id": "notificationId",
+    "type": "friend_request",
+    "payload": {},
+    "isRead": false,
+    "createdAt": "2026-03-09T10:00:00.000Z",
+    "readAt": null
+  }
+}
+```
+
+### notification_read
+```json
+{
+  "notification": {
+    "id": "notificationId",
+    "type": "room_invite",
+    "payload": {},
+    "isRead": true,
+    "createdAt": "2026-03-09T10:00:00.000Z",
+    "readAt": "2026-03-09T10:10:00.000Z"
+  }
 }
 ```
 

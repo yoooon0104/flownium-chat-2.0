@@ -1,4 +1,4 @@
-﻿const dotenv = require('dotenv');
+const dotenv = require('dotenv');
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -8,8 +8,12 @@ const { Server } = require('socket.io');
 const Message = require('./models/message.model.cjs');
 const User = require('./models/user.model.cjs');
 const ChatRoom = require('./models/chatroom.model.cjs');
+const { Friendship } = require('./models/friendship.model.cjs');
+const Notification = require('./models/notification.model.cjs');
 const createAuthRouter = require('./routes/auth.routes.cjs');
 const createChatroomRouter = require('./routes/chatroom.routes.cjs');
+const createFriendRouter = require('./routes/friend.routes.cjs');
+const createNotificationRouter = require('./routes/notification.routes.cjs');
 const { verifyAccessToken } = require('./services/auth.service.cjs');
 const { sendError } = require('./utils/error-response.cjs');
 
@@ -57,6 +61,15 @@ const toRoomResponse = (roomDoc) => ({
   lastMessageAt: roomDoc.lastMessageAt ? new Date(roomDoc.lastMessageAt).toISOString() : null,
 });
 
+const toNotificationResponse = (notificationDoc) => ({
+  id: String(notificationDoc._id || notificationDoc.id),
+  type: notificationDoc.type,
+  payload: notificationDoc.payload || {},
+  isRead: Boolean(notificationDoc.isRead),
+  createdAt: notificationDoc.createdAt ? new Date(notificationDoc.createdAt).toISOString() : null,
+  readAt: notificationDoc.readAt ? new Date(notificationDoc.readAt).toISOString() : null,
+});
+
 const extractBearerToken = (req) => {
   const raw = String(req.headers.authorization || '').trim();
   return raw.replace(/^Bearer\s+/i, '').trim();
@@ -90,6 +103,20 @@ const emitSocketError = (socket, code, message, details) => {
   socket.emit('error', payload);
 };
 
+// 사용자 전용 room에 인앱 알림 생성 이벤트를 전파한다.
+const emitNotificationCreated = (userId, notification) => {
+  io.to(`user:${String(userId)}`).emit('notification_created', {
+    notification: toNotificationResponse(notification),
+  });
+};
+
+// 읽음 처리된 알림도 같은 사용자 전용 room으로 갱신 이벤트를 보낸다.
+const emitNotificationRead = (userId, notification) => {
+  io.to(`user:${String(userId)}`).emit('notification_read', {
+    notification: toNotificationResponse(notification),
+  });
+};
+
 const addPresence = (roomId, userId, socketId) => {
   if (!roomPresence.has(roomId)) {
     roomPresence.set(roomId, new Map());
@@ -121,7 +148,6 @@ const removePresence = (roomId, userId, socketId) => {
   }
 };
 
-
 // 과거 스키마에서 남은 roomKey 유니크 인덱스를 제거해 E11000 충돌을 방지한다.
 const dropLegacyChatRoomIndexIfExists = async () => {
   try {
@@ -139,6 +165,7 @@ const dropLegacyChatRoomIndexIfExists = async () => {
     }
   }
 };
+
 const collectJoinedRoomIds = (socket) => {
   const joinedRooms = [];
   socket.rooms.forEach((roomId) => {
@@ -161,7 +188,7 @@ const emitRoomParticipants = async (roomId) => {
   }
 
   const memberIds = Array.isArray(room.memberIds) ? room.memberIds : [];
-  // memberIds에 ObjectId 형식이 아닌 값이 섞여도 캐스팅 에러가 나지 않도록 필터링한다.
+// memberIds에 ObjectId 형식이 아닌 값이 섞여도 캐스팅 에러가 나지 않도록 필터링한다.
   const objectIdMemberIds = memberIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
   const users = await User.find({ _id: { $in: objectIdMemberIds } })
     .select({ _id: 1, nickname: 1 })
@@ -240,8 +267,34 @@ app.use(
   createChatroomRouter({
     ChatRoom,
     Message,
+    User,
+    Friendship,
+    Notification,
     requireAuth,
     assertDbConnected,
+    emitNotificationCreated,
+  })
+);
+
+app.use(
+  '/api',
+  createFriendRouter({
+    User,
+    Friendship,
+    Notification,
+    requireAuth,
+    assertDbConnected,
+    emitNotificationCreated,
+  })
+);
+
+app.use(
+  '/api',
+  createNotificationRouter({
+    Notification,
+    requireAuth,
+    assertDbConnected,
+    emitNotificationRead,
   })
 );
 
@@ -251,9 +304,11 @@ app.get('/api/health', (_req, res) => {
 
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
+// 사용자 단위 알림 브로드캐스트를 위해 접속 즉시 사용자 전용 room에 참여시킨다.
+  socket.join(`user:${socket.user.userId}`);
 
   socket.on('join_room', async (payload = {}) => {
-    // 방 입장 시 멤버가 아니면 memberIds에 추가한 뒤 room_participants를 갱신한다.
+// 방 입장 시 현재 사용자가 멤버인지 확인한 뒤 room_participants를 갱신한다.
     const roomId = String(payload.roomId || '').trim();
 
     if (!roomId) {
@@ -274,8 +329,8 @@ io.on('connection', (socket) => {
       }
 
       if (!room.memberIds.includes(socket.user.userId)) {
-        room.memberIds.push(socket.user.userId);
-        await room.save();
+        emitSocketError(socket, 'FORBIDDEN', 'forbidden');
+        return;
       }
 
       socket.join(roomId);
@@ -293,7 +348,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('send_message', async (payload = {}) => {
-    // 메시지 저장 후 채팅방 요약(lastMessage, lastMessageAt)을 함께 갱신한다.
+// 메시지 저장 후 채팅방 요약(lastMessage, lastMessageAt)을 함께 갱신한다.
     const roomId = String(payload.roomId || '').trim();
     const text = String(payload.text || '').trim();
     const type = payload.type === 'system' ? 'system' : 'text';
@@ -347,7 +402,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', async () => {
-    // 연결 종료 시 참여 중인 방들의 온라인 상태를 다시 계산해 브로드캐스트한다.
+// 연결 종료 시 참여 중인 방들의 온라인 상태를 다시 계산해 브로드캐스트한다.
     const joinedRoomIds = collectJoinedRoomIds(socket);
     joinedRoomIds.forEach((roomId) => {
       removePresence(roomId, socket.user.userId, socket.id);
@@ -385,3 +440,4 @@ start().catch((error) => {
   console.error('Failed to start server:', error.message);
   process.exit(1);
 });
+
