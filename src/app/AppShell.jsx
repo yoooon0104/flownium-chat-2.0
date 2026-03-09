@@ -15,6 +15,7 @@ import { useFriends } from '../features/friends/hooks/useFriends'
 import ProfileModal from '../features/user/components/ProfileModal'
 import SettingsModal from '../features/user/components/SettingsModal'
 import { useNotifications } from '../features/notifications/hooks/useNotifications'
+import NotificationsScreen from '../features/notifications/components/NotificationsScreen'
 import { createChatApi } from '../services/api/chatApi'
 import { createChatSocketClient } from '../services/socket/chatSocketClient'
 
@@ -61,7 +62,12 @@ function AppShell() {
 
   const [text, setText] = useState('')
   const [isMobileChatView, setIsMobileChatView] = useState(false)
+  const [isMobileNotificationView, setIsMobileNotificationView] = useState(false)
   const [activeTab, setActiveTab] = useState('friends')
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth <= 767
+  })
 
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = useState(false)
   const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false)
@@ -137,7 +143,7 @@ function AppShell() {
     notificationsLoading,
     notificationErrorMessage,
     fetchNotifications,
-    markNotificationRead,
+    markAllNotificationsRead,
     clearNotifications,
   } = useNotifications({ chatApi })
 
@@ -147,6 +153,7 @@ function AppShell() {
     setParticipants([])
     setText('')
     setIsMobileChatView(false)
+    setIsMobileNotificationView(false)
     setIsParticipantsMenuOpen(false)
     setIsNotificationMenuOpen(false)
     setIsCreateRoomModalOpen(false)
@@ -180,6 +187,7 @@ function AppShell() {
   const handleSocketRoomJoined = useCallback((nextRoomId) => {
     setJoinedRoomId(nextRoomId)
     setIsMobileChatView(true)
+    setIsMobileNotificationView(false)
     setIsParticipantsMenuOpen(false)
     void loadMessageHistory(nextRoomId)
     void fetchRooms()
@@ -232,6 +240,26 @@ function AppShell() {
     void fetchNotifications()
   }, [accessToken, chatApi, fetchFriends, fetchNotifications, fetchRooms])
 
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileViewport(window.innerWidth <= 767)
+    }
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // 알림 허브는 열람 자체를 읽음으로 간주한다.
+  // 처리해야 하는 친구 요청은 pending 목록에서 따로 관리되므로 최근 알림만 자동 읽음 처리한다.
+  useEffect(() => {
+    if (!chatApi) return
+    if (!isNotificationMenuOpen && !isMobileNotificationView) return
+    if (notificationsLoading || unreadCount === 0) return
+
+    void markAllNotificationsRead()
+  }, [chatApi, isMobileNotificationView, isNotificationMenuOpen, markAllNotificationsRead, notificationsLoading, unreadCount])
+
   const joinRoom = useCallback((roomId) => {
     if (!roomId) return
 
@@ -264,6 +292,7 @@ function AppShell() {
     if (!result.ok) return result
 
     setIsCreateRoomModalOpen(false)
+    setIsMobileNotificationView(false)
     void fetchNotifications()
     if (result.roomId) {
       emitJoinRoom(result.roomId)
@@ -279,6 +308,7 @@ function AppShell() {
 
     setActiveTab('rooms')
     setSelectedMobileFriend(null)
+    setIsMobileNotificationView(false)
     void fetchNotifications()
     if (result.roomId) {
       emitJoinRoom(result.roomId)
@@ -349,6 +379,8 @@ function AppShell() {
       <section className="chat-layout">
         <RoomPanel
           isMobileChatView={isMobileChatView}
+          isMobileNotificationView={isMobileNotificationView}
+          isMobileViewport={isMobileViewport}
           activeTab={activeTab}
           onChangeTab={setActiveTab}
           roomsLoading={roomsLoading}
@@ -373,14 +405,20 @@ function AppShell() {
           currentUser={currentUser}
           unreadCount={unreadCount}
           isNotificationMenuOpen={isNotificationMenuOpen}
-          onToggleNotificationMenu={setIsNotificationMenuOpen}
+          onToggleNotificationMenu={(next) => {
+            if (isMobileViewport) {
+              setIsMobileNotificationView(Boolean(next))
+              setIsNotificationMenuOpen(false)
+              return
+            }
+            setIsNotificationMenuOpen(Boolean(next))
+          }}
           notificationsLoading={notificationsLoading}
           notifications={notifications}
           pendingReceived={pendingReceived}
           pendingSent={pendingSent}
           notificationErrorMessage={notificationErrorMessage}
           onRespondFriendRequest={handleRespondFriendRequest}
-          onMarkNotificationRead={markNotificationRead}
           isUserMenuOpen={isUserMenuOpen}
           onToggleUserMenu={setIsUserMenuOpen}
           onOpenProfile={() => {
@@ -421,6 +459,18 @@ function AppShell() {
           onSendMessage={handleSendMessage}
           canSend={canSend}
         />
+
+        {isMobileNotificationView && (
+          <NotificationsScreen
+            unreadCount={unreadCount}
+            notificationsLoading={notificationsLoading}
+            notifications={notifications}
+            pendingReceived={pendingReceived}
+            notificationErrorMessage={notificationErrorMessage}
+            onRespondFriendRequest={handleRespondFriendRequest}
+            onBack={() => setIsMobileNotificationView(false)}
+          />
+        )}
       </section>
 
       <CreateRoomModal

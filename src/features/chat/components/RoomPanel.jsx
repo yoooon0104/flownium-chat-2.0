@@ -21,6 +21,8 @@ const getFriendSectionLabel = (friend) => {
 // Friends 탭은 친구 목록만 보여주고 요청/초대 알림은 상단 벨 메뉴로 분리한다.
 function RoomPanel({
   isMobileChatView,
+  isMobileNotificationView,
+  isMobileViewport,
   activeTab,
   onChangeTab,
   roomsLoading,
@@ -72,7 +74,7 @@ function RoomPanel({
   }, [filteredFriends])
 
   return (
-    <aside className={`room-panel ${isMobileChatView ? 'mobile-hidden' : ''}`}>
+    <aside className={`room-panel ${isMobileChatView || isMobileNotificationView ? 'mobile-hidden' : ''}`}>
       <div className="panel-profile-header">
         <button type="button" className="panel-profile" onClick={onOpenProfile}>
           <span className="panel-profile-avatar">
@@ -97,8 +99,10 @@ function RoomPanel({
             ＋
           </button>
           <NotificationMenu
+            isMobile={isMobileViewport}
             isOpen={isNotificationMenuOpen}
             onToggle={onToggleNotificationMenu}
+            onOpenMobileScreen={() => onToggleNotificationMenu(true)}
             unreadCount={unreadCount}
             notificationsLoading={notificationsLoading}
             notifications={notifications}

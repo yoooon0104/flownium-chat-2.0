@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+﻿import { useCallback, useState } from 'react'
 
 const resolveErrorMessage = (body, fallback) => {
   if (body?.error?.message) return String(body.error.message)
@@ -7,7 +7,7 @@ const resolveErrorMessage = (body, fallback) => {
 }
 
 // 알림 목록과 읽지 않은 개수를 관리한다.
-// 이번 브랜치에서는 친구 요청/방 초대 알림을 상단 벨 메뉴에서 보여주는 용도다.
+// 현재 단계에서는 알림 허브를 열람하면 최근 알림을 자동 읽음 처리한다.
 export const useNotifications = ({ chatApi }) => {
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -40,9 +40,26 @@ export const useNotifications = ({ chatApi }) => {
       return { ok: false, body }
     }
 
-    await fetchNotifications()
     return { ok: true, body }
-  }, [chatApi, fetchNotifications])
+  }, [chatApi])
+
+  const markAllNotificationsRead = useCallback(async () => {
+    if (!chatApi) return { ok: false }
+
+    const unreadNotifications = notifications.filter((item) => !item.isRead)
+    if (unreadNotifications.length === 0) return { ok: true, body: null }
+
+    for (const item of unreadNotifications) {
+      const { ok, body } = await chatApi.markNotificationRead(item.id)
+      if (!ok) {
+        setNotificationErrorMessage(resolveErrorMessage(body, '알림 읽음 처리에 실패했습니다.'))
+        return { ok: false, body }
+      }
+    }
+
+    await fetchNotifications()
+    return { ok: true, body: null }
+  }, [chatApi, fetchNotifications, notifications])
 
   const clearNotifications = useCallback(() => {
     setNotifications([])
@@ -58,6 +75,7 @@ export const useNotifications = ({ chatApi }) => {
     notificationErrorMessage,
     fetchNotifications,
     markNotificationRead,
+    markAllNotificationsRead,
     clearNotifications,
   }
 }

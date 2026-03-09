@@ -7,24 +7,24 @@ const toCreatedLabel = (value) => {
   return date.toLocaleString()
 }
 
-// 알림 메뉴는 친구 요청과 방 초대를 친구 목록 본문과 분리해서 보여준다.
-// Friends 탭은 친구 탐색에만 집중시키고, 처리성 액션은 벨 허브에서 모은다.
+// 데스크톱은 드롭다운 알림 허브를 유지한다.
+// 모바일은 이 버튼이 별도 알림 화면 진입 버튼 역할만 한다.
 function NotificationMenu({
+  isMobile,
   isOpen,
   onToggle,
+  onOpenMobileScreen,
   unreadCount,
   notificationsLoading,
   notifications,
   pendingReceived,
-  pendingSent,
   notificationErrorMessage,
   onRespondFriendRequest,
-  onMarkNotificationRead,
 }) {
   const menuRef = useRef(null)
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || isMobile) return
 
     const handleOutside = (event) => {
       if (!menuRef.current?.contains(event.target)) {
@@ -44,27 +44,38 @@ function NotificationMenu({
       window.removeEventListener('mousedown', handleOutside)
       window.removeEventListener('keydown', handleEscape)
     }
-  }, [isOpen, onToggle])
+  }, [isMobile, isOpen, onToggle])
 
   return (
     <div className="notification-menu" ref={menuRef}>
-      <button type="button" className="notification-button" aria-label="알림 메뉴" onClick={() => onToggle(!isOpen)}>
+      <button
+        type="button"
+        className="notification-button"
+        aria-label="알림 메뉴"
+        onClick={() => {
+          if (isMobile) {
+            onOpenMobileScreen()
+            return
+          }
+          onToggle(!isOpen)
+        }}
+      >
         <span className="notification-button-icon">🔔</span>
         {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
       </button>
 
-      {isOpen && (
+      {!isMobile && isOpen && (
         <section className="notification-dropdown" role="dialog" aria-label="알림 목록">
           <header className="notification-header">
             <strong>알림 허브</strong>
-            <small>친구 요청과 방 초대, 최근 알림을 한곳에서 확인한다.</small>
+            <small>처리할 요청과 최근 알림을 한곳에서 확인한다.</small>
           </header>
 
           {notificationErrorMessage && <p className="error-text modal-error">{notificationErrorMessage}</p>}
 
           <div className="notification-section">
             <div className="notification-section-title">받은 친구 요청</div>
-            {pendingReceived.length === 0 && <p className="notification-empty">받은 요청이 없습니다.</p>}
+            {pendingReceived.length === 0 && <p className="notification-empty">처리할 친구 요청이 없습니다.</p>}
             <ul className="notification-list">
               {pendingReceived.map((item) => (
                 <li key={item.id} className="notification-row actionable">
@@ -75,21 +86,6 @@ function NotificationMenu({
                   <div className="notification-actions">
                     <button type="button" onClick={() => void onRespondFriendRequest(item.id, 'accept')}>수락</button>
                     <button type="button" className="secondary" onClick={() => void onRespondFriendRequest(item.id, 'reject')}>거절</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="notification-section">
-            <div className="notification-section-title">보낸 친구 요청</div>
-            {pendingSent.length === 0 && <p className="notification-empty">보낸 요청이 없습니다.</p>}
-            <ul className="notification-list">
-              {pendingSent.map((item) => (
-                <li key={item.id} className="notification-row">
-                  <div className="notification-main">
-                    <strong>{item.counterpart.nickname || '이름 없음'}</strong>
-                    <small>응답 대기 중</small>
                   </div>
                 </li>
               ))}
@@ -108,11 +104,6 @@ function NotificationMenu({
                     <small>{item.payload?.roomName || item.payload?.requester?.nickname || '추가 정보 없음'}</small>
                     <small>{toCreatedLabel(item.createdAt)}</small>
                   </div>
-                  {!item.isRead && (
-                    <button type="button" className="secondary inline-action-button" onClick={() => void onMarkNotificationRead(item.id)}>
-                      읽음
-                    </button>
-                  )}
                 </li>
               ))}
             </ul>
