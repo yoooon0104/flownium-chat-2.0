@@ -10,6 +10,8 @@ export const useChatSocket = ({
   onRoomJoined,
   onReceiveMessage,
   onRoomParticipants,
+  onNotificationCreated,
+  onNotificationRead,
   onError,
 }) => {
   const socketRef = useRef(null)
@@ -79,9 +81,18 @@ export const useChatSocket = ({
       onRoomParticipants?.(Array.isArray(payload?.participants) ? payload.participants : [])
     })
 
+    // 메시지는 현재 방 여부와 상관없이 AppShell까지 모두 전달한다.
+    // 현재 방이면 본문에 append하고, 다른 방이면 목록 unread만 갱신하는 쪽이 상위 레벨에서 더 안전하다.
     client.on('receive_message', (payload) => {
-      if (payload?.chatRoomId !== currentRoomRef.current) return
       onReceiveMessage?.(payload)
+    })
+
+    client.on('notification_created', (payload) => {
+      onNotificationCreated?.(payload?.notification || payload)
+    })
+
+    client.on('notification_read', (payload) => {
+      onNotificationRead?.(payload?.notification || payload)
     })
 
     client.on('error', (payload) => {
@@ -103,6 +114,8 @@ export const useChatSocket = ({
     isAuthInitializing,
     onConnect,
     onError,
+    onNotificationCreated,
+    onNotificationRead,
     onReceiveMessage,
     onRoomJoined,
     onRoomParticipants,
