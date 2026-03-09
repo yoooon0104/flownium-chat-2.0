@@ -28,3 +28,37 @@
 1. 배포 관련 변경은 docs/operations/deploy-runbook.md 체크리스트를 기준으로 검증한다.
 2. 장애/운영 이슈 기준은 docs/operations/ops-log-policy.md를 따른다.
 3. 장애 발생 후에는 원인/조치/재발방지를 문서로 남기고 WBS를 동기화한다.
+
+## PR 공유 규칙
+
+1. 브랜치 푸시 후에는 PR 생성 링크 또는 Compare 링크를 반드시 함께 전달한다.
+2. 사용자에게 공유하는 PR 요약은 아래 항목 순서를 유지한다.
+3. 항목명은 임의로 바꾸지 않는다.
+
+```md
+Title
+`<commit or PR title>`
+
+Summary
+<변경 목적과 핵심 요약>
+
+Changed Files
+- <file path>
+
+What’s Included
+- <구현/수정 내용>
+
+Impact
+- <영향 범위>
+
+Validation
+- <테스트/검증 결과>
+
+Branch / Commit
+- Branch: `<branch-name>`
+- Commit: `<commit-sha>`
+- Push: `<remote status>`
+
+PR
+- <pull request url or compare url>
+```
