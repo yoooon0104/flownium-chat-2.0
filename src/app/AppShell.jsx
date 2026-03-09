@@ -9,16 +9,17 @@ import CreateRoomModal from '../features/chat/components/CreateRoomModal'
 import { useChatMessages } from '../features/chat/hooks/useChatMessages'
 import { useChatRooms } from '../features/chat/hooks/useChatRooms'
 import { useChatSocket } from '../features/chat/hooks/useChatSocket'
-import UserMenu from '../features/user/components/UserMenu'
+import AddFriendModal from '../features/friends/components/AddFriendModal'
+import FriendActionSheet from '../features/friends/components/FriendActionSheet'
+import { useFriends } from '../features/friends/hooks/useFriends'
 import ProfileModal from '../features/user/components/ProfileModal'
 import SettingsModal from '../features/user/components/SettingsModal'
+import { useNotifications } from '../features/notifications/hooks/useNotifications'
 import { createChatApi } from '../services/api/chatApi'
 import { createChatSocketClient } from '../services/socket/chatSocketClient'
 
-// 배포 환경에서는 VITE_API_BASE_URL을 사용하고, 미설정 시 로컬 기본값으로 동작한다.
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3010').replace(/\/$/, '')
 
-// 토큰 payload에서 사용자 식별자를 복구해 초기 렌더 fallback으로 사용한다.
 const parseJwtPayload = (token) => {
   try {
     if (!token) return null
@@ -56,12 +57,15 @@ function AppShell() {
   const [joinedRoomId, setJoinedRoomId] = useState('')
   const [participants, setParticipants] = useState([])
   const [isParticipantsMenuOpen, setIsParticipantsMenuOpen] = useState(false)
+  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false)
 
   const [text, setText] = useState('')
   const [isMobileChatView, setIsMobileChatView] = useState(false)
+  const [activeTab, setActiveTab] = useState('friends')
 
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = useState(false)
-  const [newRoomName, setNewRoomName] = useState('')
+  const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false)
+  const [selectedMobileFriend, setSelectedMobileFriend] = useState(null)
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
@@ -75,6 +79,7 @@ function AppShell() {
       id: String(authPayload?.userId || authPayload?.sub || ''),
       nickname: String(authPayload?.nickname || '게스트'),
       profileImage: '',
+      email: '',
     }
   }, [authPayload, user])
 
@@ -111,6 +116,31 @@ function AppShell() {
     clearRooms,
   } = useChatRooms({ chatApi })
 
+  const {
+    acceptedFriends,
+    pendingReceived,
+    pendingSent,
+    friendsLoading,
+    friendSearchResults,
+    friendSearchLoading,
+    friendErrorMessage,
+    fetchFriends,
+    searchFriends,
+    requestFriend,
+    respondToFriendRequest,
+    clearFriends,
+  } = useFriends({ chatApi })
+
+  const {
+    notifications,
+    unreadCount,
+    notificationsLoading,
+    notificationErrorMessage,
+    fetchNotifications,
+    markNotificationRead,
+    clearNotifications,
+  } = useNotifications({ chatApi })
+
   const handleLogout = useCallback(() => {
     clearSession('')
     setJoinedRoomId('')
@@ -118,20 +148,26 @@ function AppShell() {
     setText('')
     setIsMobileChatView(false)
     setIsParticipantsMenuOpen(false)
+    setIsNotificationMenuOpen(false)
     setIsCreateRoomModalOpen(false)
-    setNewRoomName('')
+    setIsAddFriendModalOpen(false)
+    setSelectedMobileFriend(null)
     setIsUserMenuOpen(false)
     setIsProfileModalOpen(false)
     setIsSettingsModalOpen(false)
     setErrorMessage('')
     clearRooms()
     clearMessages()
-  }, [clearMessages, clearRooms, clearSession, setErrorMessage])
+    clearFriends()
+    clearNotifications()
+  }, [clearFriends, clearMessages, clearNotifications, clearRooms, clearSession, setErrorMessage])
 
   const handleSocketConnect = useCallback(() => {
     setErrorMessage('')
     void fetchRooms()
-  }, [fetchRooms, setErrorMessage])
+    void fetchFriends()
+    void fetchNotifications()
+  }, [fetchFriends, fetchNotifications, fetchRooms, setErrorMessage])
 
   const handleSocketUnauthorized = useCallback(async () => {
     const refreshed = await refreshAccessToken()
@@ -185,10 +221,16 @@ function AppShell() {
   }, [joinedRoomId, setCurrentRoom])
 
   useEffect(() => {
-    // 메시지가 추가되면 마지막 항목으로 자동 스크롤한다.
     if (!messagesEndRef.current) return
     messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, joinedRoomId, isLoadingHistory])
+
+  useEffect(() => {
+    if (!accessToken || !chatApi) return
+    void fetchRooms()
+    void fetchFriends()
+    void fetchNotifications()
+  }, [accessToken, chatApi, fetchFriends, fetchNotifications, fetchRooms])
 
   const joinRoom = useCallback((roomId) => {
     if (!roomId) return
@@ -217,23 +259,71 @@ function AppShell() {
     }
   }, [handleSendMessage])
 
-  const handleCreateRoomSubmit = useCallback(async () => {
-    const { ok, roomId } = await createRoom(newRoomName)
-    if (!ok) return
+  const handleCreateRoomSubmit = useCallback(async (payload) => {
+    const result = await createRoom(payload)
+    if (!result.ok) return result
 
     setIsCreateRoomModalOpen(false)
-    setNewRoomName('')
-
-    if (roomId) {
-      emitJoinRoom(roomId)
+    void fetchNotifications()
+    if (result.roomId) {
+      emitJoinRoom(result.roomId)
     }
-  }, [createRoom, emitJoinRoom, newRoomName])
+    return result
+  }, [createRoom, emitJoinRoom, fetchNotifications])
+
+  const startDirectChat = useCallback(async (friend) => {
+    if (!friend?.id) return
+
+    const result = await createRoom({ memberUserIds: [friend.id] })
+    if (!result.ok) return
+
+    setActiveTab('rooms')
+    setSelectedMobileFriend(null)
+    void fetchNotifications()
+    if (result.roomId) {
+      emitJoinRoom(result.roomId)
+    }
+  }, [createRoom, emitJoinRoom, fetchNotifications])
+
+  const handleRequestFriend = useCallback(async (targetUserId) => {
+    await requestFriend(targetUserId)
+    void fetchNotifications()
+  }, [fetchNotifications, requestFriend])
+
+  const handleRespondFriendRequest = useCallback(async (requestId, action) => {
+    await respondToFriendRequest(requestId, action)
+    void fetchNotifications()
+  }, [fetchNotifications, respondToFriendRequest])
 
   const activeRoom = useMemo(() => {
     return rooms.find((room) => room.id === joinedRoomId) || null
   }, [rooms, joinedRoomId])
 
   const canSend = Boolean(isConnected && joinedRoomId && text.trim().length > 0)
+
+  const filteredFriends = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase()
+    const friends = acceptedFriends
+      .map((item) => ({
+        id: item.counterpart.id,
+        nickname: item.counterpart.nickname || '',
+        email: item.counterpart.email || '',
+        profileImage: item.counterpart.profileImage || '',
+      }))
+      .sort((a, b) => {
+        const left = `${a.nickname} ${a.email}`.trim()
+        const right = `${b.nickname} ${b.email}`.trim()
+        return left.localeCompare(right, 'ko')
+      })
+
+    if (!keyword) return friends
+
+    return friends.filter((friend) => {
+      const nickname = String(friend.nickname || '').toLowerCase()
+      const email = String(friend.email || '').toLowerCase()
+      return nickname.includes(keyword) || email.includes(keyword)
+    })
+  }, [acceptedFriends, searchKeyword])
 
   if (isInitializing) {
     return <LoginGate isLoading authError={error} onStartKakaoLogin={startKakaoLogin} />
@@ -256,36 +346,55 @@ function AppShell() {
 
   return (
     <main className="chat-app">
-      <UserMenu
-        isOpen={isUserMenuOpen}
-        onToggle={setIsUserMenuOpen}
-        isFloating
-        onOpenProfile={() => {
-          setIsUserMenuOpen(false)
-          setIsProfileModalOpen(true)
-        }}
-        onOpenSettings={() => {
-          setIsUserMenuOpen(false)
-          setIsSettingsModalOpen(true)
-        }}
-        onLogout={() => {
-          disconnectSocket()
-          handleLogout()
-        }}
-      />
-
       <section className="chat-layout">
         <RoomPanel
           isMobileChatView={isMobileChatView}
+          activeTab={activeTab}
+          onChangeTab={setActiveTab}
           roomsLoading={roomsLoading}
-          rooms={rooms}
+          friendsLoading={friendsLoading}
           filteredRooms={filteredRooms}
+          filteredFriends={filteredFriends}
           searchKeyword={searchKeyword}
           onSearch={setSearchKeyword}
           joinedRoomId={joinedRoomId}
           onJoinRoom={joinRoom}
           onOpenCreateRoom={() => setIsCreateRoomModalOpen(true)}
+          onOpenAddFriend={() => setIsAddFriendModalOpen(true)}
+          onFriendDoubleClick={startDirectChat}
+          onFriendTap={(friend) => {
+            if (window.innerWidth <= 767) {
+              setSelectedMobileFriend(friend)
+              return
+            }
+            void startDirectChat(friend)
+          }}
           toTimeLabel={toTimeLabel}
+          currentUser={currentUser}
+          unreadCount={unreadCount}
+          isNotificationMenuOpen={isNotificationMenuOpen}
+          onToggleNotificationMenu={setIsNotificationMenuOpen}
+          notificationsLoading={notificationsLoading}
+          notifications={notifications}
+          pendingReceived={pendingReceived}
+          pendingSent={pendingSent}
+          notificationErrorMessage={notificationErrorMessage}
+          onRespondFriendRequest={handleRespondFriendRequest}
+          onMarkNotificationRead={markNotificationRead}
+          isUserMenuOpen={isUserMenuOpen}
+          onToggleUserMenu={setIsUserMenuOpen}
+          onOpenProfile={() => {
+            setIsUserMenuOpen(false)
+            setIsProfileModalOpen(true)
+          }}
+          onOpenSettings={() => {
+            setIsUserMenuOpen(false)
+            setIsSettingsModalOpen(true)
+          }}
+          onLogout={() => {
+            disconnectSocket()
+            handleLogout()
+          }}
         />
 
         <ChatPanel
@@ -300,7 +409,7 @@ function AppShell() {
             onToggle: setIsParticipantsMenuOpen,
             currentUserId: currentUser?.id || '',
           }}
-          errorMessage={errorMessage}
+          errorMessage={errorMessage || friendErrorMessage || notificationErrorMessage}
           isLoadingHistory={isLoadingHistory}
           historyError={historyError}
           messages={messages}
@@ -316,10 +425,27 @@ function AppShell() {
 
       <CreateRoomModal
         isOpen={isCreateRoomModalOpen}
-        roomName={newRoomName}
-        onChangeRoomName={setNewRoomName}
+        friends={filteredFriends}
+        errorMessage={errorMessage}
         onClose={() => setIsCreateRoomModalOpen(false)}
         onSubmit={handleCreateRoomSubmit}
+      />
+
+      <AddFriendModal
+        isOpen={isAddFriendModalOpen}
+        isLoading={friendSearchLoading}
+        results={friendSearchResults}
+        errorMessage={friendErrorMessage}
+        onSearch={searchFriends}
+        onRequestFriend={handleRequestFriend}
+        onClose={() => setIsAddFriendModalOpen(false)}
+      />
+
+      <FriendActionSheet
+        friend={selectedMobileFriend}
+        isOpen={Boolean(selectedMobileFriend)}
+        onStartChat={startDirectChat}
+        onClose={() => setSelectedMobileFriend(null)}
       />
 
       <ProfileModal
@@ -339,4 +465,3 @@ function AppShell() {
 }
 
 export default AppShell
-

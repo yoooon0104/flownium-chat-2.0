@@ -32,20 +32,20 @@ function ChatPanel({
         </button>
 
         <div className="chat-header-main">
-          <h3>{activeRoom?.name || 'Select a room'}</h3>
-          <p>{joinedRoomId ? `Room ID: ${joinedRoomId}` : 'Choose a room from left panel.'}</p>
+          <h3>{activeRoom?.name || '채팅방을 선택해 주세요'}</h3>
+          <p>{joinedRoomId ? `방 ID: ${joinedRoomId}` : '좌측 패널에서 채팅방을 선택하면 대화를 시작할 수 있다.'}</p>
         </div>
 
         <ParticipantsMenu {...participantsProps} />
       </div>
 
       <div className="message-area">
-        {errorMessage && <p className="error-text">Error: {errorMessage}</p>}
-        {isLoadingHistory && <p className="muted-text">Loading history...</p>}
+        {errorMessage && <p className="error-text">오류: {errorMessage}</p>}
+        {isLoadingHistory && <p className="muted-text">이전 메시지를 불러오는 중입니다.</p>}
         {historyError && <p className="warn-text">{historyError}</p>}
 
         {messages.length === 0 ? (
-          <p className="muted-text">No messages.</p>
+          <p className="muted-text">표시할 메시지가 없습니다.</p>
         ) : (
           <ul className="message-list">
             {messages.map((msg, idx) => {
@@ -68,11 +68,11 @@ function ChatPanel({
           value={text}
           onChange={(event) => onTextChange(event.target.value)}
           onKeyUp={onComposerKeyUp}
-          placeholder={joinedRoomId ? 'Type a message' : 'Join a room first'}
+          placeholder={joinedRoomId ? '메시지를 입력해 주세요' : '먼저 채팅방에 입장해 주세요'}
           disabled={!joinedRoomId}
         />
         <button type="button" onClick={onSendMessage} disabled={!canSend}>
-          Send
+          전송
         </button>
       </div>
     </section>
