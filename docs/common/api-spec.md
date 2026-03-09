@@ -1,4 +1,4 @@
-# API 명세
+﻿# API 명세
 
 기본 경로: `/api` (인증 관련은 `/auth`)
 
@@ -308,6 +308,25 @@ MVP2-A 1차 표준:
 ### GET /api/chatrooms
 - 현재 사용자가 참여 중인 방 목록 조회
 - 정렬: `lastMessageAt desc` -> `createdAt desc`
+- 응답에 방별 `unreadCount`, 전체 `totalUnreadCount` 포함
+
+응답 예시:
+```json
+{
+  "rooms": [
+    {
+      "id": "chatroomId",
+      "name": "프로젝트 회의방",
+      "isGroup": true,
+      "memberIds": ["u1", "u2"],
+      "lastMessage": "안녕하세요",
+      "lastMessageAt": "2026-03-09T12:00:00.000Z",
+      "unreadCount": 3
+    }
+  ],
+  "totalUnreadCount": 5
+}
+```
 
 대표 오류:
 - `401 UNAUTHORIZED`
@@ -318,10 +337,50 @@ MVP2-A 1차 표준:
 - 방 메시지 히스토리 조회
 - 현재 사용자가 해당 방 멤버여야 함
 - 쿼리: `limit` (기본 50, 최대 100)
+- 각 메시지 응답에 메시지별 `unreadCount` 포함
+
+응답 예시:
+```json
+{
+  "roomId": "chatroomId",
+  "count": 2,
+  "messages": [
+    {
+      "id": "messageId",
+      "chatRoomId": "chatroomId",
+      "senderId": "u1",
+      "senderNickname": "alice",
+      "type": "text",
+      "text": "hello",
+      "timestamp": "2026-03-09T12:00:00.000Z",
+      "unreadCount": 1
+    }
+  ]
+}
+```
 
 대표 오류:
 - `400 INVALID_REQUEST`
 - `403 FORBIDDEN`
 - `404 ROOM_NOT_FOUND`
 - `500 MESSAGE_FETCH_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+### PATCH /api/chatrooms/:id/read
+- 현재 사용자의 방 읽음 시점 갱신
+- 방에 실제 입장한 시점을 기준으로 unread 계산 기준을 갱신
+
+응답 예시:
+```json
+{
+  "roomId": "chatroomId",
+  "lastReadAt": "2026-03-09T12:05:00.000Z"
+}
+```
+
+대표 오류:
+- `400 INVALID_REQUEST`
+- `403 FORBIDDEN`
+- `404 ROOM_NOT_FOUND`
+- `500 READ_STATE_UPDATE_FAILED`
 - `503 DB_NOT_CONNECTED`

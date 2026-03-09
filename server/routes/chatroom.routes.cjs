@@ -1,32 +1,33 @@
-const express = require("express");
-const { sendError } = require("../utils/error-response.cjs");
+﻿const express = require('express');
+const { sendError } = require('../utils/error-response.cjs');
 
-// ChatRoom REST API를 생성한다. 인증과 DB 체크는 상위에서 주입받는다.
+// ChatRoom REST API를 생성한다.
+// unread count는 사용자별 읽음 상태를 기준으로 계산해 방 목록 응답에 함께 내려준다.
 const createChatroomRouter = ({
   ChatRoom,
   Message,
   User,
   Friendship,
   Notification,
+  ChatReadState,
   requireAuth,
   assertDbConnected,
   emitNotificationCreated,
 }) => {
   const router = express.Router();
 
-  const toRoomResponse = (roomDoc) => ({
+  const toRoomResponse = (roomDoc, unreadCount = 0) => ({
     id: String(roomDoc._id),
     name: roomDoc.name,
     isGroup: Boolean(roomDoc.isGroup),
     memberIds: Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds : [],
-    lastMessage: roomDoc.lastMessage || "",
+    lastMessage: roomDoc.lastMessage || '',
     lastMessageAt: roomDoc.lastMessageAt ? new Date(roomDoc.lastMessageAt).toISOString() : null,
+    unreadCount: Number(unreadCount) || 0,
   });
 
   const createNotification = async (userId, type, payload) => {
-    if (!Notification) {
-      return null;
-    }
+    if (!Notification) return null;
 
     const notification = await Notification.create({
       userId,
@@ -46,21 +47,17 @@ const createChatroomRouter = ({
     return notification;
   };
 
-  // 현재 사용자와 대상 사용자가 수락된 친구 관계인지 확인한다.
   const hasAcceptedFriendship = async (me, targetUserId) => {
-    if (!Friendship) {
-      return false;
-    }
+    if (!Friendship) return false;
 
     const friendship = await Friendship.findOne({
-      pairKey: [String(me), String(targetUserId)].sort().join(":"),
-      status: "accepted",
+      pairKey: [String(me), String(targetUserId)].sort().join(':'),
+      status: 'accepted',
     }).lean();
 
     return Boolean(friendship);
   };
 
-  // 현재 사용자와 대상 사용자만 포함된 기존 2인 방이 있으면 재사용한다.
   const findExistingDirectRoom = async (memberA, memberB) => {
     const rooms = await ChatRoom.find({
       memberIds: { $all: [memberA, memberB] },
@@ -71,13 +68,47 @@ const createChatroomRouter = ({
     return rooms.find((room) => Array.isArray(room.memberIds) && room.memberIds.length === 2) || null;
   };
 
-  // 채팅방 생성은 기존 그룹 생성과 친구 기반 1:1/그룹 생성을 모두 지원한다.
-  router.post("/chatrooms", requireAuth, async (req, res) => {
+  const getUnreadCountForRoom = async (roomId, userId, lastReadAt) => {
+    const query = {
+      chatRoomId: roomId,
+      senderId: { $ne: userId },
+    };
+
+    if (lastReadAt) {
+      query.timestamp = { $gt: lastReadAt };
+    }
+
+    return Message.countDocuments(query);
+  };
+
+  const buildMessageResponses = (messages, memberIds, readStateByUserId) =>
+    messages.map((message) => {
+      const timestamp = message.timestamp ? new Date(message.timestamp) : null;
+      const unreadCount = memberIds.filter((memberId) => {
+        if (memberId === message.senderId) return false;
+        const readState = readStateByUserId.get(String(memberId));
+        if (!readState?.lastReadAt || !timestamp) return true;
+        return new Date(readState.lastReadAt) < timestamp;
+      }).length;
+
+      return {
+        id: String(message._id),
+        chatRoomId: message.chatRoomId,
+        senderId: message.senderId,
+        senderNickname: message.senderNickname,
+        type: message.type,
+        text: message.text,
+        timestamp: timestamp ? timestamp.toISOString() : null,
+        unreadCount,
+      };
+    });
+
+  router.post('/chatrooms', requireAuth, async (req, res) => {
     const currentUserId = req.user.userId;
-    const name = String(req.body?.name || "").trim();
+    const name = String(req.body?.name || '').trim();
     const rawMemberUserIds = Array.isArray(req.body?.memberUserIds) ? req.body.memberUserIds : null;
     const normalizedTargetIds = rawMemberUserIds
-      ? [...new Set(rawMemberUserIds.map((value) => String(value || "").trim()).filter(Boolean))]
+      ? [...new Set(rawMemberUserIds.map((value) => String(value || '').trim()).filter(Boolean))]
       : null;
 
     if (!assertDbConnected(res)) {
@@ -85,10 +116,9 @@ const createChatroomRouter = ({
     }
 
     try {
-      // 현재 프론트와의 호환성을 위해 memberUserIds가 없으면 기존 name 기반 그룹 생성으로 처리한다.
       if (!normalizedTargetIds) {
         if (!name) {
-          sendError(res, 400, "INVALID_REQUEST", "name is required");
+          sendError(res, 400, 'INVALID_REQUEST', 'name is required');
           return;
         }
 
@@ -103,18 +133,18 @@ const createChatroomRouter = ({
       }
 
       if (normalizedTargetIds.includes(currentUserId)) {
-        sendError(res, 400, "INVALID_REQUEST", "memberUserIds must not include current user");
+        sendError(res, 400, 'INVALID_REQUEST', 'memberUserIds must not include current user');
         return;
       }
 
       if (normalizedTargetIds.length === 0) {
-        sendError(res, 400, "INVALID_REQUEST", "memberUserIds is required");
+        sendError(res, 400, 'INVALID_REQUEST', 'memberUserIds is required');
         return;
       }
 
       const targetUsers = await User.find({ _id: { $in: normalizedTargetIds } }).lean();
       if (targetUsers.length !== normalizedTargetIds.length) {
-        sendError(res, 404, "USER_NOT_FOUND", "one or more users were not found");
+        sendError(res, 404, 'USER_NOT_FOUND', 'one or more users were not found');
         return;
       }
 
@@ -123,7 +153,7 @@ const createChatroomRouter = ({
       for (const targetUserId of normalizedTargetIds) {
         const isFriend = await hasAcceptedFriendship(currentUserId, targetUserId);
         if (!isFriend) {
-          sendError(res, 403, "FRIENDSHIP_REQUIRED", "friendship is required");
+          sendError(res, 403, 'FRIENDSHIP_REQUIRED', 'friendship is required');
           return;
         }
       }
@@ -138,12 +168,12 @@ const createChatroomRouter = ({
 
         const friendUser = targetUserById.get(friendUserId);
         const room = await ChatRoom.create({
-          name: friendUser?.nickname || "1:1 채팅",
+          name: friendUser?.nickname || '1:1 채팅',
           isGroup: false,
           memberIds: [currentUserId, friendUserId],
         });
 
-        await createNotification(friendUserId, "room_invite", {
+        await createNotification(friendUserId, 'room_invite', {
           roomId: String(room._id),
           roomName: room.name,
           inviter: {
@@ -157,7 +187,7 @@ const createChatroomRouter = ({
       }
 
       if (!name) {
-        sendError(res, 400, "INVALID_ROOM_NAME", "name is required for group chatrooms");
+        sendError(res, 400, 'INVALID_ROOM_NAME', 'name is required for group chatrooms');
         return;
       }
 
@@ -170,7 +200,7 @@ const createChatroomRouter = ({
 
       await Promise.all(
         normalizedTargetIds.map((targetUserId) =>
-          createNotification(targetUserId, "room_invite", {
+          createNotification(targetUserId, 'room_invite', {
             roomId: String(room._id),
             roomName: room.name,
             inviter: {
@@ -183,12 +213,11 @@ const createChatroomRouter = ({
 
       res.status(201).json({ room: toRoomResponse(room) });
     } catch (error) {
-      sendError(res, 500, "CHATROOM_CREATE_FAILED", error.message || "failed to create chatroom");
+      sendError(res, 500, 'CHATROOM_CREATE_FAILED', error.message || 'failed to create chatroom');
     }
   });
 
-  // 현재 사용자가 참여한 채팅방 목록을 최신 메시지 기준으로 내려준다.
-  router.get("/chatrooms", requireAuth, async (req, res) => {
+  router.get('/chatrooms', requireAuth, async (req, res) => {
     if (!assertDbConnected(res)) {
       return;
     }
@@ -198,19 +227,35 @@ const createChatroomRouter = ({
         .sort({ lastMessageAt: -1, createdAt: -1 })
         .lean();
 
-      res.status(200).json({ rooms: rooms.map(toRoomResponse) });
+      const roomIds = rooms.map((room) => String(room._id));
+      const readStates = await ChatReadState.find({
+        userId: req.user.userId,
+        roomId: { $in: roomIds },
+      }).lean();
+
+      const readStateByRoomId = new Map(readStates.map((state) => [state.roomId, state]));
+      const roomResponses = await Promise.all(
+        rooms.map(async (room) => {
+          const roomId = String(room._id);
+          const readState = readStateByRoomId.get(roomId);
+          const unreadCount = await getUnreadCountForRoom(roomId, req.user.userId, readState?.lastReadAt || null);
+          return toRoomResponse(room, unreadCount);
+        })
+      );
+
+      const totalUnreadCount = roomResponses.reduce((sum, room) => sum + (Number(room.unreadCount) || 0), 0);
+      res.status(200).json({ rooms: roomResponses, totalUnreadCount });
     } catch (_error) {
-      sendError(res, 500, "CHATROOM_FETCH_FAILED", "failed to fetch chatrooms");
+      sendError(res, 500, 'CHATROOM_FETCH_FAILED', 'failed to fetch chatrooms');
     }
   });
 
-  // 현재 사용자에게 허용된 방의 메시지 히스토리를 조회한다.
-  router.get("/chatrooms/:id/messages", requireAuth, async (req, res) => {
-    const roomId = String(req.params.id || "").trim();
+  router.get('/chatrooms/:id/messages', requireAuth, async (req, res) => {
+    const roomId = String(req.params.id || '').trim();
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
 
     if (!roomId) {
-      sendError(res, 400, "INVALID_REQUEST", "roomId is required");
+      sendError(res, 400, 'INVALID_REQUEST', 'roomId is required');
       return;
     }
 
@@ -221,12 +266,12 @@ const createChatroomRouter = ({
     try {
       const room = await ChatRoom.findById(roomId).lean();
       if (!room) {
-        sendError(res, 404, "ROOM_NOT_FOUND", "chatroom not found");
+        sendError(res, 404, 'ROOM_NOT_FOUND', 'chatroom not found');
         return;
       }
 
       if (!room.memberIds.includes(req.user.userId)) {
-        sendError(res, 403, "FORBIDDEN", "forbidden");
+        sendError(res, 403, 'FORBIDDEN', 'forbidden');
         return;
       }
 
@@ -235,13 +280,60 @@ const createChatroomRouter = ({
         .limit(limit)
         .lean();
 
+      const memberIds = Array.isArray(room.memberIds) ? room.memberIds.map((value) => String(value)) : [];
+      const readStates = await ChatReadState.find({
+        roomId,
+        userId: { $in: memberIds },
+      }).lean();
+      const readStateByUserId = new Map(readStates.map((state) => [String(state.userId), state]));
+      const messageResponses = buildMessageResponses(messages.reverse(), memberIds, readStateByUserId);
+
       res.status(200).json({
         roomId,
-        count: messages.length,
-        messages: messages.reverse(),
+        count: messageResponses.length,
+        messages: messageResponses,
       });
     } catch (_error) {
-      sendError(res, 500, "MESSAGE_FETCH_FAILED", "failed to fetch messages");
+      sendError(res, 500, 'MESSAGE_FETCH_FAILED', 'failed to fetch messages');
+    }
+  });
+
+  router.patch('/chatrooms/:id/read', requireAuth, async (req, res) => {
+    const roomId = String(req.params.id || '').trim();
+
+    if (!roomId) {
+      sendError(res, 400, 'INVALID_REQUEST', 'roomId is required');
+      return;
+    }
+
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const room = await ChatRoom.findById(roomId).lean();
+      if (!room) {
+        sendError(res, 404, 'ROOM_NOT_FOUND', 'chatroom not found');
+        return;
+      }
+
+      if (!room.memberIds.includes(req.user.userId)) {
+        sendError(res, 403, 'FORBIDDEN', 'forbidden');
+        return;
+      }
+
+      const readState = await ChatReadState.findOneAndUpdate(
+        { roomId, userId: req.user.userId },
+        { $set: { lastReadAt: new Date() } },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      ).lean();
+
+      res.status(200).json({
+        roomId,
+        lastReadAt: readState?.lastReadAt ? new Date(readState.lastReadAt).toISOString() : null,
+      });
+    } catch (_error) {
+      sendError(res, 500, 'READ_STATE_UPDATE_FAILED', 'failed to update read state');
     }
   });
 

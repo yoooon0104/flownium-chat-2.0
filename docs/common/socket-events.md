@@ -1,4 +1,4 @@
-# 소켓 이벤트 명세
+﻿# 소켓 이벤트 명세
 
 ## 인증
 
@@ -72,14 +72,21 @@
 ### receive_message
 ```json
 {
+  "id": "messageId",
   "chatRoomId": "chatroomObjectId",
   "senderId": "u1",
   "senderNickname": "alice",
   "type": "text",
   "text": "hello",
-  "timestamp": "2026-03-05T10:00:00.000Z"
+  "timestamp": "2026-03-05T10:00:00.000Z",
+  "unreadCount": 1
 }
 ```
+
+규칙:
+- `unreadCount`는 해당 메시지를 아직 읽지 않은 상대 인원 수
+- 모두 읽었으면 `0`
+- 채팅창에서는 숫자만 노출하고 0은 숨김
 
 ### notification_created
 ```json
