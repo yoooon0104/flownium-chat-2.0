@@ -5,11 +5,18 @@ import { createAuthApi } from '../../../services/api/authApi'
 
 const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_REST_API_KEY || import.meta.env.VITE_KAKAO_CLIENT_ID || ''
 const KAKAO_REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI || `${window.location.origin}`
+const KAKAO_AUTH_CODE_STORAGE_KEY = 'flownium:kakao-auth-code'
+const KAKAO_AUTH_IN_PROGRESS_STORAGE_KEY = 'flownium:kakao-auth-in-progress'
 
 const resolveErrorMessage = (body, fallback) => {
   if (body?.error?.message) return String(body.error.message)
   if (typeof body?.error === 'string') return body.error
   return fallback
+}
+
+const clearKakaoCallbackQuery = () => {
+  const nextUrl = `${window.location.pathname}${window.location.hash || ''}`
+  window.history.replaceState({}, document.title, nextUrl)
 }
 
 // 인증 상태와 온보딩 분기를 훅으로 묶어 AppShell이 화면 조합에만 집중하도록 만든다.
@@ -129,11 +136,23 @@ export const useKakaoAuth = (apiBaseUrl) => {
     const run = async () => {
       const params = new URLSearchParams(window.location.search)
       const code = String(params.get('code') || '').trim()
+      const handledCode = window.sessionStorage.getItem(KAKAO_AUTH_CODE_STORAGE_KEY)
+      const inProgressCode = window.sessionStorage.getItem(KAKAO_AUTH_IN_PROGRESS_STORAGE_KEY)
 
       try {
         setError('')
 
         if (code) {
+          // 같은 인가 코드를 새로고침/중복 렌더로 다시 보내지 않도록 먼저 URL query를 제거한다.
+          clearKakaoCallbackQuery()
+
+          if (code === handledCode || code === inProgressCode) {
+            throw new Error('이미 처리한 로그인 요청입니다. 처음 화면에서 다시 로그인해주세요.')
+          }
+
+          // 카카오 인가 코드는 1회용이므로 처리 중 상태를 먼저 기록해 중복 교환을 차단한다.
+          window.sessionStorage.setItem(KAKAO_AUTH_IN_PROGRESS_STORAGE_KEY, code)
+
           const { ok, body } = await authApi.getKakaoCallback(code)
           if (!ok || !body) {
             throw new Error(resolveErrorMessage(body, '카카오 로그인 처리에 실패했습니다.'))
@@ -158,8 +177,8 @@ export const useKakaoAuth = (apiBaseUrl) => {
             throw new Error('지원하지 않는 인증 응답입니다.')
           }
 
-          // 콜백 처리 완료 후 주소창 query를 제거한다.
-          window.history.replaceState({}, document.title, window.location.pathname)
+          window.sessionStorage.setItem(KAKAO_AUTH_CODE_STORAGE_KEY, code)
+          window.sessionStorage.removeItem(KAKAO_AUTH_IN_PROGRESS_STORAGE_KEY)
           return
         }
 
@@ -191,6 +210,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
 
         clearSession(resolveErrorMessage(me.body, '세션 정보를 불러오지 못했습니다. 다시 로그인해주세요.'))
       } catch (nextError) {
+        window.sessionStorage.removeItem(KAKAO_AUTH_IN_PROGRESS_STORAGE_KEY)
         console.error('[auth:init] failed', nextError)
         clearSession(nextError.message || '카카오 로그인 처리에 실패했습니다.')
       } finally {
@@ -218,4 +238,3 @@ export const useKakaoAuth = (apiBaseUrl) => {
     clearSession,
   }
 }
-
