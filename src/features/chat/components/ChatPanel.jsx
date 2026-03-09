@@ -1,6 +1,7 @@
 ﻿import ParticipantsMenu from './ParticipantsMenu'
 
 // 채팅 본문 패널: 헤더/메시지/입력창을 조합하고 모바일 뒤로가기를 처리한다.
+// unread 숫자는 메시지별 unreadCount를 그대로 받아 '(숫자) 메시지' 형태로 렌더링한다.
 function ChatPanel({
   isMobileChatView,
   activeRoom,
@@ -54,6 +55,8 @@ function ChatPanel({
                 <li key={msg.id || `${msg.timestamp}-${idx}`} className={isMine ? 'mine' : 'other'}>
                   <p className="meta">{msg.senderNickname}</p>
                   <div className={`bubble-row ${isMine ? 'mine' : 'other'}`}>
+                    {/* unreadCount는 읽지 않은 사람 수이므로 0보다 클 때만 노출한다.
+                        현재 UX 규칙은 말풍선이 아니라 텍스트 숫자만 메시지 앞에 붙이는 방식이다. */}
                     {Number(msg.unreadCount) > 0 && (
                       <span className="message-unread-count">{msg.unreadCount > 99 ? '99+' : msg.unreadCount}</span>
                     )}
@@ -85,4 +88,5 @@ function ChatPanel({
 }
 
 export default ChatPanel
+
 

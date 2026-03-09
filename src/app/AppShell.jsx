@@ -171,6 +171,7 @@ function AppShell() {
     clearNotifications()
   }, [clearFriends, clearMessages, clearNotifications, clearRooms, clearSession, setErrorMessage])
 
+  // 소켓 재연결 시점에는 서버 메모리 상태가 바뀌었을 수 있으므로, 방/친구/알림 목록을 모두 다시 불러와 화면 기준 상태를 맞춘다.
   const handleSocketConnect = useCallback(() => {
     setErrorMessage('')
     void fetchRooms()
@@ -186,6 +187,11 @@ function AppShell() {
     return refreshed
   }, [handleLogout, refreshAccessToken])
 
+  // 방 입장 직후 흐름:
+  // 1) 현재 방 상태 반영
+  // 2) 과거 메시지 로드
+  // 3) 방을 실제로 열어본 시점으로 읽음 처리
+  // 이 순서를 지켜야 새로 입장한 방의 unread 배지가 바로 정리된다.
   const handleSocketRoomJoined = useCallback((nextRoomId) => {
     setJoinedRoomId(nextRoomId)
     setIsMobileChatView(true)
@@ -198,6 +204,10 @@ function AppShell() {
     })()
   }, [loadMessageHistory, markRoomRead])
 
+  // 실시간 메시지 수신 분기:
+  // - 현재 열려 있는 방 + 내가 아닌 상대 메시지면 곧바로 읽음 처리
+  // - 그 외에는 방 목록만 다시 받아 unread 배지만 갱신
+  // 이렇게 나누면 현재 방에서는 숫자가 즉시 줄고, 다른 방에서는 목록 배지만 늘어난다.
   const handleSocketReceiveMessage = useCallback((message) => {
     appendMessage(message)
 
@@ -526,3 +536,4 @@ function AppShell() {
 }
 
 export default AppShell
+

@@ -15,6 +15,7 @@ export const useChatRooms = ({ chatApi }) => {
   const [errorMessage, setErrorMessage] = useState('')
   const [totalUnreadCount, setTotalUnreadCount] = useState(0)
 
+  // 목록 재조회는 방 이름/최근 메시지뿐 아니라 unreadCount와 totalUnreadCount를 같이 갱신하는 역할을 한다.
   const fetchRooms = useCallback(async () => {
     if (!chatApi) return
 
@@ -46,6 +47,8 @@ export const useChatRooms = ({ chatApi }) => {
     return { ok: true, roomId, reused: Boolean(body?.reused) }
   }, [chatApi, fetchRooms])
 
+  // 사용자가 방에 진입했거나 현재 열려 있는 방에서 새 메시지를 확인한 시점에 호출한다.
+  // 서버에 읽음 상태를 기록한 뒤 방 목록을 다시 받아와 배지를 즉시 줄인다.
   const markRoomRead = useCallback(async (roomId) => {
     if (!chatApi || !roomId) return { ok: false }
 
@@ -92,3 +95,4 @@ export const useChatRooms = ({ chatApi }) => {
     clearRooms,
   }
 }
+

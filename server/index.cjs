@@ -43,6 +43,7 @@ const io = new Server(server, {
 });
 
 // roomId -> (userId -> Set(socketId)) 구조로 룸별 온라인 상태를 관리한다.
+// unread count와는 별도 개념이다. presence는 지금 접속 중인지, read state는 마지막으로 어디까지 읽었는지를 의미한다.
 const roomPresence = new Map();
 
 const assertDbConnected = (res) => {
@@ -386,12 +387,15 @@ io.on('connection', (socket) => {
       room.lastMessageAt = message.timestamp;
       await room.save();
 
+      // 새 메시지를 보낸 직후 unreadCount를 계산해 두면 같은 payload를 현재 방/다른 방 UI에서 모두 재사용할 수 있다.
+      // 보낸 사람 자신은 unread 대상이 아니므로 읽음 상태 조회 대상에서도 제외한다.
       const memberIds = Array.isArray(room.memberIds) ? room.memberIds.map((value) => String(value)) : [];
       const targetReadStates = await ChatReadState.find({
         roomId,
         userId: { $in: memberIds.filter((memberId) => memberId !== socket.user.userId) },
       }).lean();
       const readStateByUserId = new Map(targetReadStates.map((state) => [String(state.userId), state]));
+      // 규칙: lastReadAt이 없거나 메시지 시각보다 이전이면 아직 읽지 않은 것으로 본다.
       const unreadCount = memberIds.filter((memberId) => {
         if (memberId === socket.user.userId) return false;
         const readState = readStateByUserId.get(String(memberId));
@@ -452,3 +456,4 @@ start().catch((error) => {
   console.error('Failed to start server:', error.message);
   process.exit(1);
 });
+
