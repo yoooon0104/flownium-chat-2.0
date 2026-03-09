@@ -31,7 +31,7 @@ const exchangeKakaoAccessToken = async (payload) => {
 
   if (!response.ok) {
     const body = await response.text();
-    throw createHttpError('failed to exchange kakao token', response.status, body);
+    throw createHttpError('failed to exchange kakao token', response.status, body, { redirectUri: normalizedRedirectUri });
   }
 
   return response.json();
@@ -76,3 +76,4 @@ module.exports = {
   exchangeKakaoAccessToken,
   fetchKakaoUserProfile,
 };
+
