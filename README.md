@@ -15,7 +15,13 @@ Flownium Chat 2.0은 **카카오 로그인 기반의 실시간 그룹 채팅 서
 
 Flownium은 "대화 흐름(flow)을 끊지 않는 팀 커뮤니케이션"을 목표로 합니다.
 현재 버전은 **그룹 채팅 MVP**에 집중되어 있으며,
-친구 기반 1:1/그룹 확장은 MVP2에서 진행 중입니다.
+친구 기반 1:1/그룹 확장은 MVP2-B에서 진행 예정입니다.
+
+## 현재 상태
+
+- 로컬/운영 환경 카카오 로그인 1차 검증 완료
+- Vercel/Render/Atlas 배포 경로 확정
+- 운영 실사용 E2E 일부만 남아 있음
 
 ## 현재 제공 기능 (지금 기준)
 
@@ -29,6 +35,7 @@ Flownium은 "대화 흐름(flow)을 끊지 않는 팀 커뮤니케이션"을 목
 - 사용자 메뉴(내 정보/설정/로그아웃)
 - 표준 에러 응답(`error.code`, `error.message`)
 - 로그인 상태 확인 API(`/auth/me`)
+- 운영 배포 기준 카카오 로그인 성공
 
 ## 기술 스택
 
@@ -36,6 +43,7 @@ Flownium은 "대화 흐름(flow)을 끊지 않는 팀 커뮤니케이션"을 목
 - Backend: Express, Socket.IO
 - Database: MongoDB (Mongoose)
 - Auth: Kakao OAuth + JWT
+- Deploy: Vercel, Render, MongoDB Atlas
 
 ## 프로젝트 구조
 
@@ -60,6 +68,7 @@ flownium-chat-2.0/
 
 ```env
 VITE_KAKAO_CLIENT_ID=
+# Redirect URI는 끝 슬래시 없이 통일 권장
 VITE_KAKAO_REDIRECT_URI=http://localhost:5173
 # 미설정 시 http://localhost:3010 fallback
 VITE_API_BASE_URL=http://localhost:3010
@@ -84,8 +93,10 @@ KAKAO_REDIRECT_URI=http://localhost:5173
 KAKAO_CLIENT_SECRET=
 ```
 
-- 프론트는 `.env.example`을 복사해 `.env`로 사용
-- 배포 전에는 `docs/operations/deploy-runbook.md`의 Redirect URI 체크리스트 확인
+주의:
+- 현재 구현에서 프론트 `VITE_KAKAO_CLIENT_ID`는 카카오 인가 URL의 `client_id`로 사용되며, 코드 기준 `REST API 키`를 사용한다.
+- `VITE_KAKAO_REDIRECT_URI`, `KAKAO_REDIRECT_URI`, 카카오 콘솔 Redirect URI는 동일 문자열이어야 한다.
+- 기본 정책은 끝 슬래시 없는 URI로 통일한다.
 
 ## 로컬 실행
 

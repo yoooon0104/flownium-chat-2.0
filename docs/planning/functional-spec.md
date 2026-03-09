@@ -1,27 +1,33 @@
 ﻿# MVP2~MVP3 기능정의서
 
-업데이트: 2026-03-05
+업데이트: 2026-03-09
 기준 문서: `docs/planning/requirements.md`
 
 ## 1. 문서 목적
 
 요구사항 정의서를 구현 단위(기능/입력/처리/출력/예외)로 상세화한다.
 
-## 2. 기능 목록
+## 2. 현재 기준 메모
+
+- MVP2-A 운영 로그인/배포 안정화 1차 완료
+- 다음 구현 우선순위는 MVP2-B 친구 도메인이다.
+- 회원탈퇴는 다음 scope 후보로 별도 설계한다.
+
+## 3. 기능 목록
 
 ## F-01 인증/세션
 
 ### 목적
-- 카카오 + 이메일 로그인 병행 및 세션 확인
+- 카카오 로그인 기반 세션 처리 및 상태 복원
 
 ### 입력
 - 카카오 인가 코드
-- 이메일/비밀번호
 - refresh token
 
 ### 처리
 - 토큰 검증/재발급
 - 로그인 상태 조회(`/auth/me`)
+- 카카오 callback code 중복 처리 방어
 
 ### 출력
 - 사용자 세션 정보
@@ -30,6 +36,7 @@
 ### 예외
 - `UNAUTHORIZED`
 - `TOKEN_EXPIRED`
+- `KAKAO_LOGIN_FAILED`
 
 ## F-02 친구 검색/추가
 
@@ -151,15 +158,16 @@
 - `INVALID_LOCALE`
 - `INVALID_THEME`
 
-## 3. 공통 처리 규칙
+## 4. 공통 처리 규칙
 
 1. API/소켓 실패 응답은 공통 포맷 사용
 - `{ error: { code, message, details? } }`
 2. 운영 로그 등급 준수
 - `info`, `warn`, `error`
 3. 인증 필요한 기능은 access token 필수
+4. 카카오 Redirect URI는 프론트/서버/카카오 콘솔에서 동일해야 한다.
 
-## 4. 추적 매핑
+## 5. 추적 매핑
 
 - 요구사항 문서: `docs/planning/requirements.md`
 - 화면 정의서: `docs/planning/screen-spec.md`

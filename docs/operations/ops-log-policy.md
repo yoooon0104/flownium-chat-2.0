@@ -1,6 +1,6 @@
 ﻿# Ops Log Policy (운영 로그/장애 기준)
 
-업데이트: 2026-03-05
+업데이트: 2026-03-09
 
 ## 1) 목적
 
@@ -31,6 +31,8 @@
 - `requestId` 또는 `traceId` (있으면 포함)
 - `userId` (가능한 경우)
 - `error.code` (표준 코드)
+- `status` (외부 API/HTTP 상태가 있으면 포함)
+- `details` (예: `redirectUri`)
 
 ## 4) 장애 판정 기준
 
@@ -38,6 +40,7 @@
 
 1. 인증 실패 급증
 - `UNAUTHORIZED`/`INVALID_REFRESH_TOKEN` 오류가 짧은 시간 내 반복
+- 카카오 로그인 `KOE006`, `KOE320` 등 인증 관련 외부 오류 반복
 
 2. 핵심 기능 중단
 - 로그인 불가
@@ -67,7 +70,17 @@
 4. 기록
 - 원인/영향/조치/재발방지 항목을 문서화
 
-## 6) Incident 기록 템플릿
+## 6) 운영 이슈 예시
+
+1. 카카오 로그인 실패
+- 확인 로그: `status`, `body`, `details.redirectUri`
+- 대표 원인: Redirect URI 불일치, 인가 코드 재사용, 환경변수 미반영
+
+2. OAuth 설정 불일치
+- 확인 로그: `error.code`, `status`, `message`
+- 대표 원인: Vercel/Render env 불일치, 카카오 콘솔 설정 누락
+
+## 7) Incident 기록 템플릿
 
 ```md
 ### Incident: <제목>
@@ -82,7 +95,7 @@
 - 관련 커밋/PR:
 ```
 
-## 7) 개발 규칙 연계
+## 8) 개발 규칙 연계
 
 - API/Socket 오류는 표준 `error.code`를 유지한다.
 - 사용자 노출 메시지와 내부 로그를 구분한다.

@@ -1,6 +1,6 @@
 ﻿# Deploy Runbook (MVP2-A)
 
-업데이트: 2026-03-05
+업데이트: 2026-03-09
 
 ## 1) 목적
 
@@ -21,6 +21,7 @@
 - Redirect URI
   - 운영: `https://<app-domain>`
   - 로컬: `http://localhost:5173`
+- 기본 정책: 끝 슬래시 없는 URI로 통일
 
 3. 환경변수 준비
 - 프론트(`Vercel`)
@@ -73,10 +74,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\test-prod-ready.ps1 -ApiBaseU
 
 2. 기대 결과
 - 세 값이 완전히 동일해야 함(프로토콜/도메인/포트 포함)
+- 끝 슬래시 유무까지 동일해야 함
 
 3. 실패 증상
-- 카카오 로그인 후 callback 오류
-- `KAKAO_LOGIN_FAILED` 또는 인증 화면 재진입 반복
+- `KOE006`: redirect URI 불일치 가능성
+- `KAKAO_LOGIN_FAILED`: 서버 토큰 교환 실패 가능성
+- `KOE320`: 인가 코드 재사용 또는 client/server redirect URI 불일치 가능성
+
+4. 필수 주의사항
+- Vercel/Render 환경변수 변경 후에는 반드시 각각 재배포한다.
 
 ## 5) 배포 절차
 
@@ -149,3 +155,20 @@ powershell -ExecutionPolicy Bypass -File .\scripts\test-prod-ready.ps1 -ApiBaseU
   - `/auth/me`는 토큰 미입력으로 SKIP
 - Redirect URI 검증 결과: 운영값 미검증(로컬 기준만 확인)
 - 이슈/대응: 없음
+
+### Deploy Record (Production Login Validation)
+- 일시: 2026-03-09
+- 환경(Prod/Local): Prod
+- 프론트 도메인: `https://flownium-chat-2-0.vercel.app`
+- 백엔드 도메인: `https://flownium-chat-api.onrender.com`
+- 체크리스트 결과:
+  - Render health check 성공
+  - Vercel 배포 성공
+  - 카카오 운영 로그인 성공
+- Redirect URI 검증 결과:
+  - 프론트/서버/카카오 콘솔 값 일치 확인
+  - 끝 슬래시 불일치 시 로그인 실패 재현 및 수정 완료
+- 이슈/대응:
+  - `vercel.json` 설정 오류 수정
+  - `redirect URI` 슬래시 불일치 해결
+  - 카카오 인가 코드 중복 처리 방어 적용
