@@ -1,4 +1,4 @@
-﻿# MVP2~MVP3 기능정의서
+# MVP2~MVP3 기능정의서
 
 업데이트: 2026-03-09
 기준 문서: `docs/planning/requirements.md`
@@ -10,8 +10,8 @@
 ## 2. 현재 기준 메모
 
 - MVP2-A 운영 로그인/배포 안정화 1차 완료
-- 다음 구현 우선순위는 MVP2-B 친구 도메인이다.
-- 회원탈퇴는 다음 scope 후보로 별도 설계한다.
+- MVP2-B는 친구 도메인 백엔드부터 구현을 시작했다.
+- 회원탈퇴와 `leave_room`은 다음 scope 후보로 둔다.
 
 ## 3. 기능 목록
 
@@ -45,72 +45,65 @@
 
 ### 입력
 - `keyword` (이메일 또는 닉네임)
+- `targetUserId`
+- `action` (`accept | reject | block`)
 
 ### 처리
 - 사용자 검색
-- 친구 요청 생성/상태 전이(수락/거절/차단)
+- 친구 요청 생성
+- 친구 상태 전이(수락/거절/차단)
+- 친구 요청 알림 생성
 
 ### 출력
 - 검색 결과 목록
 - 친구 관계 상태
+- 친구 목록(`accepted`, `pendingReceived`, `pendingSent`)
 
 ### 예외
 - `USER_NOT_FOUND`
-- `ALREADY_FRIEND`
-- `REQUEST_ALREADY_PENDING`
+- `ALREADY_FRIENDS`
+- `FRIEND_REQUEST_PENDING`
+- `FRIEND_REQUEST_ALREADY_RECEIVED`
+- `FRIEND_REQUEST_BLOCKED`
 
 ## F-03 친구 기반 방 생성
 
 ### 목적
-- 친구 관계 사용자끼리만 direct/group 채팅방 생성
+- 친구 관계 사용자끼리만 1:1/그룹 채팅방 생성
 
 ### 입력
-- direct: 대상 사용자 1명
-- group: 대상 사용자 N명
+- 1:1: 대상 사용자 1명 (`memberUserIds` 1건)
+- 그룹: 대상 사용자 N명 + `name`
 
 ### 처리
 - 친구 관계 검증
-- 방 생성 및 멤버 등록
+- 2인 방 재사용 여부 확인
+- 없으면 새 방 생성
+- 그룹 생성 시 초대 알림 생성
 
 ### 출력
-- 생성된 room 정보
+- 생성 또는 재사용된 room 정보
+- 재사용 여부(`reused`)
 
 ### 예외
 - `FRIENDSHIP_REQUIRED`
-- `ROOM_NOT_FOUND`
+- `INVALID_ROOM_NAME`
+- `USER_NOT_FOUND`
 
-## F-04 방 나가기
-
-### 목적
-- 현재 사용자가 참여 중인 방에서 퇴장
-
-### 입력
-- `roomId`
-
-### 처리
-- 멤버 제거
-- presence 재계산
-- 소켓 leave 처리
-
-### 출력
-- 처리 성공 상태
-
-### 예외
-- `FORBIDDEN`
-- `ROOM_NOT_FOUND`
-
-## F-05 인앱 알림
+## F-04 인앱 알림
 
 ### 목적
-- 멘션/새 메시지/초대/읽음 상태 알림 제공
+- 친구 요청/방 초대 알림 제공
 
 ### 입력
-- 이벤트 payload(메시지/초대/읽음)
+- 친구 요청 이벤트
+- 방 초대 이벤트
+- 읽음 처리 대상 알림 ID
 
 ### 처리
 - 알림 생성
 - 읽음 처리
-- 배지 카운트 갱신
+- 소켓 이벤트 전파
 
 ### 출력
 - 알림 리스트/카운트
@@ -119,7 +112,7 @@
 ### 예외
 - `NOTIFICATION_NOT_FOUND`
 
-## F-06 메시지 고도화
+## F-05 메시지 고도화
 
 ### 목적
 - 검색/북마크/핀/읽음 상태 개선
@@ -139,7 +132,7 @@
 ### 예외
 - `MESSAGE_NOT_FOUND`
 
-## F-07 다국어/다크모드
+## F-06 다국어/다크모드
 
 ### 목적
 - 사용자 선호 언어/테마 적용
@@ -166,6 +159,7 @@
 - `info`, `warn`, `error`
 3. 인증 필요한 기능은 access token 필수
 4. 카카오 Redirect URI는 프론트/서버/카카오 콘솔에서 동일해야 한다.
+5. 친구 기반 채팅 UI에서 비친구는 채팅 대상에 표시하지 않더라도, 서버는 다시 한 번 친구 관계를 검증한다.
 
 ## 5. 추적 매핑
 
