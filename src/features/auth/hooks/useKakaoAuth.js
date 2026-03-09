@@ -4,7 +4,8 @@ import { UserProfile } from '../../../domain/user/UserProfile'
 import { createAuthApi } from '../../../services/api/authApi'
 
 const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_REST_API_KEY || import.meta.env.VITE_KAKAO_CLIENT_ID || ''
-const KAKAO_REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI || `${window.location.origin}`
+const normalizeRedirectUri = (value) => String(value || '').trim().replace(/\/+$/, '')
+const KAKAO_REDIRECT_URI = normalizeRedirectUri(import.meta.env.VITE_KAKAO_REDIRECT_URI || `${window.location.origin}`)
 const KAKAO_AUTH_CODE_STORAGE_KEY = 'flownium:kakao-auth-code'
 const KAKAO_AUTH_IN_PROGRESS_STORAGE_KEY = 'flownium:kakao-auth-in-progress'
 
@@ -238,3 +239,4 @@ export const useKakaoAuth = (apiBaseUrl) => {
     clearSession,
   }
 }
+

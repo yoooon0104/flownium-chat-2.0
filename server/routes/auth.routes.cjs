@@ -116,6 +116,7 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
         message: error.message,
         status: error.status || null,
         body: error.body || null,
+        details: error.details || null,
       });
       sendError(res, 502, 'KAKAO_LOGIN_FAILED', 'failed to complete kakao login');
     }
@@ -275,3 +276,4 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
 };
 
 module.exports = createAuthRouter;
+
