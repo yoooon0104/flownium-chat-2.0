@@ -143,7 +143,7 @@ function AppShell() {
     notificationsLoading,
     notificationErrorMessage,
     fetchNotifications,
-    markNotificationRead,
+    markAllNotificationsRead,
     clearNotifications,
   } = useNotifications({ chatApi })
 
@@ -249,6 +249,16 @@ function AppShell() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  // 알림 허브는 열람 자체를 읽음으로 간주한다.
+  // 처리해야 하는 친구 요청은 pending 목록에서 따로 관리되므로 최근 알림만 자동 읽음 처리한다.
+  useEffect(() => {
+    if (!chatApi) return
+    if (!isNotificationMenuOpen && !isMobileNotificationView) return
+    if (notificationsLoading || unreadCount === 0) return
+
+    void markAllNotificationsRead()
+  }, [chatApi, isMobileNotificationView, isNotificationMenuOpen, markAllNotificationsRead, notificationsLoading, unreadCount])
 
   const joinRoom = useCallback((roomId) => {
     if (!roomId) return
@@ -409,7 +419,6 @@ function AppShell() {
           pendingSent={pendingSent}
           notificationErrorMessage={notificationErrorMessage}
           onRespondFriendRequest={handleRespondFriendRequest}
-          onMarkNotificationRead={markNotificationRead}
           isUserMenuOpen={isUserMenuOpen}
           onToggleUserMenu={setIsUserMenuOpen}
           onOpenProfile={() => {
@@ -457,10 +466,8 @@ function AppShell() {
             notificationsLoading={notificationsLoading}
             notifications={notifications}
             pendingReceived={pendingReceived}
-            pendingSent={pendingSent}
             notificationErrorMessage={notificationErrorMessage}
             onRespondFriendRequest={handleRespondFriendRequest}
-            onMarkNotificationRead={markNotificationRead}
             onBack={() => setIsMobileNotificationView(false)}
           />
         )}

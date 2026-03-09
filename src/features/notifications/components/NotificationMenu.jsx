@@ -7,7 +7,8 @@ const toCreatedLabel = (value) => {
   return date.toLocaleString()
 }
 
-// 알림 메뉴는 데스크톱에서는 드롭다운으로 유지하고, 모바일에서는 전용 화면으로 넘긴다.
+// 데스크톱은 드롭다운 알림 허브를 유지한다.
+// 모바일은 이 버튼이 별도 알림 화면 진입 버튼 역할만 한다.
 function NotificationMenu({
   isMobile,
   isOpen,
@@ -17,10 +18,8 @@ function NotificationMenu({
   notificationsLoading,
   notifications,
   pendingReceived,
-  pendingSent,
   notificationErrorMessage,
   onRespondFriendRequest,
-  onMarkNotificationRead,
 }) {
   const menuRef = useRef(null)
 
@@ -69,14 +68,14 @@ function NotificationMenu({
         <section className="notification-dropdown" role="dialog" aria-label="알림 목록">
           <header className="notification-header">
             <strong>알림 허브</strong>
-            <small>친구 요청과 방 초대, 최근 알림을 한곳에서 확인한다.</small>
+            <small>처리할 요청과 최근 알림을 한곳에서 확인한다.</small>
           </header>
 
           {notificationErrorMessage && <p className="error-text modal-error">{notificationErrorMessage}</p>}
 
           <div className="notification-section">
             <div className="notification-section-title">받은 친구 요청</div>
-            {pendingReceived.length === 0 && <p className="notification-empty">받은 요청이 없습니다.</p>}
+            {pendingReceived.length === 0 && <p className="notification-empty">처리할 친구 요청이 없습니다.</p>}
             <ul className="notification-list">
               {pendingReceived.map((item) => (
                 <li key={item.id} className="notification-row actionable">
@@ -87,21 +86,6 @@ function NotificationMenu({
                   <div className="notification-actions">
                     <button type="button" onClick={() => void onRespondFriendRequest(item.id, 'accept')}>수락</button>
                     <button type="button" className="secondary" onClick={() => void onRespondFriendRequest(item.id, 'reject')}>거절</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="notification-section">
-            <div className="notification-section-title">보낸 친구 요청</div>
-            {pendingSent.length === 0 && <p className="notification-empty">보낸 요청이 없습니다.</p>}
-            <ul className="notification-list">
-              {pendingSent.map((item) => (
-                <li key={item.id} className="notification-row">
-                  <div className="notification-main">
-                    <strong>{item.counterpart.nickname || '이름 없음'}</strong>
-                    <small>응답 대기 중</small>
                   </div>
                 </li>
               ))}
@@ -120,11 +104,6 @@ function NotificationMenu({
                     <small>{item.payload?.roomName || item.payload?.requester?.nickname || '추가 정보 없음'}</small>
                     <small>{toCreatedLabel(item.createdAt)}</small>
                   </div>
-                  {!item.isRead && (
-                    <button type="button" className="secondary inline-action-button" onClick={() => void onMarkNotificationRead(item.id)}>
-                      읽음
-                    </button>
-                  )}
                 </li>
               ))}
             </ul>

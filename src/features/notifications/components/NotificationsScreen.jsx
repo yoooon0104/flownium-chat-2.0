@@ -5,17 +5,15 @@
   return date.toLocaleString()
 }
 
-// 모바일에서는 드롭다운보다 전체 화면 전환이 더 안정적이다.
-// 알림 전용 화면에서 친구 요청, 보낸 요청, 최근 알림을 한 번에 처리한다.
+// 모바일 알림 화면은 처리할 요청과 최근 알림만 보여준다.
+// 보낸 요청은 별도 섹션으로 분리하지 않고 최근 알림 흐름에 흡수한다.
 function NotificationsScreen({
   unreadCount,
   notificationsLoading,
   notifications,
   pendingReceived,
-  pendingSent,
   notificationErrorMessage,
   onRespondFriendRequest,
-  onMarkNotificationRead,
   onBack,
 }) {
   return (
@@ -35,7 +33,7 @@ function NotificationsScreen({
 
         <div className="notification-section">
           <div className="notification-section-title">받은 친구 요청</div>
-          {pendingReceived.length === 0 && <p className="notification-empty">받은 요청이 없습니다.</p>}
+          {pendingReceived.length === 0 && <p className="notification-empty">처리할 친구 요청이 없습니다.</p>}
           <ul className="notification-list">
             {pendingReceived.map((item) => (
               <li key={item.id} className="notification-row actionable">
@@ -46,21 +44,6 @@ function NotificationsScreen({
                 <div className="notification-actions">
                   <button type="button" onClick={() => void onRespondFriendRequest(item.id, 'accept')}>수락</button>
                   <button type="button" className="secondary" onClick={() => void onRespondFriendRequest(item.id, 'reject')}>거절</button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="notification-section">
-          <div className="notification-section-title">보낸 친구 요청</div>
-          {pendingSent.length === 0 && <p className="notification-empty">보낸 요청이 없습니다.</p>}
-          <ul className="notification-list">
-            {pendingSent.map((item) => (
-              <li key={item.id} className="notification-row">
-                <div className="notification-main">
-                  <strong>{item.counterpart.nickname || '이름 없음'}</strong>
-                  <small>응답 대기 중</small>
                 </div>
               </li>
             ))}
@@ -79,11 +62,6 @@ function NotificationsScreen({
                   <small>{item.payload?.roomName || item.payload?.requester?.nickname || '추가 정보 없음'}</small>
                   <small>{toCreatedLabel(item.createdAt)}</small>
                 </div>
-                {!item.isRead && (
-                  <button type="button" className="secondary inline-action-button" onClick={() => void onMarkNotificationRead(item.id)}>
-                    읽음
-                  </button>
-                )}
               </li>
             ))}
           </ul>
