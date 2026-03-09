@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+﻿import { useCallback, useMemo, useState } from 'react'
 
 const resolveErrorMessage = (body, fallback) => {
   if (body?.error?.message) return String(body.error.message)
@@ -7,13 +7,13 @@ const resolveErrorMessage = (body, fallback) => {
 }
 
 // 방 목록 상태와 채팅방 생성 흐름을 관리한다.
-// 이번 브랜치부터는 기존 문자열 기반 생성과 친구 선택 기반 생성이 함께 들어오기 때문에
-// createRoom이 payload 형태를 유연하게 받도록 확장한다.
+// unread count는 방 목록 응답과 함께 받아 각 방 배지와 전체 합계에 재사용한다.
 export const useChatRooms = ({ chatApi }) => {
   const [rooms, setRooms] = useState([])
   const [roomsLoading, setRoomsLoading] = useState(false)
   const [searchKeyword, setSearchKeyword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0)
 
   const fetchRooms = useCallback(async () => {
     if (!chatApi) return
@@ -27,10 +27,10 @@ export const useChatRooms = ({ chatApi }) => {
     }
 
     setRooms(Array.isArray(body?.rooms) ? body.rooms : [])
+    setTotalUnreadCount(Number(body?.totalUnreadCount) || 0)
     setRoomsLoading(false)
   }, [chatApi])
 
-  // payload가 문자열이면 기존 name 기반 생성으로, 객체면 새 친구 선택 기반 생성으로 보낸다.
   const createRoom = useCallback(async (payload) => {
     if (!chatApi) return { ok: false, roomId: '' }
 
@@ -46,18 +46,30 @@ export const useChatRooms = ({ chatApi }) => {
     return { ok: true, roomId, reused: Boolean(body?.reused) }
   }, [chatApi, fetchRooms])
 
+  const markRoomRead = useCallback(async (roomId) => {
+    if (!chatApi || !roomId) return { ok: false }
+
+    const { ok, body } = await chatApi.markRoomRead(roomId)
+    if (!ok) {
+      setErrorMessage(resolveErrorMessage(body, '읽음 상태를 갱신하지 못했습니다.'))
+      return { ok: false, body }
+    }
+
+    await fetchRooms()
+    return { ok: true, body }
+  }, [chatApi, fetchRooms])
+
   const clearRooms = useCallback(() => {
     setRooms([])
     setSearchKeyword('')
     setRoomsLoading(false)
+    setTotalUnreadCount(0)
   }, [])
 
   const filteredRooms = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase()
     if (!keyword) return rooms
 
-    // 전역 검색창에서 방 탭이 사용할 결과다.
-    // 방 이름과 마지막 메시지를 함께 검색 대상으로 둔다.
     return rooms.filter((room) => {
       const roomName = String(room.name || '').toLowerCase()
       const lastMessage = String(room.lastMessage || '').toLowerCase()
@@ -73,8 +85,10 @@ export const useChatRooms = ({ chatApi }) => {
     errorMessage,
     setErrorMessage,
     filteredRooms,
+    totalUnreadCount,
     fetchRooms,
     createRoom,
+    markRoomRead,
     clearRooms,
   }
 }

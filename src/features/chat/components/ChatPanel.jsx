@@ -51,9 +51,14 @@ function ChatPanel({
             {messages.map((msg, idx) => {
               const isMine = currentUserId && msg.senderId === currentUserId
               return (
-                <li key={`${msg.timestamp}-${idx}`} className={isMine ? 'mine' : 'other'}>
+                <li key={msg.id || `${msg.timestamp}-${idx}`} className={isMine ? 'mine' : 'other'}>
                   <p className="meta">{msg.senderNickname}</p>
-                  <p className="bubble">{msg.text}</p>
+                  <div className={`bubble-row ${isMine ? 'mine' : 'other'}`}>
+                    {Number(msg.unreadCount) > 0 && (
+                      <span className="message-unread-count">{msg.unreadCount > 99 ? '99+' : msg.unreadCount}</span>
+                    )}
+                    <p className="bubble">{msg.text}</p>
+                  </div>
                   <p className="time">{new Date(msg.timestamp).toLocaleTimeString()}</p>
                 </li>
               )
@@ -80,3 +85,4 @@ function ChatPanel({
 }
 
 export default ChatPanel
+

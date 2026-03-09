@@ -117,8 +117,10 @@ function AppShell() {
     errorMessage,
     setErrorMessage,
     filteredRooms,
+    totalUnreadCount,
     fetchRooms,
     createRoom,
+    markRoomRead,
     clearRooms,
   } = useChatRooms({ chatApi })
 
@@ -189,14 +191,24 @@ function AppShell() {
     setIsMobileChatView(true)
     setIsMobileNotificationView(false)
     setIsParticipantsMenuOpen(false)
-    void loadMessageHistory(nextRoomId)
-    void fetchRooms()
-  }, [fetchRooms, loadMessageHistory])
+
+    void (async () => {
+      await loadMessageHistory(nextRoomId)
+      await markRoomRead(nextRoomId)
+    })()
+  }, [loadMessageHistory, markRoomRead])
 
   const handleSocketReceiveMessage = useCallback((message) => {
     appendMessage(message)
-    void fetchRooms()
-  }, [appendMessage, fetchRooms])
+
+    void (async () => {
+      if (message?.senderId && message.senderId !== currentUser?.id && message?.chatRoomId === joinedRoomId) {
+        await markRoomRead(message.chatRoomId)
+        return
+      }
+      await fetchRooms()
+    })()
+  }, [appendMessage, currentUser?.id, fetchRooms, joinedRoomId, markRoomRead])
 
   const handleSocketParticipants = useCallback((nextParticipants) => {
     setParticipants(nextParticipants)
@@ -250,8 +262,6 @@ function AppShell() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // 알림 허브는 열람 자체를 읽음으로 간주한다.
-  // 처리해야 하는 친구 요청은 pending 목록에서 따로 관리되므로 최근 알림만 자동 읽음 처리한다.
   useEffect(() => {
     if (!chatApi) return
     if (!isNotificationMenuOpen && !isMobileNotificationView) return
@@ -403,7 +413,8 @@ function AppShell() {
           }}
           toTimeLabel={toTimeLabel}
           currentUser={currentUser}
-          unreadCount={unreadCount}
+          totalUnreadCount={totalUnreadCount}
+          notificationUnreadCount={unreadCount}
           isNotificationMenuOpen={isNotificationMenuOpen}
           onToggleNotificationMenu={(next) => {
             if (isMobileViewport) {

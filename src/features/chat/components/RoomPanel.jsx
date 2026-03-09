@@ -39,7 +39,8 @@ function RoomPanel({
   onFriendTap,
   toTimeLabel,
   currentUser,
-  unreadCount,
+  totalUnreadCount,
+  notificationUnreadCount,
   isNotificationMenuOpen,
   onToggleNotificationMenu,
   notificationsLoading,
@@ -48,7 +49,6 @@ function RoomPanel({
   pendingSent,
   notificationErrorMessage,
   onRespondFriendRequest,
-  onMarkNotificationRead,
   isUserMenuOpen,
   onToggleUserMenu,
   onOpenProfile,
@@ -103,14 +103,13 @@ function RoomPanel({
             isOpen={isNotificationMenuOpen}
             onToggle={onToggleNotificationMenu}
             onOpenMobileScreen={() => onToggleNotificationMenu(true)}
-            unreadCount={unreadCount}
+            unreadCount={notificationUnreadCount}
             notificationsLoading={notificationsLoading}
             notifications={notifications}
             pendingReceived={pendingReceived}
             pendingSent={pendingSent}
             notificationErrorMessage={notificationErrorMessage}
             onRespondFriendRequest={onRespondFriendRequest}
-            onMarkNotificationRead={onMarkNotificationRead}
           />
           <UserMenu
             isOpen={isUserMenuOpen}
@@ -131,6 +130,7 @@ function RoomPanel({
         </button>
         <button type="button" className={activeTab === 'rooms' ? 'active' : ''} onClick={() => onChangeTab('rooms')}>
           채팅방
+          {totalUnreadCount > 0 && <span className="tab-badge">{totalUnreadCount > 99 ? '99+' : totalUnreadCount}</span>}
         </button>
       </div>
 
@@ -198,7 +198,10 @@ function RoomPanel({
                     <strong>{room.name}</strong>
                     <small>{room.lastMessage || '메시지가 없습니다.'}</small>
                   </span>
-                  <span className="room-time">{toTimeLabel(room.lastMessageAt)}</span>
+                  <span className="room-side-meta">
+                    <span className="room-time">{toTimeLabel(room.lastMessageAt)}</span>
+                    {room.unreadCount > 0 && <span className="room-unread-badge">{room.unreadCount > 99 ? '99+' : room.unreadCount}</span>}
+                  </span>
                 </button>
               </li>
             )

@@ -10,7 +10,8 @@
 ## 2. 현재 기준 메모
 
 - MVP2-A 운영 로그인/배포 안정화 1차 완료
-- MVP2-B는 친구 도메인 백엔드 1차와 Friends/Rooms 프론트 UI 1차가 진행된 상태
+- MVP2-B는 친구 도메인 백엔드 1차, Friends/Rooms 프론트 UI 1차, 모바일 알림 허브 정리까지 반영된 상태
+- unread foundation(방 목록/탭/메시지 기준) 1차 진행 완료
 - 회원탈퇴, `leave_room`, 익명 채팅은 다음 scope 후보
 
 ## 3. 기능 목록
@@ -130,12 +131,17 @@
 - 방 초대 이벤트
 - 읽음 처리 대상 알림 ID
 
-### 처리`r`n- 알림 생성`r`n- 읽음 처리`r`n- 소켓 이벤트 전파`r`n- 친구 요청 수락/거절 액션 처리`r`n- Desktop/Tablet은 드롭다운 허브로 처리`r`n- Mobile은 별도 알림 화면으로 전환 처리
+### 처리
+- 알림 생성
+- 허브/화면 진입 시 최근 알림 자동 읽음 처리
+- 소켓 이벤트 전파
+- 친구 요청 수락/거절 액션 처리
+- Desktop/Tablet은 드롭다운 허브로 처리
+- Mobile은 별도 알림 화면으로 전환 처리
 
 ### 출력
 - unread count
 - 받은 친구 요청
-- 보낸 친구 요청
 - 최근 알림 목록
 
 ### 예외
@@ -159,6 +165,32 @@
 ### 예외
 - 이미지 URL이 없거나 깨졌을 때 fallback 표시
 
+## F-07 unread count
+
+### 목적
+- 방 목록, 채팅방 탭, 메시지 단위로 읽지 않은 개수를 보여준다.
+
+### 입력
+- `ChatReadState.lastReadAt`
+- 메시지 `timestamp`
+- 방 멤버 목록
+
+### 처리
+- 방 목록 조회 시 방별 `unreadCount` 계산
+- 방 목록 합계 `totalUnreadCount` 계산
+- 방 진입 시 읽음 시점 갱신
+- 메시지 히스토리/실시간 payload에 메시지별 `unreadCount` 포함
+- 채팅창에서는 숫자만 표시하고 모두 읽으면 숨김
+
+### 출력
+- `room.unreadCount`
+- `totalUnreadCount`
+- `message.unreadCount`
+
+### 예외
+- `READ_STATE_UPDATE_FAILED`
+- `MESSAGE_FETCH_FAILED`
+
 ## 4. 공통 처리 규칙
 
 1. API/소켓 실패 응답은 `{ error: { code, message, details? } }` 형식 사용
@@ -174,4 +206,3 @@
 - API 명세: `docs/common/api-spec.md`
 - 소켓 명세: `docs/common/socket-events.md`
 - WBS: `docs/common/wbs.md`
-

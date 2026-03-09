@@ -1,4 +1,4 @@
-const dotenv = require('dotenv');
+﻿const dotenv = require('dotenv');
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const Message = require('./models/message.model.cjs');
 const User = require('./models/user.model.cjs');
 const ChatRoom = require('./models/chatroom.model.cjs');
+const ChatReadState = require('./models/chatreadstate.model.cjs');
 const { Friendship } = require('./models/friendship.model.cjs');
 const Notification = require('./models/notification.model.cjs');
 const createAuthRouter = require('./routes/auth.routes.cjs');
@@ -41,7 +42,7 @@ const io = new Server(server, {
   },
 });
 
-// roomId -> (userId -> Set(socketId)) 구조로 온라인 상태를 관리한다.
+// roomId -> (userId -> Set(socketId)) 구조로 룸별 온라인 상태를 관리한다.
 const roomPresence = new Map();
 
 const assertDbConnected = (res) => {
@@ -103,14 +104,14 @@ const emitSocketError = (socket, code, message, details) => {
   socket.emit('error', payload);
 };
 
-// 사용자 전용 room에 인앱 알림 생성 이벤트를 전파한다.
+// 사용자 전용 room으로 알림 생성 이벤트를 보낸다.
 const emitNotificationCreated = (userId, notification) => {
   io.to(`user:${String(userId)}`).emit('notification_created', {
     notification: toNotificationResponse(notification),
   });
 };
 
-// 읽음 처리된 알림도 같은 사용자 전용 room으로 갱신 이벤트를 보낸다.
+// 읽음 처리된 알림도 사용자 전용 room으로 동기화한다.
 const emitNotificationRead = (userId, notification) => {
   io.to(`user:${String(userId)}`).emit('notification_read', {
     notification: toNotificationResponse(notification),
@@ -148,7 +149,7 @@ const removePresence = (roomId, userId, socketId) => {
   }
 };
 
-// 과거 스키마에서 남은 roomKey 유니크 인덱스를 제거해 E11000 충돌을 방지한다.
+// 과거 스키마에 있던 roomKey 인덱스를 제거해 E11000 충돌을 방지한다.
 const dropLegacyChatRoomIndexIfExists = async () => {
   try {
     const indexes = await ChatRoom.collection.indexes();
@@ -188,7 +189,6 @@ const emitRoomParticipants = async (roomId) => {
   }
 
   const memberIds = Array.isArray(room.memberIds) ? room.memberIds : [];
-// memberIds에 ObjectId 형식이 아닌 값이 섞여도 캐스팅 에러가 나지 않도록 필터링한다.
   const objectIdMemberIds = memberIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
   const users = await User.find({ _id: { $in: objectIdMemberIds } })
     .select({ _id: 1, nickname: 1 })
@@ -270,6 +270,7 @@ app.use(
     User,
     Friendship,
     Notification,
+    ChatReadState,
     requireAuth,
     assertDbConnected,
     emitNotificationCreated,
@@ -304,11 +305,9 @@ app.get('/api/health', (_req, res) => {
 
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
-// 사용자 단위 알림 브로드캐스트를 위해 접속 즉시 사용자 전용 room에 참여시킨다.
   socket.join(`user:${socket.user.userId}`);
 
   socket.on('join_room', async (payload = {}) => {
-// 방 입장 시 현재 사용자가 멤버인지 확인한 뒤 room_participants를 갱신한다.
     const roomId = String(payload.roomId || '').trim();
 
     if (!roomId) {
@@ -348,7 +347,6 @@ io.on('connection', (socket) => {
   });
 
   socket.on('send_message', async (payload = {}) => {
-// 메시지 저장 후 채팅방 요약(lastMessage, lastMessageAt)을 함께 갱신한다.
     const roomId = String(payload.roomId || '').trim();
     const text = String(payload.text || '').trim();
     const type = payload.type === 'system' ? 'system' : 'text';
@@ -388,13 +386,28 @@ io.on('connection', (socket) => {
       room.lastMessageAt = message.timestamp;
       await room.save();
 
+      const memberIds = Array.isArray(room.memberIds) ? room.memberIds.map((value) => String(value)) : [];
+      const targetReadStates = await ChatReadState.find({
+        roomId,
+        userId: { $in: memberIds.filter((memberId) => memberId !== socket.user.userId) },
+      }).lean();
+      const readStateByUserId = new Map(targetReadStates.map((state) => [String(state.userId), state]));
+      const unreadCount = memberIds.filter((memberId) => {
+        if (memberId === socket.user.userId) return false;
+        const readState = readStateByUserId.get(String(memberId));
+        if (!readState?.lastReadAt) return true;
+        return new Date(readState.lastReadAt) < message.timestamp;
+      }).length;
+
       io.to(roomId).emit('receive_message', {
+        id: String(message._id),
         chatRoomId: message.chatRoomId,
         senderId: message.senderId,
         senderNickname: message.senderNickname,
         type: message.type,
         text: message.text,
         timestamp: new Date(message.timestamp).toISOString(),
+        unreadCount,
       });
     } catch (_error) {
       emitSocketError(socket, 'MESSAGE_PROCESS_FAILED', 'failed to process message');
@@ -402,7 +415,6 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', async () => {
-// 연결 종료 시 참여 중인 방들의 온라인 상태를 다시 계산해 브로드캐스트한다.
     const joinedRoomIds = collectJoinedRoomIds(socket);
     joinedRoomIds.forEach((roomId) => {
       removePresence(roomId, socket.user.userId, socket.id);
@@ -412,7 +424,7 @@ io.on('connection', (socket) => {
       try {
         await emitRoomParticipants(roomId);
       } catch (_error) {
-        // Ignore broadcast failures during disconnect cleanup.
+        // 연결 종료 중 브로드캐스트 실패는 무시한다.
       }
     }
 
@@ -440,4 +452,3 @@ start().catch((error) => {
   console.error('Failed to start server:', error.message);
   process.exit(1);
 });
-
