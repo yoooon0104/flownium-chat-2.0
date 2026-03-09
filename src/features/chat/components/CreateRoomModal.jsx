@@ -1,9 +1,20 @@
-﻿import { useEffect } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 
-// FAB로 연 방 생성 모달: ESC/오버레이/버튼 모두 닫힘 경로를 제공한다.
-function CreateRoomModal({ isOpen, roomName, onChangeRoomName, onClose, onSubmit }) {
+// 친구 선택 기반 채팅 생성 모달이다.
+// 선택이 1명이면 1:1 생성/재사용으로 바로 보내고,
+// 2명 이상이면 그룹 이름을 추가로 받아 새 그룹 채팅을 만든다.
+function CreateRoomModal({ isOpen, friends, errorMessage, onClose, onSubmit }) {
+  const [selectedIds, setSelectedIds] = useState([])
+  const [groupName, setGroupName] = useState('')
+  const [localError, setLocalError] = useState('')
+
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      setSelectedIds([])
+      setGroupName('')
+      setLocalError('')
+      return
+    }
 
     const handleEscape = (event) => {
       if (event.key === 'Escape') {
@@ -17,7 +28,46 @@ function CreateRoomModal({ isOpen, roomName, onChangeRoomName, onClose, onSubmit
     }
   }, [isOpen, onClose])
 
+  const selectedFriends = useMemo(() => {
+    const selectedSet = new Set(selectedIds)
+    return friends.filter((friend) => selectedSet.has(friend.id))
+  }, [friends, selectedIds])
+
   if (!isOpen) return null
+
+  const toggleFriend = (friendId) => {
+    setSelectedIds((current) => {
+      if (current.includes(friendId)) {
+        return current.filter((id) => id !== friendId)
+      }
+      return [...current, friendId]
+    })
+  }
+
+  const handleSubmit = async () => {
+    if (selectedIds.length === 0) {
+      setLocalError('친구를 한 명 이상 선택해야 한다.')
+      return
+    }
+
+    if (selectedIds.length > 1 && !groupName.trim()) {
+      setLocalError('그룹 채팅방 이름을 입력해야 한다.')
+      return
+    }
+
+    setLocalError('')
+    const payload = {
+      memberUserIds: selectedIds,
+      ...(selectedIds.length > 1 ? { name: groupName.trim() } : {}),
+    }
+
+    const result = await onSubmit(payload)
+    if (result?.ok) {
+      setSelectedIds([])
+      setGroupName('')
+      setLocalError('')
+    }
+  }
 
   return (
     <div
@@ -28,24 +78,56 @@ function CreateRoomModal({ isOpen, roomName, onChangeRoomName, onClose, onSubmit
         }
       }}
     >
-      <section className="modal-card" role="dialog" aria-modal="true" aria-label="방 생성">
-        <h3>새 방 만들기</h3>
-        <p>방 이름을 입력하면 생성 후 자동으로 입장합니다.</p>
-        <input
-          value={roomName}
-          onChange={(event) => onChangeRoomName(event.target.value)}
-          onKeyUp={(event) => {
-            if (event.key === 'Enter') {
-              void onSubmit()
-            }
-          }}
-          placeholder="예: 프로젝트 회의방"
-        />
+      <section className="modal-card create-chat-modal" role="dialog" aria-modal="true" aria-label="채팅 생성">
+        <h3>채팅 시작</h3>
+        <p>친구를 선택하면 1:1 또는 그룹 채팅을 만들 수 있다.</p>
+
+        <ul className="friend-picker-list">
+          {friends.length === 0 && <li className="state-item friend-picker-empty">선택 가능한 친구가 없습니다.</li>}
+          {friends.map((friend) => {
+            const isSelected = selectedIds.includes(friend.id)
+            return (
+              <li key={friend.id}>
+                <button
+                  type="button"
+                  className={`friend-picker-row ${isSelected ? 'selected' : ''}`}
+                  onClick={() => toggleFriend(friend.id)}
+                >
+                  <span className="friend-avatar">
+                    {friend.profileImage ? <img src={friend.profileImage} alt="" /> : friend.nickname.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="friend-main">
+                    <strong>{friend.nickname || '이름 없음'}</strong>
+                    <small>{friend.email || '이메일 미등록'}</small>
+                  </span>
+                  <span className={`selection-indicator ${isSelected ? 'checked' : ''}`}>{isSelected ? '선택' : ''}</span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+
+        {selectedIds.length > 1 && (
+          <input
+            value={groupName}
+            onChange={(event) => setGroupName(event.target.value)}
+            placeholder="그룹 채팅방 이름"
+          />
+        )}
+
+        {(localError || errorMessage) && <p className="error-text modal-error">{localError || errorMessage}</p>}
+
+        <div className="selected-friends-summary">
+          {selectedFriends.map((friend) => (
+            <span key={friend.id} className="selected-friend-chip">{friend.nickname || '이름 없음'}</span>
+          ))}
+        </div>
+
         <div className="modal-actions">
           <button type="button" className="secondary" onClick={onClose}>
             취소
           </button>
-          <button type="button" onClick={() => void onSubmit()} disabled={!roomName.trim()}>
+          <button type="button" onClick={() => void handleSubmit()} disabled={friends.length === 0}>
             생성
           </button>
         </div>

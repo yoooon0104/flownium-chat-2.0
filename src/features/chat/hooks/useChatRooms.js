@@ -1,4 +1,4 @@
-﻿import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 const resolveErrorMessage = (body, fallback) => {
   if (body?.error?.message) return String(body.error.message)
@@ -6,7 +6,9 @@ const resolveErrorMessage = (body, fallback) => {
   return fallback
 }
 
-// 방 목록 조회/검색/생성 책임을 하나의 훅으로 분리한다.
+// 방 목록 상태와 채팅방 생성 흐름을 관리한다.
+// 이번 브랜치부터는 기존 문자열 기반 생성과 친구 선택 기반 생성이 함께 들어오기 때문에
+// createRoom이 payload 형태를 유연하게 받도록 확장한다.
 export const useChatRooms = ({ chatApi }) => {
   const [rooms, setRooms] = useState([])
   const [roomsLoading, setRoomsLoading] = useState(false)
@@ -28,19 +30,20 @@ export const useChatRooms = ({ chatApi }) => {
     setRoomsLoading(false)
   }, [chatApi])
 
-  const createRoom = useCallback(async (roomName) => {
-    const normalized = String(roomName || '').trim()
-    if (!normalized || !chatApi) return { ok: false, roomId: '' }
+  // payload가 문자열이면 기존 name 기반 생성으로, 객체면 새 친구 선택 기반 생성으로 보낸다.
+  const createRoom = useCallback(async (payload) => {
+    if (!chatApi) return { ok: false, roomId: '' }
 
+    const normalized = typeof payload === 'string' ? { name: String(payload || '').trim() } : payload
     const { ok, body } = await chatApi.createRoom(normalized)
     if (!ok) {
-      setErrorMessage(resolveErrorMessage(body, 'Failed to create chat room.'))
+      setErrorMessage(resolveErrorMessage(body, '채팅방 생성에 실패했습니다.'))
       return { ok: false, roomId: '' }
     }
 
     const roomId = String(body?.room?.id || '')
     await fetchRooms()
-    return { ok: true, roomId }
+    return { ok: true, roomId, reused: Boolean(body?.reused) }
   }, [chatApi, fetchRooms])
 
   const clearRooms = useCallback(() => {
@@ -53,7 +56,8 @@ export const useChatRooms = ({ chatApi }) => {
     const keyword = searchKeyword.trim().toLowerCase()
     if (!keyword) return rooms
 
-    // 검색은 방 이름과 마지막 메시지를 동시에 기준으로 한다.
+    // 전역 검색창에서 방 탭이 사용할 결과다.
+    // 방 이름과 마지막 메시지를 함께 검색 대상으로 둔다.
     return rooms.filter((room) => {
       const roomName = String(room.name || '').toLowerCase()
       const lastMessage = String(room.lastMessage || '').toLowerCase()

@@ -1,13 +1,22 @@
 ﻿import { useEffect, useRef } from 'react'
 
-// 우측 상단 점3개 메뉴: 내 정보/설정/로그아웃 진입점.
-function UserMenu({ isOpen, onToggle, onOpenProfile, onOpenSettings, onLogout, isFloating = false }) {
+// 사용자 메뉴는 상단 우측 액션 영역에서 내 정보/설정/로그아웃 진입점을 담당한다.
+// 버튼 기호를 외부에서 주입할 수 있게 열어둬서 헤더 레이아웃에 맞게 재사용한다.
+function UserMenu({
+  isOpen,
+  onToggle,
+  onOpenProfile,
+  onOpenSettings,
+  onLogout,
+  isFloating = false,
+  buttonLabel = '사용자 메뉴',
+  buttonSymbol = '⋮',
+}) {
   const menuRef = useRef(null)
 
   useEffect(() => {
     if (!isOpen) return
 
-    // 메뉴 외부 클릭 시 드롭다운을 닫아 모바일/데스크톱 UX를 통일한다.
     const handleOutside = (event) => {
       if (!menuRef.current?.contains(event.target)) {
         onToggle(false)
@@ -30,8 +39,8 @@ function UserMenu({ isOpen, onToggle, onOpenProfile, onOpenSettings, onLogout, i
 
   return (
     <div className={`user-menu ${isFloating ? 'floating' : ''}`} ref={menuRef}>
-      <button type="button" className="kebab-button" onClick={() => onToggle(!isOpen)} aria-label="사용자 메뉴">
-        ⋮
+      <button type="button" className="kebab-button" onClick={() => onToggle(!isOpen)} aria-label={buttonLabel}>
+        {buttonSymbol}
       </button>
 
       {isOpen && (
