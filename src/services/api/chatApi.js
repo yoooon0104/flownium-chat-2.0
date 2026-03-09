@@ -29,6 +29,7 @@ export const createChatApi = ({ apiBaseUrl, getAccessToken, onUnauthorizedRetry 
     return response
   }
 
+  // 방 목록 응답에는 각 방 unreadCount와 전체 totalUnreadCount가 함께 들어온다.
   const getRooms = async () => {
     const response = await fetchWithAuth(`${apiBaseUrl}/api/chatrooms`)
     const body = await parseJsonSafe(response)
@@ -47,12 +48,15 @@ export const createChatApi = ({ apiBaseUrl, getAccessToken, onUnauthorizedRetry 
     return { ok: response.ok, status: response.status, body }
   }
 
+  // 메시지 히스토리 응답에는 텍스트뿐 아니라 메시지별 unreadCount도 포함된다.
   const getRoomMessages = async (roomId, limit = 50) => {
     const response = await fetchWithAuth(`${apiBaseUrl}/api/chatrooms/${roomId}/messages?limit=${limit}`)
     const body = await parseJsonSafe(response)
     return { ok: response.ok, status: response.status, body }
   }
 
+  // 사용자가 실제로 방에 들어왔을 때 마지막 읽은 시점을 서버에 반영한다.
+  // 이 호출이 성공하면 이후 방 목록 배지와 메시지 unread 숫자가 다시 계산된다.
   const markRoomRead = async (roomId) => {
     const response = await fetchWithAuth(`${apiBaseUrl}/api/chatrooms/${roomId}/read`, {
       method: 'PATCH',
@@ -121,3 +125,4 @@ export const createChatApi = ({ apiBaseUrl, getAccessToken, onUnauthorizedRetry 
     markNotificationRead,
   }
 }
+

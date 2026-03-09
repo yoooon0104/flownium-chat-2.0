@@ -16,6 +16,8 @@ const createChatroomRouter = ({
 }) => {
   const router = express.Router();
 
+  // 방 목록 응답 형태를 한곳에서 고정해 두면 create/get 응답이 서로 어긋나지 않는다.
+  // unreadCount는 조회 시점의 현재 사용자 기준 값이므로 기본값을 0으로 둔다.
   const toRoomResponse = (roomDoc, unreadCount = 0) => ({
     id: String(roomDoc._id),
     name: roomDoc.name,
@@ -26,6 +28,7 @@ const createChatroomRouter = ({
     unreadCount: Number(unreadCount) || 0,
   });
 
+  // 친구 요청이나 방 초대는 DB 저장만으로 끝내지 않고, 소켓 이벤트까지 같이 보내 즉시 화면에 반영한다.
   const createNotification = async (userId, type, payload) => {
     if (!Notification) return null;
 
@@ -47,6 +50,7 @@ const createChatroomRouter = ({
     return notification;
   };
 
+  // 프론트에서 비친구를 숨기더라도 서버가 다시 검증해야 직접 호출이나 오래된 UI 상태를 막을 수 있다.
   const hasAcceptedFriendship = async (me, targetUserId) => {
     if (!Friendship) return false;
 
@@ -58,6 +62,8 @@ const createChatroomRouter = ({
     return Boolean(friendship);
   };
 
+  // 1:1 방 재사용 규칙: 같은 두 사람만 들어 있는 방이면 direct 성격으로 보고 재사용한다.
+  // 별도 type 필드를 강제하지 않았기 때문에 memberIds 길이 2를 기준으로 판별한다.
   const findExistingDirectRoom = async (memberA, memberB) => {
     const rooms = await ChatRoom.find({
       memberIds: { $all: [memberA, memberB] },
@@ -68,6 +74,10 @@ const createChatroomRouter = ({
     return rooms.find((room) => Array.isArray(room.memberIds) && room.memberIds.length === 2) || null;
   };
 
+  // 방 목록 unread 계산 규칙:
+  // - 내가 보낸 메시지는 unread에서 제외
+  // - lastReadAt이 있으면 그 이후 메시지만 unread로 계산
+  // - lastReadAt이 없으면 상대가 보낸 메시지를 전부 unread로 본다.
   const getUnreadCountForRoom = async (roomId, userId, lastReadAt) => {
     const query = {
       chatRoomId: roomId,
@@ -81,6 +91,10 @@ const createChatroomRouter = ({
     return Message.countDocuments(query);
   };
 
+  // 메시지별 unreadCount 계산 규칙:
+  // - 보낸 사람 자신은 unread 대상에서 제외
+  // - 각 멤버의 lastReadAt과 메시지 timestamp를 비교해 아직 읽지 않은 인원 수를 만든다
+  // - 이 값은 채팅창에서 '(숫자) 메시지' 형태로 그대로 쓰인다.
   const buildMessageResponses = (messages, memberIds, readStateByUserId) =>
     messages.map((message) => {
       const timestamp = message.timestamp ? new Date(message.timestamp) : null;
@@ -103,6 +117,10 @@ const createChatroomRouter = ({
       };
     });
 
+  // 채팅방 생성 흐름:
+  // - memberUserIds가 없으면 기존 name 기반 그룹방 생성 호환 로직으로 처리
+  // - 1명 선택이면 기존 2인 방 재사용 또는 새 생성
+  // - 2명 이상 선택이면 그룹방 생성 후 초대 알림을 보낸다.
   router.post('/chatrooms', requireAuth, async (req, res) => {
     const currentUserId = req.user.userId;
     const name = String(req.body?.name || '').trim();
@@ -217,6 +235,8 @@ const createChatroomRouter = ({
     }
   });
 
+  // 방 목록 조회는 unread count까지 같이 계산한다.
+  // 프론트는 rooms 배열과 totalUnreadCount를 받아 목록 배지와 탭 총합 배지를 한 번에 그린다.
   router.get('/chatrooms', requireAuth, async (req, res) => {
     if (!assertDbConnected(res)) {
       return;
@@ -250,6 +270,8 @@ const createChatroomRouter = ({
     }
   });
 
+  // 메시지 히스토리 조회 시점에도 unreadCount를 다시 계산한다.
+  // 그래야 새로고침 후에도 메시지 옆 unread 숫자를 동일하게 복원할 수 있다.
   router.get('/chatrooms/:id/messages', requireAuth, async (req, res) => {
     const roomId = String(req.params.id || '').trim();
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
@@ -341,3 +363,4 @@ const createChatroomRouter = ({
 };
 
 module.exports = createChatroomRouter;
+
