@@ -62,7 +62,12 @@ function ChatPanel({
                     )}
                     <p className="bubble">{msg.text}</p>
                   </div>
-                  <p className="time">{new Date(msg.timestamp).toLocaleTimeString()}</p>
+                  <p className="time">
+                    {new Date(msg.timestamp).toLocaleTimeString([], {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </p>
                 </li>
               )
             })}
