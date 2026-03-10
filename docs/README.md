@@ -1,4 +1,4 @@
-﻿# 문서 인덱스
+# 문서 인덱스
 
 업데이트: 2026-03-10
 
@@ -21,7 +21,9 @@
 4. `docs/common/api-spec.md`
 5. `docs/common/socket-events.md`
 6. `docs/operations/deploy-runbook.md`
-7. `docs/common/env-policy.md`
+7. `docs/operations/realtime-validation-checklist.md`
+8. `docs/common/env-policy.md`
+9. `docs/operations/new-machine-setup.md`
 
 ## common
 
@@ -33,8 +35,12 @@
 - `auth-flow.md`
 - `ui-plan.md`
 - `wbs.md`
-- `development-rules.md`
 - `env-policy.md`
+
+## root-level guides
+
+- `docs/development-rules.md`
+- `CONTRIBUTING.md`
 
 ## planning
 
@@ -46,7 +52,9 @@
 ## operations
 
 - `deploy-runbook.md`
+- `new-machine-setup.md`
 - `ops-log-policy.md`
+- `realtime-validation-checklist.md`
 
 ## branding assets
 
