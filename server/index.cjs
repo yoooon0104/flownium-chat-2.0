@@ -248,7 +248,7 @@ const disconnectUserFromRoom = async (roomId, userId) => {
   });
 };
 
-const emitRoomMessage = async (roomDoc, messageDoc, clientMessageId = null) => {
+const buildRealtimeMessagePayload = async (roomDoc, messageDoc, clientMessageId = null) => {
   const roomId = String(roomDoc._id || roomDoc.id || messageDoc.chatRoomId);
   const memberIds = Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
   const targetReadStates = await ChatReadState.find({
@@ -266,7 +266,7 @@ const emitRoomMessage = async (roomDoc, messageDoc, clientMessageId = null) => {
     return new Date(readState.lastReadAt) < messageTimestamp;
   }).length;
 
-  io.to(roomId).emit('receive_message', {
+  return {
     clientMessageId,
     id: String(messageDoc._id),
     chatRoomId: roomId,
@@ -276,7 +276,17 @@ const emitRoomMessage = async (roomDoc, messageDoc, clientMessageId = null) => {
     text: messageDoc.text,
     timestamp: messageTimestamp.toISOString(),
     unreadCount,
-  });
+  };
+};
+
+const emitRoomMessage = async (roomDoc, messageDoc, clientMessageId = null) => {
+  const payload = await buildRealtimeMessagePayload(roomDoc, messageDoc, clientMessageId);
+  io.to(payload.chatRoomId).emit('receive_message', payload);
+};
+
+const emitMessageUpdated = async (roomDoc, messageDoc) => {
+  const payload = await buildRealtimeMessagePayload(roomDoc, messageDoc);
+  io.to(payload.chatRoomId).emit('message_updated', payload);
 };
 
 io.use((socket, next) => {
@@ -343,6 +353,7 @@ app.use(
     emitRoomDeleted,
     emitRoomParticipants,
     emitRoomMessage,
+    emitMessageUpdated,
     disconnectUserFromRoom,
   })
 );

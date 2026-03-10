@@ -42,7 +42,10 @@ export const useChatMessages = ({ chatApi }) => {
       }
 
       if (message?.id && prev.some((item) => item?.id === message.id)) {
-        return prev
+        return prev.map((item) => {
+          if (item?.id !== message.id) return item
+          return { ...item, ...message }
+        })
       }
 
       return [...prev, message]

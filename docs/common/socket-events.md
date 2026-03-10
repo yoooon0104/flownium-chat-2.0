@@ -144,6 +144,25 @@ ack 실패:
 - 채팅창에서는 숫자만 노출하고 0은 숨김
 - `type: "system"` 메시지는 입장/퇴장 lifecycle 기록에 사용
 
+### message_updated
+```json
+{
+  "id": "messageId",
+  "chatRoomId": "chatroomObjectId",
+  "senderId": "u1",
+  "senderNickname": "alice",
+  "type": "text",
+  "text": "hello",
+  "timestamp": "2026-03-05T10:00:00.000Z",
+  "unreadCount": 0
+}
+```
+
+규칙:
+- 기존 메시지와 같은 `id`를 사용해 unread count 같은 후속 상태만 갱신
+- 주로 읽음 처리 후 해당 메시지들의 unread count 재계산 결과를 브로드캐스트
+- 프론트는 새 메시지로 추가하지 말고 같은 `id` 메시지에 merge해야 함
+
 ### notification_created
 ```json
 {

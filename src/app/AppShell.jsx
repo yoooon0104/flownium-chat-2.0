@@ -238,6 +238,11 @@ function AppShell() {
     })()
   }, [appendMessage, currentUser?.id, fetchRooms, joinedRoomId, markRoomRead])
 
+  const handleSocketMessageUpdated = useCallback((message) => {
+    if (message?.chatRoomId !== joinedRoomId) return
+    appendMessage(message)
+  }, [appendMessage, joinedRoomId])
+
   const handleSocketParticipants = useCallback((nextParticipants) => {
     setParticipants(nextParticipants)
   }, [])
@@ -298,6 +303,7 @@ function AppShell() {
     onUnauthorized: handleSocketUnauthorized,
     onRoomJoined: handleSocketRoomJoined,
     onReceiveMessage: handleSocketReceiveMessage,
+    onMessageUpdated: handleSocketMessageUpdated,
     onRoomParticipants: handleSocketParticipants,
     onRoomUpdated: handleSocketRoomUpdated,
     onRoomDeleted: handleSocketRoomDeleted,

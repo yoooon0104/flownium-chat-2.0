@@ -9,6 +9,7 @@ export const useChatSocket = ({
   onUnauthorized,
   onRoomJoined,
   onReceiveMessage,
+  onMessageUpdated,
   onRoomParticipants,
   onRoomUpdated,
   onRoomDeleted,
@@ -98,6 +99,11 @@ export const useChatSocket = ({
       onReceiveMessage?.(payload)
     })
 
+    client.on('message_updated', (payload) => {
+      if (String(payload?.chatRoomId || '') !== currentRoomRef.current) return
+      onMessageUpdated?.(payload)
+    })
+
     client.on('notification_created', (payload) => {
       onNotificationCreated?.(payload?.notification || payload)
     })
@@ -135,6 +141,7 @@ export const useChatSocket = ({
     onNotificationCreated,
     onNotificationRead,
     onFriendshipUpdated,
+    onMessageUpdated,
     onReceiveMessage,
     onRoomJoined,
     onRoomParticipants,

@@ -17,6 +17,7 @@ const createChatroomRouter = ({
   emitRoomDeleted,
   emitRoomParticipants,
   emitRoomMessage,
+  emitMessageUpdated,
   disconnectUserFromRoom,
 }) => {
   const router = express.Router();
@@ -621,11 +622,33 @@ const createChatroomRouter = ({
         return;
       }
 
+      const previousReadState = await ChatReadState.findOne({
+        roomId,
+        userId: req.user.userId,
+      }).lean();
+
       const readState = await ChatReadState.findOneAndUpdate(
         { roomId, userId: req.user.userId },
         { $set: { lastReadAt: new Date() } },
         { new: true, upsert: true, setDefaultsOnInsert: true }
       ).lean();
+
+      const affectedMessagesQuery = {
+        chatRoomId: roomId,
+        senderId: { $ne: req.user.userId },
+      }
+
+      if (previousReadState?.lastReadAt) {
+        affectedMessagesQuery.timestamp = { $gt: previousReadState.lastReadAt }
+      }
+
+      const affectedMessages = await Message.find(affectedMessagesQuery)
+        .sort({ timestamp: 1 })
+        .lean()
+
+      await Promise.all(
+        affectedMessages.map((message) => emitMessageUpdated?.(room, message))
+      )
 
       res.status(200).json({
         roomId,
