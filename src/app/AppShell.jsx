@@ -205,9 +205,9 @@ function AppShell() {
   }, [loadMessageHistory, markRoomRead])
 
   // 실시간 메시지 수신 분기:
-  // - 현재 열려 있는 방 + 내가 아닌 상대 메시지면 곧바로 읽음 처리
-  // - 그 외에는 방 목록만 다시 받아 unread 배지만 갱신
-  // 이렇게 나누면 현재 방에서는 숫자가 즉시 줄고, 다른 방에서는 목록 배지만 늘어난다.
+  // - 현재 열려 있는 방이면 본문에 바로 append
+  // - 그중 상대 메시지면 읽음 처리까지 이어서 호출
+  // - 다른 방 메시지는 본문에는 넣지 않고 방 목록 unread만 갱신
   const handleSocketReceiveMessage = useCallback((message) => {
     void (async () => {
       if (message?.chatRoomId === joinedRoomId) {
