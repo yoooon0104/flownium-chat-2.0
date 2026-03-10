@@ -89,6 +89,38 @@ ack 실패:
 - 멤버 목록은 `ChatRoom.memberIds` 기준
 - online 여부는 소켓 메모리 presence 맵 기준
 - 방 입장/연결 종료 시 재계산 후 재전송
+- 초대/나가기 후 멤버가 바뀌면 재계산 후 재전송
+
+### room_updated
+```json
+{
+  "room": {
+    "id": "chatroomObjectId",
+    "name": "프로젝트 회의방",
+    "isGroup": true,
+    "memberIds": ["u1", "u2", "u3"],
+    "lastMessage": "alice님이 bob님을 초대했습니다.",
+    "lastMessageAt": "2026-03-10T12:00:00.000Z"
+  }
+}
+```
+
+규칙:
+- 사용자 전용 room(`user:<userId>`)으로 전달
+- 새 방 생성, 초대, 나가기 후 방 메타가 바뀌면 전송
+- 프론트는 이 이벤트를 받으면 방 목록을 다시 조회해 room 메타와 unread를 맞춘다
+
+### room_deleted
+```json
+{
+  "roomId": "chatroomObjectId"
+}
+```
+
+규칙:
+- 사용자 전용 room(`user:<userId>`)으로 전달
+- direct 방 삭제 또는 현재 사용자의 leave 처리 후 목록/상세 제거용으로 사용
+- 프론트는 현재 열려 있는 방이면 상세를 닫고 방 목록을 다시 조회한다
 
 ### receive_message
 ```json
@@ -110,6 +142,7 @@ ack 실패:
 - `unreadCount`는 해당 메시지를 아직 읽지 않은 상대 인원 수
 - 모두 읽었으면 `0`
 - 채팅창에서는 숫자만 노출하고 0은 숨김
+- `type: "system"` 메시지는 입장/퇴장 lifecycle 기록에 사용
 
 ### notification_created
 ```json

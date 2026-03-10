@@ -55,6 +55,24 @@ export const createChatApi = ({ apiBaseUrl, getAccessToken, onUnauthorizedRetry 
     return { ok: response.ok, status: response.status, body }
   }
 
+  const inviteToRoom = async (roomId, userIds) => {
+    const response = await fetchWithAuth(`${apiBaseUrl}/api/chatrooms/${roomId}/invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userIds }),
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
+  const leaveRoom = async (roomId) => {
+    const response = await fetchWithAuth(`${apiBaseUrl}/api/chatrooms/${roomId}/leave`, {
+      method: 'POST',
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
   // 사용자가 실제로 방에 들어왔을 때 마지막 읽은 시점을 서버에 반영한다.
   // 이 호출이 성공하면 이후 방 목록 배지와 메시지 unread 숫자가 다시 계산된다.
   const markRoomRead = async (roomId) => {
@@ -116,6 +134,8 @@ export const createChatApi = ({ apiBaseUrl, getAccessToken, onUnauthorizedRetry 
     getRooms,
     createRoom,
     getRoomMessages,
+    inviteToRoom,
+    leaveRoom,
     markRoomRead,
     getFriends,
     searchFriends,

@@ -47,6 +47,33 @@ export const useChatRooms = ({ chatApi }) => {
     return { ok: true, roomId, reused: Boolean(body?.reused) }
   }, [chatApi, fetchRooms])
 
+  const inviteToRoom = useCallback(async (roomId, userIds) => {
+    if (!chatApi || !roomId) return { ok: false, roomId: '' }
+
+    const { ok, body } = await chatApi.inviteToRoom(roomId, userIds)
+    if (!ok) {
+      setErrorMessage(resolveErrorMessage(body, '채팅방 초대에 실패했습니다.'))
+      return { ok: false, roomId: '' }
+    }
+
+    const nextRoomId = String(body?.room?.id || roomId)
+    await fetchRooms()
+    return { ok: true, roomId: nextRoomId, createdNewRoom: Boolean(body?.createdNewRoom) }
+  }, [chatApi, fetchRooms])
+
+  const leaveRoom = useCallback(async (roomId) => {
+    if (!chatApi || !roomId) return { ok: false, deleted: false }
+
+    const { ok, body } = await chatApi.leaveRoom(roomId)
+    if (!ok) {
+      setErrorMessage(resolveErrorMessage(body, '채팅방 나가기에 실패했습니다.'))
+      return { ok: false, deleted: false }
+    }
+
+    await fetchRooms()
+    return { ok: true, deleted: Boolean(body?.deleted), roomId: String(body?.roomId || roomId) }
+  }, [chatApi, fetchRooms])
+
   // 사용자가 방에 진입했거나 현재 열려 있는 방에서 새 메시지를 확인한 시점에 호출한다.
   // 서버에 읽음 상태를 기록한 뒤 방 목록을 다시 받아와 배지를 즉시 줄인다.
   const markRoomRead = useCallback(async (roomId) => {
@@ -91,6 +118,8 @@ export const useChatRooms = ({ chatApi }) => {
     totalUnreadCount,
     fetchRooms,
     createRoom,
+    inviteToRoom,
+    leaveRoom,
     markRoomRead,
     clearRooms,
   }

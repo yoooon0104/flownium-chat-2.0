@@ -36,7 +36,7 @@
 
 - `server/index.cjs`: 서버 엔트리 + 소켓 이벤트
 - `routes/auth.routes.cjs`: 카카오/온보딩/refresh/me/profile
-- `routes/chatroom.routes.cjs`: 채팅방/메시지/read 상태 REST
+- `routes/chatroom.routes.cjs`: 채팅방 생성/초대/나가기/메시지/read 상태 REST
 - `routes/friend.routes.cjs`: 친구 검색/요청/수락/거절/차단
 - `routes/notification.routes.cjs`: 알림 목록/읽음 처리
 - `services/auth.service.cjs`: JWT/해시/signup 토큰 검증
@@ -53,13 +53,14 @@
 6. Friends/Rooms 목록 조회
 7. 채팅방 조회/입장/메시지 송수신
 8. `room_participants`로 전체 멤버 + 온라인 상태 표시
-9. 알림 허브/모바일 알림 화면에서 친구 요청과 초대 처리
+9. 채팅 상세에서 친구 초대/나가기 처리
+10. 알림 허브/모바일 알림 화면에서 친구 요청과 초대 처리
 
 ## 데이터 핵심 필드
 
 - `User`: `kakaoId`, `email`, `nickname`, `profileImage`, `refreshTokenHash`
 - `ChatRoom`: `name`, `memberIds`, `lastMessage`, `lastMessageAt`
-- `Message`: `chatRoomId`, `senderId`, `text`, `timestamp`
+- `Message`: `chatRoomId`, `senderId`, `type`, `text`, `timestamp`
 - `Friendship`: `requesterId`, `addresseeId`, `pairKey`, `status`
 - `Notification`: `userId`, `type`, `payload`, `isRead`, `readAt`
 - `ChatReadState`: `roomId`, `userId`, `lastReadAt`
@@ -76,6 +77,10 @@
   - 친구 목록과 알림 허브 재조회 트리거
 - `room_participants`
   - 현재 입장 방 기준 참여자 online/offline 반영
+- `room_updated`
+  - 새 방 생성/초대/나가기 뒤 방 목록 메타 재조회 트리거
+- `room_deleted`
+  - 삭제되거나 내가 떠난 방을 목록/상세에서 제거하는 트리거
 
 ## 운영 보정 로직
 
@@ -86,6 +91,7 @@
 
 - 프로필 이미지는 카카오 원본 우선(업로드/편집은 다음 단계)
 - 관리자/초대/강퇴 정책 미구현
+- 초대 승인 절차/강퇴 정책은 아직 없음(친구 검증 후 즉시 반영)
 - presence는 메모리 기반(서버 재시작 시 초기화)
 - unread 감소/증가 흐름은 실제 친구 계정 2개 기준 추가 검증 필요
-- 설정은 아직 모달 기반이며, 별도 화면 구조로 확장 예정
+- 설정은 모바일 별도 화면 + 데스크톱 모달 구조

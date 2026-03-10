@@ -6,6 +6,7 @@ import { useKakaoAuth } from '../features/auth/hooks/useKakaoAuth'
 import RoomPanel from '../features/chat/components/RoomPanel'
 import ChatPanel from '../features/chat/components/ChatPanel'
 import CreateRoomModal from '../features/chat/components/CreateRoomModal'
+import InviteFriendsModal from '../features/chat/components/InviteFriendsModal'
 import { useChatMessages } from '../features/chat/hooks/useChatMessages'
 import { useChatRooms } from '../features/chat/hooks/useChatRooms'
 import { useChatSocket } from '../features/chat/hooks/useChatSocket'
@@ -73,6 +74,7 @@ function AppShell() {
   })
 
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = useState(false)
+  const [isInviteFriendsModalOpen, setIsInviteFriendsModalOpen] = useState(false)
   const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false)
   const [selectedMobileFriend, setSelectedMobileFriend] = useState(null)
 
@@ -124,6 +126,8 @@ function AppShell() {
     totalUnreadCount,
     fetchRooms,
     createRoom,
+    inviteToRoom,
+    leaveRoom,
     markRoomRead,
     clearRooms,
   } = useChatRooms({ chatApi })
@@ -164,6 +168,7 @@ function AppShell() {
     setIsParticipantsMenuOpen(false)
     setIsNotificationMenuOpen(false)
     setIsCreateRoomModalOpen(false)
+    setIsInviteFriendsModalOpen(false)
     setIsAddFriendModalOpen(false)
     setSelectedMobileFriend(null)
     setIsUserMenuOpen(false)
@@ -237,6 +242,30 @@ function AppShell() {
     setParticipants(nextParticipants)
   }, [])
 
+  const clearActiveRoom = useCallback(() => {
+    setJoinedRoomId('')
+    setParticipants([])
+    setIsParticipantsMenuOpen(false)
+    setIsInviteFriendsModalOpen(false)
+    setIsMobileChatView(false)
+    clearMessages()
+  }, [clearMessages])
+
+  const handleSocketRoomUpdated = useCallback(() => {
+    void fetchRooms()
+  }, [fetchRooms])
+
+  const handleSocketRoomDeleted = useCallback((payload) => {
+    const deletedRoomId = String(payload?.roomId || '').trim()
+    if (!deletedRoomId) return
+
+    if (deletedRoomId === joinedRoomId) {
+      clearActiveRoom()
+    }
+
+    void fetchRooms()
+  }, [clearActiveRoom, fetchRooms, joinedRoomId])
+
   const handleSocketNotificationCreated = useCallback(() => {
     void fetchNotifications()
   }, [fetchNotifications])
@@ -270,6 +299,8 @@ function AppShell() {
     onRoomJoined: handleSocketRoomJoined,
     onReceiveMessage: handleSocketReceiveMessage,
     onRoomParticipants: handleSocketParticipants,
+    onRoomUpdated: handleSocketRoomUpdated,
+    onRoomDeleted: handleSocketRoomDeleted,
     onNotificationCreated: handleSocketNotificationCreated,
     onNotificationRead: handleSocketNotificationRead,
     onFriendshipUpdated: handleSocketFriendshipUpdated,
@@ -359,6 +390,32 @@ function AppShell() {
     await respondToFriendRequest(requestId, action)
     void fetchNotifications()
   }, [fetchNotifications, respondToFriendRequest])
+
+  const handleInviteFriends = useCallback(async (userIds) => {
+    if (!joinedRoomId) return { ok: false }
+
+    const result = await inviteToRoom(joinedRoomId, userIds)
+    if (!result.ok) return result
+
+    setIsInviteFriendsModalOpen(false)
+    if (result.createdNewRoom && result.roomId) {
+      emitJoinRoom(result.roomId)
+    }
+
+    return result
+  }, [emitJoinRoom, inviteToRoom, joinedRoomId])
+
+  const handleLeaveRoom = useCallback(async () => {
+    if (!joinedRoomId) return
+
+    const shouldLeave = window.confirm('현재 채팅방에서 나가시겠습니까?')
+    if (!shouldLeave) return
+
+    const result = await leaveRoom(joinedRoomId)
+    if (!result.ok) return
+
+    clearActiveRoom()
+  }, [clearActiveRoom, joinedRoomId, leaveRoom])
 
   const activeRoom = useMemo(() => {
     return rooms.find((room) => room.id === joinedRoomId) || null
@@ -496,6 +553,23 @@ function AppShell() {
     })
   }, [acceptedFriends, searchKeyword])
 
+  const inviteableFriends = useMemo(() => {
+    const currentMemberIds = new Set(Array.isArray(activeRoom?.memberIds) ? activeRoom.memberIds : [])
+    return acceptedFriends
+      .map((item) => ({
+        id: item.counterpart.id,
+        nickname: item.counterpart.nickname || '',
+        email: item.counterpart.email || '',
+        profileImage: item.counterpart.profileImage || '',
+      }))
+      .filter((friend) => !currentMemberIds.has(friend.id))
+      .sort((a, b) => {
+        const left = `${a.nickname} ${a.email}`.trim()
+        const right = `${b.nickname} ${b.email}`.trim()
+        return left.localeCompare(right, 'ko')
+      })
+  }, [acceptedFriends, activeRoom?.memberIds])
+
   if (isInitializing) {
     return <LoginGate isLoading authError={error} onStartKakaoLogin={startKakaoLogin} />
   }
@@ -589,6 +663,9 @@ function AppShell() {
             isOpen: isParticipantsMenuOpen,
             onToggle: setIsParticipantsMenuOpen,
             currentUserId: currentUser?.id || '',
+            onOpenInvite: () => setIsInviteFriendsModalOpen(true),
+            onLeaveRoom: () => void handleLeaveRoom(),
+            canInvite: inviteableFriends.length > 0,
           }}
           errorMessage={errorMessage || friendErrorMessage || notificationErrorMessage}
           isLoadingHistory={isLoadingHistory}
@@ -641,6 +718,15 @@ function AppShell() {
         errorMessage={errorMessage}
         onClose={() => setIsCreateRoomModalOpen(false)}
         onSubmit={handleCreateRoomSubmit}
+      />
+
+      <InviteFriendsModal
+        isOpen={isInviteFriendsModalOpen}
+        friends={inviteableFriends}
+        roomName={activeRoom?.name || ''}
+        errorMessage={errorMessage}
+        onClose={() => setIsInviteFriendsModalOpen(false)}
+        onSubmit={handleInviteFriends}
       />
 
       <AddFriendModal
