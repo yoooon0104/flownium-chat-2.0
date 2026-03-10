@@ -1,4 +1,14 @@
-﻿You are implementing a feature in the Flownium Chat project.
+﻿## Permission Scope
+
+- Code changes are allowed.
+- Documentation changes are allowed when contracts, screens, architecture, or flows are affected.
+- Commits are not allowed unless the user explicitly asks for them.
+- Pushes are not allowed unless the user explicitly asks for them.
+- PR creation is not allowed unless the user explicitly asks for it.
+- GitHub Issue creation is not allowed unless the user explicitly asks for it.
+- Validation is required after implementation.
+
+You are implementing a feature in the Flownium Chat project.
 
 Before modifying code:
 

@@ -1,5 +1,15 @@
 ﻿# Workflow: Issue -> Implementation -> PR
 
+## Permission Scope
+
+- Code changes are allowed.
+- Documentation changes are allowed when they are required to keep the repository synchronized with the implementation.
+- Commits are allowed when the workflow reaches a completed implementation state.
+- Pushes are allowed only when the user explicitly asks for them.
+- PR creation is allowed only when the user explicitly asks for it.
+- GitHub Issue creation is not allowed unless the user explicitly asks for it.
+- Validation is required before completion.
+
 This workflow describes how an AI agent should convert a GitHub Issue into an implementation pull request.
 
 ## Step 1: Issue Analysis

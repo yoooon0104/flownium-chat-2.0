@@ -4,6 +4,19 @@ This document defines how AI agents should operate in this repository.
 
 Agents must review `docs/development-rules.md` before changing code, documentation, or configuration. For branching, PR, and merge flow, follow `CONTRIBUTING.md`.
 
+## 0. Prompt Permission Rule
+
+1. When a prompt file under `.codex/prompts/` defines a `Permission Scope` section, that scope must be followed for the current task.
+2. Prompt-level permission rules narrow behavior for that task and should be treated as stricter, task-specific limits.
+3. If a dangerous action is not explicitly allowed by the active prompt, treat it as disallowed by default.
+4. Dangerous actions include:
+   - code changes
+   - documentation changes
+   - commits
+   - pushes
+   - PR creation
+   - GitHub Issue creation
+
 ## 1. Working Principles
 
 1. Prefer the smallest change that solves the problem.
