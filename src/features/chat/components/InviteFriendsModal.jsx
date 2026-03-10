@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 // 방 초대 모달은 현재 방 멤버를 제외한 친구만 보여준다.
-// 1:1/다인방 여부는 서버가 판단하므로 여기서는 선택과 제출만 담당한다.
+// 기존 direct/group 여부와 무관하게 초대 대상 선택과 제출만 담당한다.
 function InviteFriendsModal({ isOpen, friends, roomName, errorMessage, onClose, onSubmit }) {
   const [selectedIds, setSelectedIds] = useState([])
   const [localError, setLocalError] = useState('')
@@ -72,6 +72,8 @@ function InviteFriendsModal({ isOpen, friends, roomName, errorMessage, onClose, 
           {friends.length === 0 && <li className="state-item friend-picker-empty">초대 가능한 친구가 없습니다.</li>}
           {friends.map((friend) => {
             const isSelected = selectedIds.includes(friend.id)
+            const fallbackName = String(friend.nickname || '').trim() || '이름 없음'
+            const fallbackEmail = String(friend.email || '').trim() || '이메일 미등록'
             return (
               <li key={friend.id}>
                 <button
@@ -80,11 +82,11 @@ function InviteFriendsModal({ isOpen, friends, roomName, errorMessage, onClose, 
                   onClick={() => toggleFriend(friend.id)}
                 >
                   <span className="friend-avatar">
-                    {friend.profileImage ? <img src={friend.profileImage} alt="" /> : friend.nickname.slice(0, 1).toUpperCase()}
+                    {friend.profileImage ? <img src={friend.profileImage} alt="" /> : fallbackName.slice(0, 1).toUpperCase()}
                   </span>
                   <span className="friend-main">
-                    <strong>{friend.nickname || '이름 없음'}</strong>
-                    <small>{friend.email || '이메일 미등록'}</small>
+                    <strong>{fallbackName}</strong>
+                    <small>{fallbackEmail}</small>
                   </span>
                   <span className={`selection-indicator ${isSelected ? 'checked' : ''}`}>{isSelected ? '선택' : ''}</span>
                 </button>
@@ -97,7 +99,9 @@ function InviteFriendsModal({ isOpen, friends, roomName, errorMessage, onClose, 
 
         <div className="selected-friends-summary">
           {selectedFriends.map((friend) => (
-            <span key={friend.id} className="selected-friend-chip">{friend.nickname || '이름 없음'}</span>
+            <span key={friend.id} className="selected-friend-chip">
+              {String(friend.nickname || '').trim() || '이름 없음'}
+            </span>
           ))}
         </div>
 
