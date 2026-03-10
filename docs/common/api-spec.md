@@ -312,6 +312,7 @@ MVP2-A 1차 표준:
 - 요청 payload의 중복 `userId`는 서버에서 dedupe
 - direct(`isGroup=false`) 방이면 기존 방을 유지하고 새 다인방을 생성
 - group(`isGroup=true`) 방이면 기존 방 `memberIds`에 즉시 멤버 추가
+- 자동 생성형 그룹명은 초대 후 현재 멤버 기준으로 다시 계산
 - 멤버 변경 시 시스템 메시지와 `lastMessage`, `lastMessageAt` 갱신
 
 요청:

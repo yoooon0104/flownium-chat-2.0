@@ -134,6 +134,11 @@ const createChatroomRouter = ({
     );
   };
 
+  const shouldRefreshGeneratedRoomName = (roomDoc, memberUsers) => {
+    const generatedName = buildGroupRoomName(memberUsers);
+    return String(roomDoc?.name || '').trim() === generatedName;
+  };
+
   const buildGroupRoomName = (memberUsers) => {
     const names = memberUsers
       .map((user) => String(user?.nickname || '').trim())
@@ -360,7 +365,18 @@ const createChatroomRouter = ({
           return;
         }
 
+        const existingUsers = await User.find({ _id: { $in: room.memberIds } }).lean();
+        const existingUserById = new Map(existingUsers.map((user) => [String(user._id), user]));
+        const currentMemberUsers = room.memberIds
+          .map((memberId) => existingUserById.get(String(memberId)))
+          .filter(Boolean);
+        const nextMemberUsers = [...currentMemberUsers, ...targetUsers];
+
         await seedReadStatesForInvitedUsers(room, targetUserIds);
+
+        if (shouldRefreshGeneratedRoomName(room, currentMemberUsers)) {
+          room.name = buildGroupRoomName(nextMemberUsers);
+        }
 
         room.memberIds = [...room.memberIds.map((value) => String(value)), ...targetUserIds];
         room.isGroup = true;
