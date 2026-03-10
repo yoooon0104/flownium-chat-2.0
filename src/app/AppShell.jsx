@@ -16,6 +16,7 @@ import ProfileModal from '../features/user/components/ProfileModal'
 import SettingsModal from '../features/user/components/SettingsModal'
 import { useNotifications } from '../features/notifications/hooks/useNotifications'
 import NotificationsScreen from '../features/notifications/components/NotificationsScreen'
+import MobileBottomTabBar from '../features/navigation/components/MobileBottomTabBar'
 import { createChatApi } from '../services/api/chatApi'
 import { createChatSocketClient } from '../services/socket/chatSocketClient'
 
@@ -66,7 +67,7 @@ function AppShell() {
   const [activeTab, setActiveTab] = useState('friends')
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false
-    return window.innerWidth <= 767
+    return window.innerWidth <= 1023
   })
 
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = useState(false)
@@ -205,9 +206,9 @@ function AppShell() {
   }, [loadMessageHistory, markRoomRead])
 
   // 실시간 메시지 수신 분기:
-  // - 현재 열려 있는 방 + 내가 아닌 상대 메시지면 곧바로 읽음 처리
-  // - 그 외에는 방 목록만 다시 받아 unread 배지만 갱신
-  // 이렇게 나누면 현재 방에서는 숫자가 즉시 줄고, 다른 방에서는 목록 배지만 늘어난다.
+  // - 현재 열려 있는 방이면 본문에 바로 append
+  // - 그중 상대 메시지면 읽음 처리까지 이어서 호출
+  // - 다른 방 메시지는 본문에는 넣지 않고 방 목록 unread만 갱신
   const handleSocketReceiveMessage = useCallback((message) => {
     void (async () => {
       if (message?.chatRoomId === joinedRoomId) {
@@ -277,7 +278,7 @@ function AppShell() {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobileViewport(window.innerWidth <= 767)
+      setIsMobileViewport(window.innerWidth <= 1023)
     }
 
     handleResize()
@@ -364,6 +365,43 @@ function AppShell() {
 
   const canSend = Boolean(isConnected && joinedRoomId && text.trim().length > 0)
 
+  // 모바일 하단 탭바는 현재 어떤 1차 화면을 보고 있는지에 따라 활성 상태를 바꾼다.
+  // 알림 화면이 열려 있으면 notifications를 우선으로 보고, 그 외에는 Friends/Rooms 탭 상태를 그대로 따른다.
+  const mobileNavActiveItem = useMemo(() => {
+    if (isMobileNotificationView) return 'notifications'
+    return activeTab === 'rooms' ? 'rooms' : 'friends'
+  }, [activeTab, isMobileNotificationView])
+
+  // 모바일 하단 탭은 단순 화면 전환만 담당한다.
+  // 실제 데이터는 기존 Friends/Rooms/Notifications 화면이 그대로 사용하므로, 여기서는 관련 상태만 정리한다.
+  const handleSelectMobileFriends = useCallback(() => {
+    setActiveTab('friends')
+    setIsMobileChatView(false)
+    setIsMobileNotificationView(false)
+    setIsNotificationMenuOpen(false)
+  }, [])
+
+  const handleSelectMobileRooms = useCallback(() => {
+    setActiveTab('rooms')
+    setIsMobileChatView(false)
+    setIsMobileNotificationView(false)
+    setIsNotificationMenuOpen(false)
+  }, [])
+
+  const handleSelectMobileNotifications = useCallback(() => {
+    setIsMobileChatView(false)
+    setIsMobileNotificationView(true)
+    setIsNotificationMenuOpen(false)
+  }, [])
+
+  const handleSelectMobileSettings = useCallback(() => {
+    setIsMobileChatView(false)
+    setIsMobileNotificationView(false)
+    setIsNotificationMenuOpen(false)
+    setIsUserMenuOpen(false)
+    setIsSettingsModalOpen(true)
+  }, [])
+
   const filteredFriends = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase()
     const friends = acceptedFriends
@@ -428,7 +466,7 @@ function AppShell() {
           onOpenAddFriend={() => setIsAddFriendModalOpen(true)}
           onFriendDoubleClick={startDirectChat}
           onFriendTap={(friend) => {
-            if (window.innerWidth <= 767) {
+            if (window.innerWidth <= 1023) {
               setSelectedMobileFriend(friend)
               return
             }
@@ -507,6 +545,17 @@ function AppShell() {
         )}
       </section>
 
+      {isMobileViewport && !isMobileChatView && (
+        <MobileBottomTabBar
+          activeItem={mobileNavActiveItem}
+          totalUnreadCount={totalUnreadCount}
+          notificationUnreadCount={unreadCount}
+          onSelectFriends={handleSelectMobileFriends}
+          onSelectRooms={handleSelectMobileRooms}
+          onSelectNotifications={handleSelectMobileNotifications}
+          onSelectSettings={handleSelectMobileSettings}
+        />
+      )}
       <CreateRoomModal
         isOpen={isCreateRoomModalOpen}
         friends={filteredFriends}
@@ -549,5 +598,11 @@ function AppShell() {
 }
 
 export default AppShell
+
+
+
+
+
+
 
 
