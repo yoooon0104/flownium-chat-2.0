@@ -44,6 +44,7 @@ export const useChatMessages = ({ chatApi }) => {
   const [hasMoreHistory, setHasMoreHistory] = useState(false)
   const [historyCursor, setHistoryCursor] = useState('')
   const [historyError, setHistoryError] = useState('')
+  const [lastMessageMutation, setLastMessageMutation] = useState('')
 
   const loadMessageHistory = useCallback(async (roomId) => {
     if (!chatApi || !roomId) return
@@ -74,6 +75,7 @@ export const useChatMessages = ({ chatApi }) => {
       // 이때 단순 replace를 하면 방금 도착한 메시지와 read-count 갱신이 사라질 수 있으므로 merge로 보존한다.
       return mergeMessageLists(historyMessages, prev)
     })
+    setLastMessageMutation('history')
     setIsLoadingHistory(false)
   }, [chatApi])
 
@@ -104,10 +106,12 @@ export const useChatMessages = ({ chatApi }) => {
       const olderMessages = Array.isArray(body?.messages) ? body.messages : []
       return mergeMessageLists(olderMessages, prev)
     })
+    setLastMessageMutation('older')
     setIsLoadingOlderHistory(false)
   }, [chatApi, hasMoreHistory, historyCursor, isLoadingHistory, isLoadingOlderHistory])
 
   const appendMessage = useCallback((message) => {
+    setLastMessageMutation('append')
     setMessages((prev) => {
       // 서버 응답에 clientMessageId가 있으면 먼저 임시 메시지 교체 대상을 찾는다.
       // 같은 clientMessageId를 가진 optimistic 메시지가 있으면 실제 메시지로 덮어쓴다.
@@ -146,6 +150,7 @@ export const useChatMessages = ({ chatApi }) => {
     setIsLoadingOlderHistory(false)
     setHasMoreHistory(false)
     setHistoryCursor('')
+    setLastMessageMutation('')
   }, [])
 
   return {
@@ -154,6 +159,7 @@ export const useChatMessages = ({ chatApi }) => {
     isLoadingOlderHistory,
     hasMoreHistory,
     historyError,
+    lastMessageMutation,
     setHistoryError,
     loadMessageHistory,
     loadOlderMessageHistory,
