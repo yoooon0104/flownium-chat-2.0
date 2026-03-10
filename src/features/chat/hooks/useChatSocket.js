@@ -136,8 +136,39 @@ export const useChatSocket = ({
   }, [])
 
   const sendMessage = useCallback((payload) => {
-    if (!socketRef.current) return
-    socketRef.current.emit('send_message', payload)
+    if (!socketRef.current) {
+      return Promise.resolve({
+        ok: false,
+        code: 'SOCKET_NOT_CONNECTED',
+        message: 'Socket is not connected.',
+      })
+    }
+
+    return new Promise((resolve) => {
+      let isSettled = false
+      const finish = (result) => {
+        if (isSettled) return
+        isSettled = true
+        clearTimeout(timeoutId)
+        resolve(result)
+      }
+
+      const timeoutId = setTimeout(() => {
+        finish({
+          ok: false,
+          code: 'SEND_MESSAGE_TIMEOUT',
+          message: 'Message send acknowledgement timed out.',
+        })
+      }, 5000)
+
+      socketRef.current.emit('send_message', payload, (response) => {
+        finish(response || {
+          ok: false,
+          code: 'SEND_MESSAGE_ACK_EMPTY',
+          message: 'Message acknowledgement was empty.',
+        })
+      })
+    })
   }, [])
 
   return {

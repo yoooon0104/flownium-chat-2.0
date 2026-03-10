@@ -27,7 +27,8 @@
 {
   "roomId": "chatroomObjectId",
   "text": "message text",
-  "type": "text"
+  "type": "text",
+  "clientMessageId": "local-1710057600000-ab12cd"
 }
 ```
 
@@ -35,6 +36,26 @@
 - 메시지 DB 저장
 - 방의 `lastMessage`, `lastMessageAt` 갱신
 - `receive_message` 브로드캐스트
+- ack 응답으로 전송 성공/실패를 호출자에게 즉시 반환
+
+ack 성공:
+```json
+{
+  "ok": true,
+  "clientMessageId": "local-1710057600000-ab12cd",
+  "messageId": "messageId"
+}
+```
+
+ack 실패:
+```json
+{
+  "ok": false,
+  "code": "DB_NOT_CONNECTED",
+  "message": "database is not connected",
+  "clientMessageId": "local-1710057600000-ab12cd"
+}
+```
 
 ## 서버 -> 클라이언트
 
@@ -72,6 +93,7 @@
 ### receive_message
 ```json
 {
+  "clientMessageId": "local-1710057600000-ab12cd",
   "id": "messageId",
   "chatRoomId": "chatroomObjectId",
   "senderId": "u1",
@@ -84,6 +106,7 @@
 ```
 
 규칙:
+- 보낸 사람에게는 같은 `clientMessageId`가 다시 전달되어 optimistic 메시지를 실제 메시지로 치환할 수 있음
 - `unreadCount`는 해당 메시지를 아직 읽지 않은 상대 인원 수
 - 모두 읽었으면 `0`
 - 채팅창에서는 숫자만 노출하고 0은 숨김

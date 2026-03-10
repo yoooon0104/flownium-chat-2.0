@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '../App.css'
 import LoginGate from '../features/auth/components/LoginGate'
 import SignupOnboarding from '../features/auth/components/SignupOnboarding'
@@ -14,6 +14,7 @@ import FriendActionSheet from '../features/friends/components/FriendActionSheet'
 import { useFriends } from '../features/friends/hooks/useFriends'
 import ProfileModal from '../features/user/components/ProfileModal'
 import SettingsModal from '../features/user/components/SettingsModal'
+import SettingsScreen from '../features/user/components/SettingsScreen'
 import { useNotifications } from '../features/notifications/hooks/useNotifications'
 import NotificationsScreen from '../features/notifications/components/NotificationsScreen'
 import MobileBottomTabBar from '../features/navigation/components/MobileBottomTabBar'
@@ -64,6 +65,7 @@ function AppShell() {
   const [text, setText] = useState('')
   const [isMobileChatView, setIsMobileChatView] = useState(false)
   const [isMobileNotificationView, setIsMobileNotificationView] = useState(false)
+  const [isMobileSettingsView, setIsMobileSettingsView] = useState(false)
   const [activeTab, setActiveTab] = useState('friends')
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -107,6 +109,7 @@ function AppShell() {
     historyError,
     loadMessageHistory,
     appendMessage,
+    removeMessageByClientMessageId,
     clearMessages,
   } = useChatMessages({ chatApi })
 
@@ -157,6 +160,7 @@ function AppShell() {
     setText('')
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     setIsParticipantsMenuOpen(false)
     setIsNotificationMenuOpen(false)
     setIsCreateRoomModalOpen(false)
@@ -197,10 +201,11 @@ function AppShell() {
     setJoinedRoomId(nextRoomId)
     setIsMobileChatView(true)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     setIsParticipantsMenuOpen(false)
 
-    // room_participants ??????? ??? ??????, ? ?? ??? ?? ??? ??? ??? ??.
-    // ??? room_joined? ?? ? participants? ?? ???? ?? ??? ???? ?? ??? ????.
+    // room_participants 이벤트가 뒤늦게 오더라도, 방 입장 직후 헤더와 참여자 목록이
+    // 비어 보이지 않게 room_joined payload의 participants를 먼저 반영한다.
     setParticipants(Array.isArray(payload?.participants) ? payload.participants : [])
 
     void (async () => {
@@ -314,23 +319,6 @@ function AppShell() {
     emitJoinRoom(roomId)
   }, [emitJoinRoom, setErrorMessage])
 
-  const handleSendMessage = useCallback(() => {
-    const normalized = text.trim()
-    if (!joinedRoomId || !normalized) return
-
-    sendMessage({
-      roomId: joinedRoomId,
-      text: normalized,
-      type: 'text',
-    })
-    setText('')
-  }, [joinedRoomId, sendMessage, text])
-
-  const handleComposerKeyUp = useCallback((event) => {
-    if (event.key === 'Enter') {
-      handleSendMessage()
-    }
-  }, [handleSendMessage])
 
   const handleCreateRoomSubmit = useCallback(async (payload) => {
     const result = await createRoom(payload)
@@ -338,6 +326,7 @@ function AppShell() {
 
     setIsCreateRoomModalOpen(false)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     void fetchNotifications()
     if (result.roomId) {
       emitJoinRoom(result.roomId)
@@ -354,6 +343,7 @@ function AppShell() {
     setActiveTab('rooms')
     setSelectedMobileFriend(null)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     void fetchNotifications()
     if (result.roomId) {
       emitJoinRoom(result.roomId)
@@ -374,14 +364,80 @@ function AppShell() {
     return rooms.find((room) => room.id === joinedRoomId) || null
   }, [rooms, joinedRoomId])
 
-  const canSend = Boolean(isConnected && joinedRoomId && text.trim().length > 0)
+  const roomMemberCount = Array.isArray(activeRoom?.memberIds)
+    ? activeRoom.memberIds.length
+    : Array.isArray(participants)
+      ? participants.length
+      : 0
+
+  const optimisticUnreadCount = Math.max(roomMemberCount - 1, 0)
+
+
+  const canSend = Boolean(isConnected && joinedRoomId && !isLoadingHistory && text.trim().length > 0)
+
+  const handleSendMessage = useCallback(async () => {
+    const normalized = text.trim()
+    if (!joinedRoomId || !normalized || isLoadingHistory) return
+
+    // 히스토리 로딩이 끝난 뒤에만 optimistic 메시지를 붙여야
+    // 직후 도착한 과거 메시지 응답이 방금 보낸 메시지를 덮어쓰지 않는다.
+    // 실패/타임아웃 시에는 같은 clientMessageId로 optimistic 메시지를 제거한다.
+    const clientMessageId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    appendMessage({
+      clientMessageId,
+      id: clientMessageId,
+      chatRoomId: joinedRoomId,
+      senderId: currentUser?.id || '',
+      senderNickname: currentUser?.nickname || '?',
+      type: 'text',
+      text: normalized,
+      timestamp: new Date().toISOString(),
+      unreadCount: optimisticUnreadCount,
+    })
+
+    setText('')
+
+    const result = await sendMessage({
+      roomId: joinedRoomId,
+      text: normalized,
+      type: 'text',
+      clientMessageId,
+    })
+
+    if (result?.ok) return
+
+    removeMessageByClientMessageId(clientMessageId)
+    setText(normalized)
+    setErrorMessage(String(result?.message || '메시지 전송에 실패했습니다.'))
+  }, [
+    appendMessage,
+    currentUser?.id,
+    currentUser?.nickname,
+    isLoadingHistory,
+    joinedRoomId,
+    optimisticUnreadCount,
+    removeMessageByClientMessageId,
+    sendMessage,
+    setErrorMessage,
+    text,
+  ])
+
+  const handleComposerKeyUp = useCallback((event) => {
+    if (event.key === 'Enter') {
+      handleSendMessage()
+    }
+  }, [handleSendMessage])
+
+
+
 
   // 모바일 하단 탭바는 현재 어떤 1차 화면을 보고 있는지에 따라 활성 상태를 바꾼다.
   // 알림 화면이 열려 있으면 notifications를 우선으로 보고, 그 외에는 Friends/Rooms 탭 상태를 그대로 따른다.
   const mobileNavActiveItem = useMemo(() => {
     if (isMobileNotificationView) return 'notifications'
+    if (isMobileSettingsView) return 'settings'
     return activeTab === 'rooms' ? 'rooms' : 'friends'
-  }, [activeTab, isMobileNotificationView])
+  }, [activeTab, isMobileNotificationView, isMobileSettingsView])
 
   // 모바일 하단 탭은 단순 화면 전환만 담당한다.
   // 실제 데이터는 기존 Friends/Rooms/Notifications 화면이 그대로 사용하므로, 여기서는 관련 상태만 정리한다.
@@ -389,6 +445,7 @@ function AppShell() {
     setActiveTab('friends')
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     setIsNotificationMenuOpen(false)
   }, [])
 
@@ -396,21 +453,23 @@ function AppShell() {
     setActiveTab('rooms')
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     setIsNotificationMenuOpen(false)
   }, [])
 
   const handleSelectMobileNotifications = useCallback(() => {
     setIsMobileChatView(false)
     setIsMobileNotificationView(true)
+    setIsMobileSettingsView(false)
     setIsNotificationMenuOpen(false)
   }, [])
 
   const handleSelectMobileSettings = useCallback(() => {
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(true)
     setIsNotificationMenuOpen(false)
     setIsUserMenuOpen(false)
-    setIsSettingsModalOpen(true)
   }, [])
 
   const filteredFriends = useMemo(() => {
@@ -462,6 +521,7 @@ function AppShell() {
         <RoomPanel
           isMobileChatView={isMobileChatView}
           isMobileNotificationView={isMobileNotificationView}
+          isMobileSettingsView={isMobileSettingsView}
           isMobileViewport={isMobileViewport}
           activeTab={activeTab}
           onChangeTab={setActiveTab}
@@ -554,6 +614,14 @@ function AppShell() {
             onBack={() => setIsMobileNotificationView(false)}
           />
         )}
+
+        {isMobileSettingsView && (
+          <SettingsScreen
+            user={currentUser}
+            onSubmit={updateProfileNickname}
+            onBack={() => setIsMobileSettingsView(false)}
+          />
+        )}
       </section>
 
       {isMobileViewport && !isMobileChatView && (
@@ -599,7 +667,7 @@ function AppShell() {
       />
 
       <SettingsModal
-        isOpen={isSettingsModalOpen}
+        isOpen={isSettingsModalOpen && !isMobileViewport}
         user={currentUser}
         onClose={() => setIsSettingsModalOpen(false)}
         onSubmit={updateProfileNickname}
@@ -609,6 +677,8 @@ function AppShell() {
 }
 
 export default AppShell
+
+
 
 
 

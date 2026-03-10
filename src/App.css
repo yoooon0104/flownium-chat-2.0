@@ -46,7 +46,8 @@
 
 .room-panel,
 .chat-panel,
-.notification-screen {
+.notification-screen,
+.settings-screen {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel);
@@ -418,7 +419,16 @@
   min-height: 0;
 }
 
+.settings-screen {
+  display: none;
+  min-height: 0;
+}
+
 .notification-screen.mobile-active {
+  display: none;
+}
+
+.settings-screen.mobile-active {
   display: none;
 }
 
@@ -431,11 +441,29 @@
   border-bottom: 1px solid var(--line);
 }
 
+.settings-screen-header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
 .notification-screen-main {
   min-width: 0;
 }
 
+.settings-screen-main {
+  min-width: 0;
+}
+
 .notification-screen-main h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.settings-screen-main h3 {
   margin: 0;
   font-size: 17px;
 }
@@ -446,11 +474,63 @@
   color: var(--muted);
 }
 
+.settings-screen-main p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .notification-screen-body {
   min-height: 0;
   overflow: auto;
   padding: 14px;
   background: linear-gradient(to bottom, #f9faff, #f5f7fc);
+}
+
+.settings-screen-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+  background: linear-gradient(to bottom, #f9faff, #f5f7fc);
+}
+
+.settings-form-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.settings-field {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-field span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.settings-field input {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid #d5dbe3;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  outline: none;
+  color: var(--text);
+}
+
+.settings-field input::placeholder {
+  color: #8892a2;
+}
+
+.settings-field input:focus {
+  border-color: #9ea8b6;
 }
 
 .chat-header {
@@ -1015,6 +1095,10 @@
     display: block;
   }
 
+  .settings-screen.mobile-active {
+    display: block;
+  }
+
   .panel-profile-text strong {
     font-size: 24px;
   }
@@ -1046,7 +1130,8 @@
   }
 
   .room-panel,
-  .notification-screen.mobile-active {
+  .notification-screen.mobile-active,
+  .settings-screen.mobile-active {
     padding-bottom: 76px;
   }
 
