@@ -367,19 +367,32 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('send_message', async (payload = {}) => {
+  socket.on('send_message', async (payload = {}, ack) => {
     const roomId = String(payload.roomId || '').trim();
     const text = String(payload.text || '').trim();
     const type = payload.type === 'system' ? 'system' : 'text';
     const clientMessageId = String(payload.clientMessageId || '').trim();
+    const reply = typeof ack === 'function' ? ack : () => {};
 
     if (!roomId || !text) {
       emitSocketError(socket, 'INVALID_REQUEST', 'roomId and text are required');
+      reply({
+        ok: false,
+        code: 'INVALID_REQUEST',
+        message: 'roomId and text are required',
+        clientMessageId: clientMessageId || null,
+      });
       return;
     }
 
     if (mongoose.connection.readyState !== 1) {
       emitSocketError(socket, 'DB_NOT_CONNECTED', 'database is not connected');
+      reply({
+        ok: false,
+        code: 'DB_NOT_CONNECTED',
+        message: 'database is not connected',
+        clientMessageId: clientMessageId || null,
+      });
       return;
     }
 
@@ -387,11 +400,23 @@ io.on('connection', (socket) => {
       const room = await ChatRoom.findById(roomId);
       if (!room) {
         emitSocketError(socket, 'ROOM_NOT_FOUND', 'chatroom not found');
+        reply({
+          ok: false,
+          code: 'ROOM_NOT_FOUND',
+          message: 'chatroom not found',
+          clientMessageId: clientMessageId || null,
+        });
         return;
       }
 
       if (!room.memberIds.includes(socket.user.userId)) {
         emitSocketError(socket, 'FORBIDDEN', 'forbidden');
+        reply({
+          ok: false,
+          code: 'FORBIDDEN',
+          message: 'forbidden',
+          clientMessageId: clientMessageId || null,
+        });
         return;
       }
 
@@ -435,8 +460,20 @@ io.on('connection', (socket) => {
         timestamp: new Date(message.timestamp).toISOString(),
         unreadCount,
       });
+
+      reply({
+        ok: true,
+        clientMessageId: clientMessageId || null,
+        messageId: String(message._id),
+      });
     } catch (_error) {
       emitSocketError(socket, 'MESSAGE_PROCESS_FAILED', 'failed to process message');
+      reply({
+        ok: false,
+        code: 'MESSAGE_PROCESS_FAILED',
+        message: 'failed to process message',
+        clientMessageId: clientMessageId || null,
+      });
     }
   });
 
