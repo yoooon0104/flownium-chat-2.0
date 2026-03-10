@@ -107,6 +107,7 @@ function AppShell() {
     historyError,
     loadMessageHistory,
     appendMessage,
+    removeMessageByClientMessageId,
     clearMessages,
   } = useChatMessages({ chatApi })
 
@@ -366,15 +367,15 @@ function AppShell() {
   const optimisticUnreadCount = Math.max(roomMemberCount - 1, 0)
 
 
-  const canSend = Boolean(isConnected && joinedRoomId && text.trim().length > 0)
+  const canSend = Boolean(isConnected && joinedRoomId && !isLoadingHistory && text.trim().length > 0)
 
-  const handleSendMessage = useCallback(() => {
+  const handleSendMessage = useCallback(async () => {
     const normalized = text.trim()
-    if (!joinedRoomId || !normalized) return
+    if (!joinedRoomId || !normalized || isLoadingHistory) return
 
-    // 서버 응답 전에도 화면에 즉시 메시지를 보여주기 위해 임시 메시지 ID를 만든다.
-    // 이후 서버가 같은 clientMessageId를 돌려주면 optimistic 메시지를 실제 메시지로 치환한다.
-    // unreadCount도 이 시점에 예상값을 먼저 붙여서 마지막 보낸 메시지에 숫자가 바로 보이게 한다.
+    // 히스토리 로딩이 끝난 뒤에만 optimistic 메시지를 붙여야
+    // 직후 도착한 과거 메시지 응답이 방금 보낸 메시지를 덮어쓰지 않는다.
+    // 실패/타임아웃 시에는 같은 clientMessageId로 optimistic 메시지를 제거한다.
     const clientMessageId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     appendMessage({
       clientMessageId,
@@ -388,14 +389,32 @@ function AppShell() {
       unreadCount: optimisticUnreadCount,
     })
 
-    sendMessage({
+    setText('')
+
+    const result = await sendMessage({
       roomId: joinedRoomId,
       text: normalized,
       type: 'text',
       clientMessageId,
     })
-    setText('')
-  }, [appendMessage, currentUser?.id, currentUser?.nickname, joinedRoomId, optimisticUnreadCount, sendMessage, text])
+
+    if (result?.ok) return
+
+    removeMessageByClientMessageId(clientMessageId)
+    setText(normalized)
+    setErrorMessage(String(result?.message || '메시지 전송에 실패했습니다.'))
+  }, [
+    appendMessage,
+    currentUser?.id,
+    currentUser?.nickname,
+    isLoadingHistory,
+    joinedRoomId,
+    optimisticUnreadCount,
+    removeMessageByClientMessageId,
+    sendMessage,
+    setErrorMessage,
+    text,
+  ])
 
   const handleComposerKeyUp = useCallback((event) => {
     if (event.key === 'Enter') {

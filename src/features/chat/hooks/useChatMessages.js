@@ -49,6 +49,14 @@ export const useChatMessages = ({ chatApi }) => {
     })
   }, [])
 
+  const removeMessageByClientMessageId = useCallback((clientMessageId) => {
+    if (!clientMessageId) return
+
+    setMessages((prev) => {
+      return prev.filter((item) => item?.clientMessageId !== clientMessageId)
+    })
+  }, [])
+
   const clearMessages = useCallback(() => {
     setMessages([])
     setHistoryError('')
@@ -62,6 +70,7 @@ export const useChatMessages = ({ chatApi }) => {
     setHistoryError,
     loadMessageHistory,
     appendMessage,
+    removeMessageByClientMessageId,
     clearMessages,
   }
 }
