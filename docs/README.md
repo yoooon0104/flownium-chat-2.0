@@ -1,4 +1,4 @@
-﻿# 문서 인덱스
+# 문서 인덱스
 
 업데이트: 2026-03-10
 
@@ -34,8 +34,12 @@
 - `auth-flow.md`
 - `ui-plan.md`
 - `wbs.md`
-- `development-rules.md`
 - `env-policy.md`
+
+## root-level guides
+
+- `docs/development-rules.md`
+- `CONTRIBUTING.md`
 
 ## planning
 
