@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '../App.css'
 import LoginGate from '../features/auth/components/LoginGate'
 import SignupOnboarding from '../features/auth/components/SignupOnboarding'
@@ -199,8 +199,8 @@ function AppShell() {
     setIsMobileNotificationView(false)
     setIsParticipantsMenuOpen(false)
 
-    // room_participants ??????? ??? ??????, ? ?? ??? ?? ??? ??? ??? ??.
-    // ??? room_joined? ?? ? participants? ?? ???? ?? ??? ???? ?? ??? ????.
+    // room_participants 이벤트가 뒤늦게 오더라도, 방 입장 직후 헤더와 참여자 목록이
+    // 비어 보이지 않게 room_joined payload의 participants를 먼저 반영한다.
     setParticipants(Array.isArray(payload?.participants) ? payload.participants : [])
 
     void (async () => {
@@ -357,15 +357,13 @@ function AppShell() {
     return rooms.find((room) => room.id === joinedRoomId) || null
   }, [rooms, joinedRoomId])
 
-  const optimisticUnreadCount = useMemo(() => {
-    const roomMemberCount = Array.isArray(activeRoom?.memberIds)
-      ? activeRoom.memberIds.length
-      : Array.isArray(participants)
-        ? participants.length
-        : 0
+  const roomMemberCount = Array.isArray(activeRoom?.memberIds)
+    ? activeRoom.memberIds.length
+    : Array.isArray(participants)
+      ? participants.length
+      : 0
 
-    return Math.max(roomMemberCount - 1, 0)
-  }, [activeRoom?.memberIds, participants])
+  const optimisticUnreadCount = Math.max(roomMemberCount - 1, 0)
 
 
   const canSend = Boolean(isConnected && joinedRoomId && text.trim().length > 0)
@@ -374,9 +372,9 @@ function AppShell() {
     const normalized = text.trim()
     if (!joinedRoomId || !normalized) return
 
-    // ?? ?? ??? ?? ??? ?? ??? ID? ???.
-    // ?? ??? ?? ?? clientMessageId? ???? ?? ???? ????.
-    // ? ?? ?? ???? unread ??? ???? ?? ? ?? ? ?? ?? ?? ???.
+    // 서버 응답 전에도 화면에 즉시 메시지를 보여주기 위해 임시 메시지 ID를 만든다.
+    // 이후 서버가 같은 clientMessageId를 돌려주면 optimistic 메시지를 실제 메시지로 치환한다.
+    // unreadCount도 이 시점에 예상값을 먼저 붙여서 마지막 보낸 메시지에 숫자가 바로 보이게 한다.
     const clientMessageId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     appendMessage({
       clientMessageId,

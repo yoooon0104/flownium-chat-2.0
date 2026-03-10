@@ -1,4 +1,4 @@
-﻿# Flownium Chat 2.0
+# Flownium Chat 2.0
 
 <p align="left">
   <img src="assets/branding/logo/flownium-wordmark-light.png" alt="Flownium" width="260" />
@@ -152,3 +152,5 @@ npm run dev
 - [WBS](docs/common/wbs.md)
 - [배포 런북](docs/operations/deploy-runbook.md)
 - [운영 로그 기준](docs/operations/ops-log-policy.md)
+- [개발 규칙](docs/development-rules.md)
+- [기여 가이드](CONTRIBUTING.md)
