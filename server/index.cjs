@@ -371,6 +371,7 @@ io.on('connection', (socket) => {
     const roomId = String(payload.roomId || '').trim();
     const text = String(payload.text || '').trim();
     const type = payload.type === 'system' ? 'system' : 'text';
+    const clientMessageId = String(payload.clientMessageId || '').trim();
 
     if (!roomId || !text) {
       emitSocketError(socket, 'INVALID_REQUEST', 'roomId and text are required');
@@ -424,6 +425,7 @@ io.on('connection', (socket) => {
       }).length;
 
       io.to(roomId).emit('receive_message', {
+        clientMessageId: clientMessageId || null,
         id: String(message._id),
         chatRoomId: message.chatRoomId,
         senderId: message.senderId,

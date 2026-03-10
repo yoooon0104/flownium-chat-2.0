@@ -21,7 +21,8 @@
 4. `docs/common/api-spec.md`
 5. `docs/common/socket-events.md`
 6. `docs/operations/deploy-runbook.md`
-7. `docs/common/env-policy.md`
+7. `docs/operations/realtime-validation-checklist.md`
+8. `docs/common/env-policy.md`
 
 ## common
 
@@ -47,6 +48,7 @@
 
 - `deploy-runbook.md`
 - `ops-log-policy.md`
+- `realtime-validation-checklist.md`
 
 ## branding assets
 

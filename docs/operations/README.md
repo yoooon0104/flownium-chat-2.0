@@ -10,6 +10,9 @@
 - `ops-log-policy.md`  
   로그 레벨(`info/warn/error`), 장애 판정 기준, Incident 기록 템플릿
 
+- `realtime-validation-checklist.md`  
+  실계정 2개 기준 친구/채팅/알림/unread/모바일 UI 검증 체크리스트
+
 ## 예정 문서
 
 - `rollback-runbook.md` (상세 버전)
