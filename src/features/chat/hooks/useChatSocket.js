@@ -45,6 +45,13 @@ export const useChatSocket = ({
     client.on('connect', () => {
       setIsConnected(true)
       setSocketId(client.id)
+
+      // 재연결 뒤에도 현재 열려 있던 방의 실시간 이벤트를 계속 받으려면
+      // 서버 기준 새 소켓 인스턴스를 다시 같은 room에 참여시켜야 한다.
+      if (currentRoomRef.current) {
+        client.emit('join_room', { roomId: currentRoomRef.current })
+      }
+
       onConnect?.()
     })
 
