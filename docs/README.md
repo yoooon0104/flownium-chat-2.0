@@ -23,6 +23,7 @@
 6. `docs/operations/deploy-runbook.md`
 7. `docs/operations/realtime-validation-checklist.md`
 8. `docs/common/env-policy.md`
+9. `docs/operations/new-machine-setup.md`
 
 ## common
 
@@ -51,6 +52,7 @@
 ## operations
 
 - `deploy-runbook.md`
+- `new-machine-setup.md`
 - `ops-log-policy.md`
 - `realtime-validation-checklist.md`
 

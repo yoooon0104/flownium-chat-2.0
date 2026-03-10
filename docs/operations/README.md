@@ -7,6 +7,9 @@
 - `deploy-runbook.md`  
   MVP2-A 기준 배포 전 체크리스트, 배포 절차, 검증/롤백 규칙
 
+- `new-machine-setup.md`  
+  새 PC에서 개발 환경을 다시 구성할 때 필요한 설치, 환경변수, GitHub CLI, 로컬 실행 절차
+
 - `ops-log-policy.md`  
   로그 레벨(`info/warn/error`), 장애 판정 기준, Incident 기록 템플릿
 
