@@ -193,11 +193,15 @@ function AppShell() {
   // 2) 과거 메시지 로드
   // 3) 방을 실제로 열어본 시점으로 읽음 처리
   // 이 순서를 지켜야 새로 입장한 방의 unread 배지가 바로 정리된다.
-  const handleSocketRoomJoined = useCallback((nextRoomId) => {
+  const handleSocketRoomJoined = useCallback((nextRoomId, payload) => {
     setJoinedRoomId(nextRoomId)
     setIsMobileChatView(true)
     setIsMobileNotificationView(false)
     setIsParticipantsMenuOpen(false)
+
+    // room_participants ??????? ??? ??????, ? ?? ??? ?? ??? ??? ??? ??.
+    // ??? room_joined? ?? ? participants? ?? ???? ?? ??? ???? ?? ??? ????.
+    setParticipants(Array.isArray(payload?.participants) ? payload.participants : [])
 
     void (async () => {
       await loadMessageHistory(nextRoomId)

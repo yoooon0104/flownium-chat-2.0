@@ -185,14 +185,14 @@ const collectJoinedRoomIds = (socket) => {
 };
 
 // 전체 멤버(ChatRoom.memberIds)와 현재 온라인 상태(roomPresence)를 합쳐 전송한다.
-const emitRoomParticipants = async (roomId) => {
+const buildRoomParticipants = async (roomId) => {
   if (mongoose.connection.readyState !== 1) {
-    return;
+    return [];
   }
 
   const room = await ChatRoom.findById(roomId).lean();
   if (!room) {
-    return;
+    return [];
   }
 
   const memberIds = Array.isArray(room.memberIds) ? room.memberIds : [];
@@ -204,7 +204,7 @@ const emitRoomParticipants = async (roomId) => {
   const userById = new Map(users.map((u) => [String(u._id), u]));
   const onlineMap = roomPresence.get(String(room._id)) || new Map();
 
-  const participants = memberIds.map((memberId) => {
+  return memberIds.map((memberId) => {
     const found = userById.get(memberId);
     const online = Boolean(onlineMap.get(memberId)?.size);
 
@@ -214,9 +214,16 @@ const emitRoomParticipants = async (roomId) => {
       online,
     };
   });
+};
 
-  io.to(String(room._id)).emit('room_participants', {
-    roomId: String(room._id),
+const emitRoomParticipants = async (roomId) => {
+  const participants = await buildRoomParticipants(roomId);
+  if (!participants.length) {
+    return;
+  }
+
+  io.to(String(roomId)).emit('room_participants', {
+    roomId: String(roomId),
     participants,
   });
 };
@@ -342,14 +349,19 @@ io.on('connection', (socket) => {
       }
 
       socket.join(roomId);
-      addPresence(roomId, socket.user.userId, socket.id);
+        addPresence(roomId, socket.user.userId, socket.id);
 
-      socket.emit('room_joined', {
-        roomId,
-        room: toRoomResponse(room),
-      });
+        // ? ?? ?? ??? ??? ?/??? ?? ??? ???,
+        // room_participants ?? ???? ???? ?? ?? ??? ??? ?? ????.
+        const participants = await buildRoomParticipants(roomId);
 
-      await emitRoomParticipants(roomId);
+        socket.emit('room_joined', {
+          roomId,
+          room: toRoomResponse(room),
+          participants,
+        });
+
+        await emitRoomParticipants(roomId);
     } catch (_error) {
       emitSocketError(socket, 'ROOM_JOIN_FAILED', 'failed to join room');
     }
