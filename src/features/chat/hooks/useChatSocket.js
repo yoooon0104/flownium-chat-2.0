@@ -12,6 +12,7 @@ export const useChatSocket = ({
   onRoomParticipants,
   onNotificationCreated,
   onNotificationRead,
+  onFriendshipUpdated,
   onError,
 }) => {
   const socketRef = useRef(null)
@@ -95,6 +96,11 @@ export const useChatSocket = ({
       onNotificationRead?.(payload?.notification || payload)
     })
 
+    // 친구 요청/수락/거절은 양쪽 목록을 다시 그려야 하므로 최소 이벤트만 전달한다.
+    client.on('friendship_updated', (payload) => {
+      onFriendshipUpdated?.(payload || {})
+    })
+
     client.on('error', (payload) => {
       const code = String(payload?.code || '').trim()
       const message = String(payload?.message || 'Unknown socket error')
@@ -116,6 +122,7 @@ export const useChatSocket = ({
     onError,
     onNotificationCreated,
     onNotificationRead,
+    onFriendshipUpdated,
     onReceiveMessage,
     onRoomJoined,
     onRoomParticipants,

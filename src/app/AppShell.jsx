@@ -236,6 +236,12 @@ function AppShell() {
     void fetchNotifications()
   }, [fetchNotifications])
 
+  // 친구 요청/수락/거절은 Friends와 알림 허브를 함께 바꾸므로 둘 다 다시 조회한다.
+  const handleSocketFriendshipUpdated = useCallback(() => {
+    void fetchFriends()
+    void fetchNotifications()
+  }, [fetchFriends, fetchNotifications])
+
   const handleSocketError = useCallback((message) => {
     setErrorMessage(message)
   }, [setErrorMessage])
@@ -257,6 +263,7 @@ function AppShell() {
     onRoomParticipants: handleSocketParticipants,
     onNotificationCreated: handleSocketNotificationCreated,
     onNotificationRead: handleSocketNotificationRead,
+    onFriendshipUpdated: handleSocketFriendshipUpdated,
     onError: handleSocketError,
   })
 
@@ -598,6 +605,8 @@ function AppShell() {
 }
 
 export default AppShell
+
+
 
 
 

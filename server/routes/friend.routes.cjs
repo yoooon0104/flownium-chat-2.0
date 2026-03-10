@@ -1,7 +1,8 @@
-const express = require("express");
+﻿const express = require("express");
 const { sendError } = require("../utils/error-response.cjs");
 
-// 친구 관계 REST API를 생성한다. 검색, 요청, 상태 처리만 담당한다.
+// 친구 관계 REST API를 생성한다.
+// 검색, 요청 생성, 상태 변경만 담당하고, 실시간 동기화는 emit 콜백으로 위임한다.
 const createFriendRouter = ({
   User,
   Friendship,
@@ -9,6 +10,7 @@ const createFriendRouter = ({
   requireAuth,
   assertDbConnected,
   emitNotificationCreated,
+  emitFriendshipUpdated,
 }) => {
   const router = express.Router();
 
@@ -55,7 +57,7 @@ const createFriendRouter = ({
     return notification;
   };
 
-  // 친구 검색은 이메일 또는 닉네임 기준으로 수행하고 현재 친구 상태를 함께 내려준다.
+  // 친구 검색은 이메일/닉네임 기준으로 수행하고, 현재 친구 상태를 함께 내려준다.
   router.get("/friends/search", requireAuth, async (req, res) => {
     const me = req.user.userId;
     const keyword = String(req.query.keyword || "").trim();
@@ -227,6 +229,16 @@ const createFriendRouter = ({
         },
       });
 
+      // 요청을 보낸 사람과 받은 사람 모두 Friends/알림 목록을 즉시 다시 가져오게 한다.
+      emitFriendshipUpdated?.(me, {
+        type: "friend_request_created",
+        friendshipId: String(friendship._id),
+      });
+      emitFriendshipUpdated?.(targetUserId, {
+        type: "friend_request_created",
+        friendshipId: String(friendship._id),
+      });
+
       res.status(201).json({
         friendship: {
           id: String(friendship._id),
@@ -290,6 +302,18 @@ const createFriendRouter = ({
       }
 
       await friendship.save();
+
+      // 상태가 바뀌면 요청 당사자 둘 다 목록 구조가 변하므로 양쪽에 동시에 갱신 이벤트를 보낸다.
+      emitFriendshipUpdated?.(requesterId, {
+        type: "friend_request_updated",
+        friendshipId: String(friendship._id),
+        status: friendship.status,
+      });
+      emitFriendshipUpdated?.(addresseeId, {
+        type: "friend_request_updated",
+        friendshipId: String(friendship._id),
+        status: friendship.status,
+      });
 
       res.status(200).json({
         friendship: {
