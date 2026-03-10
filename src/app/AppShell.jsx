@@ -23,6 +23,7 @@ import { createChatApi } from '../services/api/chatApi'
 import { createChatSocketClient } from '../services/socket/chatSocketClient'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3010').replace(/\/$/, '')
+const THEME_PREFERENCE_KEY = 'themePreference'
 
 const parseJwtPayload = (token) => {
   try {
@@ -46,6 +47,14 @@ const toTimeLabel = (value) => {
 
 function AppShell() {
   const messagesEndRef = useRef(null)
+  const [themePreference, setThemePreference] = useState(() => {
+    if (typeof window === 'undefined') return 'system'
+    return localStorage.getItem(THEME_PREFERENCE_KEY) || 'system'
+  })
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
 
   const {
     authState,
@@ -93,6 +102,10 @@ function AppShell() {
       email: '',
     }
   }, [authPayload, user])
+
+  const resolvedTheme = themePreference === 'system'
+    ? (systemPrefersDark ? 'dark' : 'light')
+    : themePreference
 
   const createSocketClient = useCallback((token) => createChatSocketClient(API_BASE_URL, token), [])
 
@@ -337,6 +350,38 @@ function AppShell() {
     handleResize()
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleChange = (event) => {
+      setSystemPrefersDark(event.matches)
+    }
+
+    setSystemPrefersDark(mediaQuery.matches)
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleChange)
+      return () => mediaQuery.removeEventListener('change', handleChange)
+    }
+
+    mediaQuery.addListener(handleChange)
+    return () => mediaQuery.removeListener(handleChange)
+  }, [])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.documentElement.dataset.theme = themePreference
+    document.documentElement.dataset.resolvedTheme = resolvedTheme
+  }, [resolvedTheme, themePreference])
+
+  const handleChangeTheme = useCallback((nextTheme) => {
+    const normalized = ['light', 'dark', 'system'].includes(nextTheme) ? nextTheme : 'system'
+    setThemePreference(normalized)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(THEME_PREFERENCE_KEY, normalized)
+    }
   }, [])
 
   useEffect(() => {
@@ -596,8 +641,8 @@ function AppShell() {
   }
 
   return (
-    <main className="chat-app">
-      <section className="chat-layout">
+    <main className="min-h-[100dvh] overflow-hidden px-3 py-3 text-[var(--text-primary)] md:px-5 md:py-5">
+      <section className="mx-auto grid h-[calc(100dvh-24px)] w-full max-w-[1440px] min-h-0 grid-cols-1 gap-3 md:h-[calc(100dvh-40px)] lg:grid-cols-[minmax(380px,440px)_1fr]">
         <RoomPanel
           isMobileChatView={isMobileChatView}
           isMobileNotificationView={isMobileNotificationView}
@@ -650,6 +695,12 @@ function AppShell() {
           }}
           onOpenSettings={() => {
             setIsUserMenuOpen(false)
+            if (isMobileViewport) {
+              setIsMobileChatView(false)
+              setIsMobileNotificationView(false)
+              setIsMobileSettingsView(true)
+              return
+            }
             setIsSettingsModalOpen(true)
           }}
           onLogout={() => {
@@ -701,6 +752,8 @@ function AppShell() {
         {isMobileSettingsView && (
           <SettingsScreen
             user={currentUser}
+            themePreference={themePreference}
+            onChangeTheme={handleChangeTheme}
             onSubmit={updateProfileNickname}
             onBack={() => setIsMobileSettingsView(false)}
           />
@@ -761,6 +814,8 @@ function AppShell() {
       <SettingsModal
         isOpen={isSettingsModalOpen && !isMobileViewport}
         user={currentUser}
+        themePreference={themePreference}
+        onChangeTheme={handleChangeTheme}
         onClose={() => setIsSettingsModalOpen(false)}
         onSubmit={updateProfileNickname}
       />

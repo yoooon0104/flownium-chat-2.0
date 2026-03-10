@@ -29,10 +29,10 @@ function ParticipantsMenu({
   }, [isOpen, onToggle])
 
   return (
-    <div className="participants-menu" ref={menuRef}>
+    <div className="relative justify-self-end" ref={menuRef}>
       <button
         type="button"
-        className="participants-menu-button"
+        className="inline-flex h-10 items-center rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] px-3 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] disabled:text-[var(--text-secondary)]"
         onClick={() => onToggle(!isOpen)}
         disabled={!joinedRoomId}
       >
@@ -40,18 +40,18 @@ function ParticipantsMenu({
       </button>
 
       {isOpen && (
-        <div className="participants-dropdown">
-          <p className="participants-title">대화상대</p>
+        <div className="absolute right-0 top-[calc(100%+10px)] z-20 w-[280px] overflow-hidden rounded-3xl border border-[var(--border-soft)] bg-[var(--panel-raised)] p-4 shadow-[0_24px_60px_rgba(2,6,23,0.22)] backdrop-blur">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-tertiary)]">대화상대</p>
           {participants.length === 0 ? (
-            <p className="participants-empty">참여자 정보가 없습니다.</p>
+            <p className="text-xs text-[var(--text-secondary)]">참여자 정보가 없습니다.</p>
           ) : (
-            <ul className="participants-list">
+            <ul className="flex flex-col gap-2">
               {participants.map((participant) => {
                 const isMe = participant.userId === currentUserId
                 return (
-                  <li key={participant.userId} className="participants-row">
-                    <span>{participant.nickname}{isMe ? ' (나)' : ''}</span>
-                    <span className={`participant-chip ${participant.online ? 'online' : 'offline'}`}>
+                  <li key={participant.userId} className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]">
+                    <span className="min-w-0 truncate">{participant.nickname}{isMe ? ' (나)' : ''}</span>
+                    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${participant.online ? 'border-brand-accent/30 bg-brand-accent/10 text-brand-accent' : 'border-[var(--border-soft)] bg-[var(--surface-elevated)] text-[var(--text-secondary)]'}`}>
                       {participant.online ? 'online' : 'offline'}
                     </span>
                   </li>
@@ -60,11 +60,21 @@ function ParticipantsMenu({
             </ul>
           )}
 
-          <div className="participants-actions">
-            <button type="button" className="participants-inline-button" onClick={onOpenInvite} disabled={!joinedRoomId || !canInvite}>
+          <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--border-soft)] pt-3">
+            <button
+              type="button"
+              className="h-10 rounded-2xl border border-brand-primary/25 bg-[var(--cta-bg)] text-xs font-semibold text-[var(--cta-text)] shadow-[var(--shadow-glow)] transition hover:brightness-105 disabled:border-[var(--border-soft)] disabled:bg-[var(--surface-muted)] disabled:text-[var(--text-secondary)] disabled:shadow-none"
+              onClick={onOpenInvite}
+              disabled={!joinedRoomId || !canInvite}
+            >
               + 초대
             </button>
-            <button type="button" className="participants-inline-button danger" onClick={onLeaveRoom} disabled={!joinedRoomId}>
+            <button
+              type="button"
+              className="h-10 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-xs font-semibold text-rose-300 transition hover:border-rose-300/40 hover:bg-rose-400/10 disabled:text-[var(--text-secondary)]"
+              onClick={onLeaveRoom}
+              disabled={!joinedRoomId}
+            >
               나가기
             </button>
           </div>

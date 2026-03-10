@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import NotificationMenu from '../../notifications/components/NotificationMenu'
 import UserMenu from '../../user/components/UserMenu'
 
@@ -17,8 +17,8 @@ const getFriendSectionLabel = (friend) => {
   return first
 }
 
-// 좌측 패널은 현재 사용자 프로필, 액션 버튼, Friends/Rooms 탭, 목록을 한 번에 묶는다.
-// Friends 탭은 친구 목록만 보여주고 요청/초대 알림은 상단 벨 메뉴로 분리한다.
+// 좌측 패널은 프로필, 액션 버튼, 검색창, 친구/방 목록을 함께 렌더링한다.
+// 모바일에서는 하단 탭이 Friends/Rooms 전환을 담당하므로 상단 토글은 숨긴다.
 function RoomPanel({
   isMobileChatView,
   isMobileNotificationView,
@@ -56,8 +56,6 @@ function RoomPanel({
   onOpenSettings,
   onLogout,
 }) {
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-
   const groupedFriends = useMemo(() => {
     const groups = []
     let currentLabel = ''
@@ -75,29 +73,32 @@ function RoomPanel({
   }, [filteredFriends])
 
   return (
-    <aside className={`room-panel ${isMobileChatView || isMobileNotificationView || isMobileSettingsView ? 'mobile-hidden' : ''}`}>
-      <div className="panel-profile-header">
-        <button type="button" className="panel-profile" onClick={onOpenProfile}>
-          <span className="panel-profile-avatar">
-            {currentUser?.profileImage ? <img src={currentUser.profileImage} alt="" /> : String(currentUser?.nickname || '?').slice(0, 1).toUpperCase()}
+    <aside
+      className={`room-panel ${isMobileChatView || isMobileNotificationView || isMobileSettingsView ? 'mobile-hidden' : ''} flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-[var(--border-strong)] bg-[var(--panel-bg)] shadow-[var(--shadow-panel)] backdrop-blur`}
+    >
+      <div className="flex items-start justify-between gap-3 border-b border-[var(--border-soft)] px-4 pb-4 pt-4 md:px-5 md:pb-5 md:pt-5">
+        <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={onOpenProfile}>
+          <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-sm font-semibold text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+            {currentUser?.profileImage ? <img src={currentUser.profileImage} alt="" className="h-full w-full object-cover" /> : String(currentUser?.nickname || '?').slice(0, 1).toUpperCase()}
           </span>
-          <span className="panel-profile-text">
-            <strong>{currentUser?.nickname || '게스트'}</strong>
-            <small>{activeTab === 'friends' ? '친구' : '채팅방'}</small>
+          <span className="min-w-0">
+            <strong className="block truncate text-[24px] font-semibold leading-tight tracking-[-0.03em] text-[var(--text-primary)] md:text-[28px]">
+              {currentUser?.nickname || '게스트'}
+            </strong>
+            <small className="mt-1 block text-xs font-medium uppercase tracking-[0.24em] text-[var(--text-tertiary)]">
+              {activeTab === 'friends' ? 'Friends' : 'Rooms'}
+            </small>
           </span>
         </button>
 
-        <div className="panel-top-actions">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            className={`panel-icon-button ${isSearchOpen ? 'active' : ''}`}
-            aria-label="검색 열기"
-            onClick={() => setIsSearchOpen((current) => !current)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-brand-primary/25 bg-[var(--cta-bg)] text-xl font-bold leading-none text-[var(--cta-text)] shadow-[var(--shadow-glow)] transition hover:brightness-105"
+            aria-label="친구 추가"
+            onClick={onOpenAddFriend}
           >
-            ⌕
-          </button>
-          <button type="button" className="panel-icon-button" aria-label="친구 추가" onClick={onOpenAddFriend}>
-            ＋
+            +
           </button>
           <NotificationMenu
             isMobile={isMobileViewport}
@@ -125,36 +126,56 @@ function RoomPanel({
         </div>
       </div>
 
-      <div className="panel-tabs">
-        <button type="button" className={activeTab === 'friends' ? 'active' : ''} onClick={() => onChangeTab('friends')}>
-          친구
-        </button>
-        <button type="button" className={activeTab === 'rooms' ? 'active' : ''} onClick={() => onChangeTab('rooms')}>
-          채팅방
-          {totalUnreadCount > 0 && <span className="tab-badge">{totalUnreadCount > 99 ? '99+' : totalUnreadCount}</span>}
-        </button>
+      <div className="hidden px-4 pb-3 pt-4 md:block md:px-5">
+        <div className="inline-flex rounded-full border border-[var(--border-soft)] bg-[var(--surface-muted)] p-1">
+          <button
+            type="button"
+            className={`relative rounded-full px-5 py-2.5 text-sm font-semibold transition ${activeTab === 'friends' ? 'bg-[var(--tab-active-bg)] text-[var(--tab-active-text)] shadow-[var(--shadow-panel)]' : 'text-[var(--tab-inactive-text)] hover:text-[var(--text-primary)]'}`}
+            onClick={() => onChangeTab('friends')}
+          >
+            친구
+          </button>
+          <button
+            type="button"
+            className={`relative rounded-full px-5 py-2.5 text-sm font-semibold transition ${activeTab === 'rooms' ? 'bg-[var(--tab-active-bg)] text-[var(--tab-active-text)] shadow-[var(--shadow-panel)]' : 'text-[var(--tab-inactive-text)] hover:text-[var(--text-primary)]'}`}
+            onClick={() => onChangeTab('rooms')}
+          >
+            채팅방
+            {totalUnreadCount > 0 && (
+              <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--badge-bg)] px-1.5 text-[10px] font-bold text-white shadow-[var(--shadow-glow)]">
+                {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
-      {isSearchOpen && (
-        <div className="panel-search-shell">
-          <div className="room-search panel-search-input">
-            <input
-              value={searchKeyword}
-              onChange={(event) => onSearch(event.target.value)}
-              placeholder={activeTab === 'friends' ? '친구 이름 또는 이메일 검색' : '방 이름 또는 메시지 검색'}
-            />
-          </div>
+      <div className="px-4 pb-5 pt-1 md:px-5">
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <input
+            className="w-full border-none bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
+            value={searchKeyword}
+            onChange={(event) => onSearch(event.target.value)}
+            placeholder={activeTab === 'friends' ? '친구 이름 또는 이메일 검색' : '방 이름 또는 메시지 검색'}
+          />
         </div>
-      )}
+      </div>
 
       {activeTab === 'friends' ? (
-        <div className="friend-panel-content friend-list-only-panel">
-          <div className="friend-list-section">
-            <ul className="friend-list grouped-friend-list">
-              {friendsLoading && <li className="state-item">친구 목록을 불러오는 중입니다.</li>}
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="h-full min-h-0 overflow-hidden">
+            <ul className="flex h-full min-h-0 flex-col gap-2 overflow-auto px-3 pb-24 md:px-4">
+              {friendsLoading && <li className="px-3 py-3 text-xs text-[var(--text-secondary)]">친구 목록을 불러오는 중입니다.</li>}
               {!friendsLoading && groupedFriends.map((entry, index) => {
                 if (entry.type === 'label') {
-                  return <li key={`label-${entry.value}-${index}`} className="friend-group-label">{entry.value}</li>
+                  return (
+                    <li
+                      key={`label-${entry.value}-${index}`}
+                      className="sticky top-0 z-[1] px-3 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--text-tertiary)] backdrop-blur"
+                    >
+                      {entry.value}
+                    </li>
+                  )
                 }
 
                 const friend = entry.value
@@ -162,17 +183,17 @@ function RoomPanel({
                   <li key={friend.id}>
                     <button
                       type="button"
-                      className="friend-item"
+                      className="grid w-full grid-cols-[auto_1fr] items-center gap-3 rounded-2xl border border-transparent bg-[var(--panel-soft)] px-3 py-3 text-left transition hover:border-[var(--border-soft)] hover:bg-[var(--surface-muted)] focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
                       onDoubleClick={() => onFriendDoubleClick(friend)}
                       onClick={() => onFriendTap(friend)}
                       title="친구와 1:1 채팅 시작"
                     >
-                      <span className="friend-avatar">
-                        {friend.profileImage ? <img src={friend.profileImage} alt="" /> : getFriendInitial(friend)}
+                      <span className="inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-xs font-semibold text-[var(--text-primary)]">
+                        {friend.profileImage ? <img src={friend.profileImage} alt="" className="h-full w-full object-cover" /> : getFriendInitial(friend)}
                       </span>
-                      <span className="friend-main">
-                        <strong>{friend.nickname || '이름 없음'}</strong>
-                        <small>{friend.email || '이메일 미등록'}</small>
+                      <span className="min-w-0">
+                        <strong className="block truncate text-sm font-semibold text-[var(--text-primary)]">{friend.nickname || '이름 없음'}</strong>
+                        <small className="mt-1 block truncate text-xs text-[var(--text-secondary)]">{friend.email || '이메일 미등록'}</small>
                       </span>
                     </button>
                   </li>
@@ -182,26 +203,32 @@ function RoomPanel({
           </div>
         </div>
       ) : (
-        <ul className="room-list">
-          {roomsLoading && <li className="state-item">채팅방 목록을 불러오는 중입니다.</li>}
-          {!roomsLoading && filteredRooms.length === 0 && <li className="state-item">표시할 채팅방이 없습니다.</li>}
+        <ul className="min-h-0 flex-1 overflow-auto px-3 pb-24 md:px-4">
+          {roomsLoading && <li className="px-3 py-3 text-xs text-[var(--text-secondary)]">채팅방 목록을 불러오는 중입니다.</li>}
+          {!roomsLoading && filteredRooms.length === 0 && <li className="px-3 py-3 text-xs text-[var(--text-secondary)]">표시할 채팅방이 없습니다.</li>}
           {filteredRooms.map((room) => {
             const isActive = room.id === joinedRoomId
             return (
-              <li key={room.id}>
+              <li key={room.id} className="mb-2">
                 <button
                   type="button"
-                  className={`room-item ${isActive ? 'active' : ''}`}
+                  className={`grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border px-3 py-3 text-left transition ${isActive ? 'border-brand-primary/35 bg-[var(--surface-elevated)] shadow-[var(--shadow-glow)] ring-1 ring-brand-primary/15' : 'border-transparent bg-[var(--panel-soft)] hover:border-[var(--border-soft)] hover:bg-[var(--surface-muted)]'}`}
                   onClick={() => onJoinRoom(room.id)}
                 >
-                  <span className="avatar">{room.name.slice(0, 2).toUpperCase()}</span>
-                  <span className="room-main">
-                    <strong>{room.name}</strong>
-                    <small>{room.lastMessage || '메시지가 없습니다.'}</small>
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-xs font-semibold text-[var(--text-primary)]">
+                    {room.name.slice(0, 2).toUpperCase()}
                   </span>
-                  <span className="room-side-meta">
-                    <span className="room-time">{toTimeLabel(room.lastMessageAt)}</span>
-                    {room.unreadCount > 0 && <span className="room-unread-badge">{room.unreadCount > 99 ? '99+' : room.unreadCount}</span>}
+                  <span className="min-w-0">
+                    <strong className="block truncate text-sm font-semibold text-[var(--text-primary)]">{room.name}</strong>
+                    <small className="mt-1 block truncate text-xs text-[var(--text-secondary)]">{room.lastMessage || '메시지가 없습니다.'}</small>
+                  </span>
+                  <span className="flex min-w-[58px] flex-col items-end gap-2">
+                    <span className="text-[11px] text-[var(--text-secondary)]">{toTimeLabel(room.lastMessageAt)}</span>
+                    {room.unreadCount > 0 && (
+                      <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--badge-bg)] px-2 py-0.5 text-[10px] font-bold text-white shadow-[var(--shadow-glow)]">
+                        {room.unreadCount > 99 ? '99+' : room.unreadCount}
+                      </span>
+                    )}
                   </span>
                 </button>
               </li>
@@ -210,7 +237,12 @@ function RoomPanel({
         </ul>
       )}
 
-      <button type="button" className="fab-create-room" aria-label="새 채팅 만들기" onClick={onOpenCreateRoom}>
+      <button
+        type="button"
+        className="absolute bottom-4 right-4 inline-flex h-14 w-14 items-center justify-center rounded-full border border-brand-primary/25 bg-[var(--cta-bg)] text-[30px] font-semibold leading-none text-[var(--cta-text)] shadow-[var(--shadow-glow)] transition hover:scale-[1.02] hover:brightness-105"
+        aria-label="새 채팅 만들기"
+        onClick={onOpenCreateRoom}
+      >
         <span>+</span>
       </button>
     </aside>
@@ -218,4 +250,3 @@ function RoomPanel({
 }
 
 export default RoomPanel
-
