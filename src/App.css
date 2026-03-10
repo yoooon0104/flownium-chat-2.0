@@ -116,6 +116,7 @@
     calc(100% - 14px) calc(50% - 1px);
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
+  color-scheme: light;
   transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
 }
 
@@ -124,8 +125,8 @@
 }
 
 .settings-field select option {
-  background: var(--surface-elevated);
-  color: var(--brand-text);
+  background: #ffffff;
+  color: #111827;
 }
 
 .settings-field input::placeholder {
