@@ -2,15 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 전역 폰트/렌더링 품질 설정 */
 :root {
-  font-family: "Segoe UI", "Noto Sans KR", system-ui, -apple-system, sans-serif;
+  font-family: "Sora", "Noto Sans KR", system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: light;
+
+  --app-bg:
+    radial-gradient(circle at 10% 6%, rgba(0, 212, 255, 0.12) 0%, transparent 28%),
+    radial-gradient(circle at 92% 0%, rgba(122, 60, 255, 0.18) 0%, transparent 28%),
+    linear-gradient(145deg, #eef2ff 0%, #f5f7ff 48%, #f3f5fb 100%);
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-raised: rgba(255, 255, 255, 0.72);
+  --panel-soft: rgba(91, 92, 255, 0.06);
+  --surface-muted: rgba(255, 255, 255, 0.88);
+  --surface-elevated: rgba(255, 255, 255, 0.96);
+  --text-primary: #1f2328;
+  --text-secondary: #68727d;
+  --text-tertiary: #8a94a6;
+  --border-soft: rgba(31, 35, 40, 0.1);
+  --border-strong: rgba(31, 35, 40, 0.18);
+  --shadow-panel: 0 18px 40px rgba(18, 21, 42, 0.12);
+  --shadow-glow: 0 14px 28px rgba(91, 92, 255, 0.2);
+  --overlay-bg: rgba(148, 163, 184, 0.26);
+  --tab-active-bg: #ffffff;
+  --tab-active-text: #1f2328;
+  --tab-inactive-text: #68727d;
+  --badge-bg: linear-gradient(135deg, #6670ff 0%, #7f86ff 100%);
+  --cta-bg: linear-gradient(135deg, #6670ff 0%, #7f86ff 100%);
+  --cta-text: #f5f7ff;
+  --bubble-mine-bg: linear-gradient(135deg, #5360ff 0%, #6a74ff 100%);
+  --bubble-mine-text: #f5f7ff;
+  --bubble-other-bg: #f8faff;
+  --bubble-other-text: #111827;
+  --system-pill-bg: rgba(91, 92, 255, 0.08);
+  --system-pill-text: #5f6b7a;
+}
+
+:root[data-resolved-theme='dark'] {
+  color-scheme: dark;
+
+  --app-bg:
+    radial-gradient(circle at 15% 18%, rgba(0, 212, 255, 0.12) 0%, transparent 22%),
+    radial-gradient(circle at 88% 8%, rgba(122, 60, 255, 0.18) 0%, transparent 28%),
+    linear-gradient(160deg, #0b0f1a 0%, #0f1324 52%, #0b1020 100%);
+  --panel-bg: rgba(18, 21, 42, 0.9);
+  --panel-raised: rgba(16, 20, 39, 0.96);
+  --panel-soft: rgba(255, 255, 255, 0.05);
+  --surface-muted: rgba(255, 255, 255, 0.06);
+  --surface-elevated: rgba(255, 255, 255, 0.08);
+  --text-primary: #f5f7ff;
+  --text-secondary: #9aa3b2;
+  --text-tertiary: rgba(154, 163, 178, 0.72);
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(154, 163, 178, 0.18);
+  --shadow-panel: 0 18px 40px rgba(5, 10, 24, 0.35);
+  --shadow-glow: 0 16px 30px rgba(91, 92, 255, 0.18);
+  --overlay-bg: rgba(3, 7, 18, 0.64);
+  --tab-active-bg: rgba(255, 255, 255, 0.1);
+  --tab-active-text: #f5f7ff;
+  --tab-inactive-text: #9aa3b2;
+  --badge-bg: linear-gradient(135deg, #5b5cff 0%, #726dff 100%);
+  --cta-bg: linear-gradient(135deg, #5b5cff 0%, #726dff 100%);
+  --cta-text: #f5f7ff;
+  --bubble-mine-bg: linear-gradient(135deg, #5b5cff 0%, #726dff 100%);
+  --bubble-mine-text: #f5f7ff;
+  --bubble-other-bg: rgba(255, 255, 255, 0.06);
+  --bubble-other-text: #f5f7ff;
+  --system-pill-bg: rgba(255, 255, 255, 0.06);
+  --system-pill-text: #9aa3b2;
 }
 
 /* 전체 레이아웃 계산을 단순화하기 위한 기본 박스모델 */
@@ -28,9 +92,16 @@ body,
 body {
   margin: 0;
   min-width: 320px;
+  background: var(--app-bg);
+  color: var(--text-primary);
+  transition: background 180ms ease, color 180ms ease;
 }
 
 button,
 input {
   font: inherit;
+}
+
+body {
+  @apply font-sans;
 }

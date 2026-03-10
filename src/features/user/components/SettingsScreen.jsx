@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 
-// 모바일 설정 화면은 기존 설정 모달의 닉네임 변경 기능만 그대로 옮겨온다.
-// 데스크톱 모달과 동작을 맞춰서 저장 검증과 에러 문구를 동일하게 유지한다.
-function SettingsScreen({ user, onSubmit, onBack }) {
+// 모바일 설정 화면은 데스크톱 모달과 같은 항목을 화면 형태로 제공한다.
+function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onBack }) {
   const [nickname, setNickname] = useState('')
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -40,7 +39,7 @@ function SettingsScreen({ user, onSubmit, onBack }) {
         </button>
         <div className="settings-screen-main">
           <h3>설정</h3>
-          <p>닉네임을 변경할 수 있습니다.</p>
+          <p>닉네임과 테마를 설정할 수 있습니다.</p>
         </div>
       </header>
 
@@ -49,6 +48,14 @@ function SettingsScreen({ user, onSubmit, onBack }) {
           <label className="settings-field">
             <span>닉네임</span>
             <input value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="닉네임" />
+          </label>
+          <label className="settings-field">
+            <span>테마</span>
+            <select value={themePreference} onChange={(event) => onChangeTheme(event.target.value)}>
+              <option value="system">시스템 설정 따라가기</option>
+              <option value="light">라이트 모드</option>
+              <option value="dark">다크 모드</option>
+            </select>
           </label>
           {error && <p className="error-text modal-error">{error}</p>}
           <div className="modal-actions single-column-actions">
