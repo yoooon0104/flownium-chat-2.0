@@ -314,39 +314,6 @@ function AppShell() {
     emitJoinRoom(roomId)
   }, [emitJoinRoom, setErrorMessage])
 
-  const handleSendMessage = useCallback(() => {
-    const normalized = text.trim()
-    if (!joinedRoomId || !normalized) return
-
-    // 입력 직후 화면에 먼저 보여줄 임시 메시지 ID를 만든다.
-    // 서버 응답이 오면 같은 clientMessageId를 기준으로 실제 메시지로 교체한다.
-    const clientMessageId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    appendMessage({
-      clientMessageId,
-      id: clientMessageId,
-      chatRoomId: joinedRoomId,
-      senderId: currentUser?.id || '',
-      senderNickname: currentUser?.nickname || '?',
-      type: 'text',
-      text: normalized,
-      timestamp: new Date().toISOString(),
-      unreadCount: 0,
-    })
-
-    sendMessage({
-      roomId: joinedRoomId,
-      text: normalized,
-      type: 'text',
-      clientMessageId,
-    })
-    setText('')
-  }, [appendMessage, currentUser?.id, currentUser?.nickname, joinedRoomId, sendMessage, text])
-
-  const handleComposerKeyUp = useCallback((event) => {
-    if (event.key === 'Enter') {
-      handleSendMessage()
-    }
-  }, [handleSendMessage])
 
   const handleCreateRoomSubmit = useCallback(async (payload) => {
     const result = await createRoom(payload)
@@ -390,7 +357,56 @@ function AppShell() {
     return rooms.find((room) => room.id === joinedRoomId) || null
   }, [rooms, joinedRoomId])
 
+  const optimisticUnreadCount = useMemo(() => {
+    const roomMemberCount = Array.isArray(activeRoom?.memberIds)
+      ? activeRoom.memberIds.length
+      : Array.isArray(participants)
+        ? participants.length
+        : 0
+
+    return Math.max(roomMemberCount - 1, 0)
+  }, [activeRoom?.memberIds, participants])
+
+
   const canSend = Boolean(isConnected && joinedRoomId && text.trim().length > 0)
+
+  const handleSendMessage = useCallback(() => {
+    const normalized = text.trim()
+    if (!joinedRoomId || !normalized) return
+
+    // ?? ?? ??? ?? ??? ?? ??? ID? ???.
+    // ?? ??? ?? ?? clientMessageId? ???? ?? ???? ????.
+    // ? ?? ?? ???? unread ??? ???? ?? ? ?? ? ?? ?? ?? ???.
+    const clientMessageId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    appendMessage({
+      clientMessageId,
+      id: clientMessageId,
+      chatRoomId: joinedRoomId,
+      senderId: currentUser?.id || '',
+      senderNickname: currentUser?.nickname || '?',
+      type: 'text',
+      text: normalized,
+      timestamp: new Date().toISOString(),
+      unreadCount: optimisticUnreadCount,
+    })
+
+    sendMessage({
+      roomId: joinedRoomId,
+      text: normalized,
+      type: 'text',
+      clientMessageId,
+    })
+    setText('')
+  }, [appendMessage, currentUser?.id, currentUser?.nickname, joinedRoomId, optimisticUnreadCount, sendMessage, text])
+
+  const handleComposerKeyUp = useCallback((event) => {
+    if (event.key === 'Enter') {
+      handleSendMessage()
+    }
+  }, [handleSendMessage])
+
+
+
 
   // 모바일 하단 탭바는 현재 어떤 1차 화면을 보고 있는지에 따라 활성 상태를 바꾼다.
   // 알림 화면이 열려 있으면 notifications를 우선으로 보고, 그 외에는 Friends/Rooms 탭 상태를 그대로 따른다.
@@ -625,6 +641,7 @@ function AppShell() {
 }
 
 export default AppShell
+
 
 
 
