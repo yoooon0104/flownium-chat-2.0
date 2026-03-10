@@ -318,13 +318,29 @@ function AppShell() {
     const normalized = text.trim()
     if (!joinedRoomId || !normalized) return
 
+    // 입력 직후 화면에 먼저 보여줄 임시 메시지 ID를 만든다.
+    // 서버 응답이 오면 같은 clientMessageId를 기준으로 실제 메시지로 교체한다.
+    const clientMessageId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    appendMessage({
+      clientMessageId,
+      id: clientMessageId,
+      chatRoomId: joinedRoomId,
+      senderId: currentUser?.id || '',
+      senderNickname: currentUser?.nickname || '?',
+      type: 'text',
+      text: normalized,
+      timestamp: new Date().toISOString(),
+      unreadCount: 0,
+    })
+
     sendMessage({
       roomId: joinedRoomId,
       text: normalized,
       type: 'text',
+      clientMessageId,
     })
     setText('')
-  }, [joinedRoomId, sendMessage, text])
+  }, [appendMessage, currentUser?.id, currentUser?.nickname, joinedRoomId, sendMessage, text])
 
   const handleComposerKeyUp = useCallback((event) => {
     if (event.key === 'Enter') {
@@ -609,6 +625,7 @@ function AppShell() {
 }
 
 export default AppShell
+
 
 
 
