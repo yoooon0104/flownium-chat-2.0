@@ -71,10 +71,13 @@ function ChatPanel({
                   <div className={`bubble-row ${isMine ? 'mine' : 'other'}`}>
                     {/* unreadCount는 읽지 않은 사람 수이므로 0보다 클 때만 노출한다.
                         현재 UX 규칙은 말풍선이 아니라 텍스트 숫자만 메시지 앞에 붙이는 방식이다. */}
-                    {Number(msg.unreadCount) > 0 && (
+                    {!isMine && Number(msg.unreadCount) > 0 && (
                       <span className="message-unread-count">{msg.unreadCount > 99 ? '99+' : msg.unreadCount}</span>
                     )}
                     <p className="bubble">{msg.text}</p>
+                    {isMine && Number(msg.unreadCount) > 0 && (
+                      <span className="message-unread-count">{msg.unreadCount > 99 ? '99+' : msg.unreadCount}</span>
+                    )}
                   </div>
                   <p className="time">
                     {new Date(msg.timestamp).toLocaleTimeString([], {
