@@ -40,6 +40,9 @@ const mergeMessageLists = (historyMessages, currentMessages) => {
 export const useChatMessages = ({ chatApi }) => {
   const [messages, setMessages] = useState([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [isLoadingOlderHistory, setIsLoadingOlderHistory] = useState(false)
+  const [hasMoreHistory, setHasMoreHistory] = useState(false)
+  const [historyCursor, setHistoryCursor] = useState('')
   const [historyError, setHistoryError] = useState('')
 
   const loadMessageHistory = useCallback(async (roomId) => {
@@ -49,17 +52,21 @@ export const useChatMessages = ({ chatApi }) => {
     setHistoryError('')
     setMessages([])
 
-    const { ok, status, body } = await chatApi.getRoomMessages(roomId, 50)
+    const { ok, status, body } = await chatApi.getRoomMessages(roomId, { limit: 50 })
     if (!ok) {
       if (status === 503) {
         setHistoryError('Database is not connected.')
       } else {
         setHistoryError(body?.error || 'Failed to load message history.')
       }
+      setHasMoreHistory(false)
+      setHistoryCursor('')
       setIsLoadingHistory(false)
       return
     }
 
+    setHasMoreHistory(Boolean(body?.hasMore))
+    setHistoryCursor(String(body?.nextCursor || ''))
     setMessages((prev) => {
       const historyMessages = Array.isArray(body?.messages) ? body.messages : []
 
@@ -69,6 +76,36 @@ export const useChatMessages = ({ chatApi }) => {
     })
     setIsLoadingHistory(false)
   }, [chatApi])
+
+  const loadOlderMessageHistory = useCallback(async (roomId) => {
+    if (!chatApi || !roomId || !historyCursor || isLoadingHistory || isLoadingOlderHistory || !hasMoreHistory) return
+
+    setIsLoadingOlderHistory(true)
+    setHistoryError('')
+
+    const { ok, status, body } = await chatApi.getRoomMessages(roomId, {
+      limit: 50,
+      before: historyCursor,
+    })
+
+    if (!ok) {
+      if (status === 503) {
+        setHistoryError('Database is not connected.')
+      } else {
+        setHistoryError(body?.error || 'Failed to load older messages.')
+      }
+      setIsLoadingOlderHistory(false)
+      return
+    }
+
+    setHasMoreHistory(Boolean(body?.hasMore))
+    setHistoryCursor(String(body?.nextCursor || ''))
+    setMessages((prev) => {
+      const olderMessages = Array.isArray(body?.messages) ? body.messages : []
+      return mergeMessageLists(olderMessages, prev)
+    })
+    setIsLoadingOlderHistory(false)
+  }, [chatApi, hasMoreHistory, historyCursor, isLoadingHistory, isLoadingOlderHistory])
 
   const appendMessage = useCallback((message) => {
     setMessages((prev) => {
@@ -106,14 +143,20 @@ export const useChatMessages = ({ chatApi }) => {
     setMessages([])
     setHistoryError('')
     setIsLoadingHistory(false)
+    setIsLoadingOlderHistory(false)
+    setHasMoreHistory(false)
+    setHistoryCursor('')
   }, [])
 
   return {
     messages,
     isLoadingHistory,
+    isLoadingOlderHistory,
+    hasMoreHistory,
     historyError,
     setHistoryError,
     loadMessageHistory,
+    loadOlderMessageHistory,
     appendMessage,
     removeMessageByClientMessageId,
     clearMessages,

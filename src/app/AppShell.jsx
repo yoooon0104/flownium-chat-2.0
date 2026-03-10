@@ -121,8 +121,11 @@ function AppShell() {
   const {
     messages,
     isLoadingHistory,
+    isLoadingOlderHistory,
+    hasMoreHistory,
     historyError,
     loadMessageHistory,
+    loadOlderMessageHistory,
     appendMessage,
     removeMessageByClientMessageId,
     clearMessages,
@@ -330,10 +333,22 @@ function AppShell() {
     setCurrentRoom(joinedRoomId)
   }, [joinedRoomId, setCurrentRoom])
 
+  const previousRoomIdRef = useRef('')
+  const previousMessageCountRef = useRef(0)
+
   useEffect(() => {
-    if (!messagesEndRef.current) return
-    messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages, joinedRoomId, isLoadingHistory])
+    if (!messagesEndRef.current || isLoadingHistory || isLoadingOlderHistory) return
+
+    const roomChanged = previousRoomIdRef.current !== joinedRoomId
+    const appendedNewMessage = messages.length > previousMessageCountRef.current
+
+    if (joinedRoomId && (roomChanged || appendedNewMessage)) {
+      messagesEndRef.current.scrollIntoView({ behavior: roomChanged ? 'auto' : 'smooth', block: 'end' })
+    }
+
+    previousRoomIdRef.current = joinedRoomId
+    previousMessageCountRef.current = messages.length
+  }, [isLoadingHistory, isLoadingOlderHistory, joinedRoomId, messages.length])
 
   useEffect(() => {
     if (!accessToken || !chatApi) return
@@ -726,10 +741,13 @@ function AppShell() {
           }}
           errorMessage={errorMessage || friendErrorMessage || notificationErrorMessage}
           isLoadingHistory={isLoadingHistory}
+          isLoadingOlderHistory={isLoadingOlderHistory}
+          hasMoreHistory={hasMoreHistory}
           historyError={historyError}
           messages={messages}
           currentUserId={currentUser?.id || ''}
           messagesEndRef={messagesEndRef}
+          onLoadOlderMessages={() => void loadOlderMessageHistory(joinedRoomId)}
           text={text}
           onTextChange={setText}
           onComposerKeyUp={handleComposerKeyUp}

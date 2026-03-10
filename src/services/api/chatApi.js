@@ -49,8 +49,16 @@ export const createChatApi = ({ apiBaseUrl, getAccessToken, onUnauthorizedRetry 
   }
 
   // 메시지 히스토리 응답에는 텍스트뿐 아니라 메시지별 unreadCount도 포함된다.
-  const getRoomMessages = async (roomId, limit = 50) => {
-    const response = await fetchWithAuth(`${apiBaseUrl}/api/chatrooms/${roomId}/messages?limit=${limit}`)
+  const getRoomMessages = async (roomId, options = {}) => {
+    const normalizedOptions = typeof options === 'number' ? { limit: options } : options
+    const limit = Math.min(Math.max(Number(normalizedOptions?.limit) || 50, 1), 100)
+    const query = new URLSearchParams({ limit: String(limit) })
+
+    if (normalizedOptions?.before) {
+      query.set('before', String(normalizedOptions.before))
+    }
+
+    const response = await fetchWithAuth(`${apiBaseUrl}/api/chatrooms/${roomId}/messages?${query.toString()}`)
     const body = await parseJsonSafe(response)
     return { ok: response.ok, status: response.status, body }
   }

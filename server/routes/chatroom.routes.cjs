@@ -569,9 +569,16 @@ const createChatroomRouter = ({
   router.get('/chatrooms/:id/messages', requireAuth, async (req, res) => {
     const roomId = String(req.params.id || '').trim();
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+    const beforeRaw = String(req.query.before || '').trim();
+    const beforeDate = beforeRaw ? new Date(beforeRaw) : null;
 
     if (!roomId) {
       sendError(res, 400, 'INVALID_REQUEST', 'roomId is required');
+      return;
+    }
+
+    if (beforeRaw && (!beforeDate || Number.isNaN(beforeDate.getTime()))) {
+      sendError(res, 400, 'INVALID_REQUEST', 'before must be a valid datetime');
       return;
     }
 
@@ -591,10 +598,18 @@ const createChatroomRouter = ({
         return;
       }
 
-      const messages = await Message.find({ chatRoomId: roomId })
+      const messageQuery = { chatRoomId: roomId };
+      if (beforeDate) {
+        messageQuery.timestamp = { $lt: beforeDate };
+      }
+
+      const messages = await Message.find(messageQuery)
         .sort({ timestamp: -1 })
-        .limit(limit)
+        .limit(limit + 1)
         .lean();
+
+      const hasMore = messages.length > limit;
+      const pagedMessages = hasMore ? messages.slice(0, limit) : messages;
 
       const memberIds = Array.isArray(room.memberIds) ? room.memberIds.map((value) => String(value)) : [];
       const readStates = await ChatReadState.find({
@@ -602,12 +617,16 @@ const createChatroomRouter = ({
         userId: { $in: memberIds },
       }).lean();
       const readStateByUserId = new Map(readStates.map((state) => [String(state.userId), state]));
-      const messageResponses = buildMessageResponses(messages.reverse(), memberIds, readStateByUserId);
+      const chronologicallySortedMessages = [...pagedMessages].reverse();
+      const messageResponses = buildMessageResponses(chronologicallySortedMessages, memberIds, readStateByUserId);
+      const oldestMessage = chronologicallySortedMessages[0];
 
       res.status(200).json({
         roomId,
         count: messageResponses.length,
         messages: messageResponses,
+        hasMore,
+        nextCursor: oldestMessage?.timestamp ? new Date(oldestMessage.timestamp).toISOString() : null,
       });
     } catch (_error) {
       sendError(res, 500, 'MESSAGE_FETCH_FAILED', 'failed to fetch messages');
