@@ -1,7 +1,16 @@
 ﻿import { useEffect, useRef } from 'react'
 
 // 참여자 메뉴는 헤더 우측에서 room_participants 이벤트를 시각화한다.
-function ParticipantsMenu({ joinedRoomId, participants, isOpen, onToggle, currentUserId }) {
+function ParticipantsMenu({
+  joinedRoomId,
+  participants,
+  isOpen,
+  onToggle,
+  currentUserId,
+  onOpenInvite,
+  onLeaveRoom,
+  canInvite,
+}) {
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -50,6 +59,15 @@ function ParticipantsMenu({ joinedRoomId, participants, isOpen, onToggle, curren
               })}
             </ul>
           )}
+
+          <div className="participants-actions">
+            <button type="button" className="participants-inline-button" onClick={onOpenInvite} disabled={!joinedRoomId || !canInvite}>
+              + 초대
+            </button>
+            <button type="button" className="participants-inline-button danger" onClick={onLeaveRoom} disabled={!joinedRoomId}>
+              나가기
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -305,6 +305,84 @@ MVP2-A 1차 표준:
 - `500 CHATROOM_CREATE_FAILED`
 - `503 DB_NOT_CONNECTED`
 
+### POST /api/chatrooms/:id/invite
+- 현재 방에 친구를 초대
+- 요청 사용자와 초대 대상은 서로 친구여야 함
+- 자기 자신 초대는 불가
+- 요청 payload의 중복 `userId`는 서버에서 dedupe
+- direct(`isGroup=false`) 방이면 기존 방을 유지하고 새 다인방을 생성
+- group(`isGroup=true`) 방이면 기존 방 `memberIds`에 즉시 멤버 추가
+- 멤버 변경 시 시스템 메시지와 `lastMessage`, `lastMessageAt` 갱신
+
+요청:
+```json
+{
+  "userIds": ["userId-1", "userId-2"]
+}
+```
+
+응답 예시:
+```json
+{
+  "room": {
+    "id": "chatroomId",
+    "name": "alice, bob, charlie",
+    "isGroup": true,
+    "memberIds": ["u1", "u2", "u3"],
+    "lastMessage": "alice님이 charlie님을 초대했습니다.",
+    "lastMessageAt": "2026-03-10T12:00:00.000Z",
+    "unreadCount": 0
+  },
+  "createdNewRoom": true
+}
+```
+
+대표 오류:
+- `400 INVALID_REQUEST`
+- `403 FRIENDSHIP_REQUIRED`
+- `404 ROOM_NOT_FOUND`
+- `404 USER_NOT_FOUND`
+- `409 ALREADY_IN_ROOM`
+- `500 CHATROOM_INVITE_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+### POST /api/chatrooms/:id/leave
+- 현재 사용자가 채팅방에서 나감
+- direct(`isGroup=false`) 방은 한 명이라도 나가면 방 삭제
+- group(`isGroup=true`) 방은 나간 뒤 멤버가 0명이 될 때만 삭제
+- 시스템 메시지와 `lastMessage`, `lastMessageAt` 갱신
+- 방 삭제 시 메시지/읽음 상태도 함께 정리
+
+응답 예시:
+```json
+{
+  "roomId": "chatroomId",
+  "deleted": true
+}
+```
+
+```json
+{
+  "room": {
+    "id": "chatroomId",
+    "name": "프로젝트 회의방",
+    "isGroup": true,
+    "memberIds": ["u2", "u3"],
+    "lastMessage": "alice님이 나갔습니다.",
+    "lastMessageAt": "2026-03-10T12:05:00.000Z",
+    "unreadCount": 0
+  },
+  "deleted": false
+}
+```
+
+대표 오류:
+- `400 INVALID_REQUEST`
+- `403 FORBIDDEN`
+- `404 ROOM_NOT_FOUND`
+- `500 CHATROOM_LEAVE_FAILED`
+- `503 DB_NOT_CONNECTED`
+
 ### GET /api/chatrooms
 - 현재 사용자가 참여 중인 방 목록 조회
 - 정렬: `lastMessageAt desc` -> `createdAt desc`
@@ -338,6 +416,7 @@ MVP2-A 1차 표준:
 - 현재 사용자가 해당 방 멤버여야 함
 - 쿼리: `limit` (기본 50, 최대 100)
 - 각 메시지 응답에 메시지별 `unreadCount` 포함
+- `type`은 `text | system`
 
 응답 예시:
 ```json

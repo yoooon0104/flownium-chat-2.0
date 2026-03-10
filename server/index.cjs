@@ -125,6 +125,16 @@ const emitFriendshipUpdated = (userId, payload = {}) => {
   io.to(`user:${String(userId)}`).emit('friendship_updated', payload);
 };
 
+const emitRoomUpdated = (userId, room) => {
+  io.to(`user:${String(userId)}`).emit('room_updated', { room });
+};
+
+const emitRoomDeleted = (userId, roomId) => {
+  io.to(`user:${String(userId)}`).emit('room_deleted', {
+    roomId: String(roomId),
+  });
+};
+
 const addPresence = (roomId, userId, socketId) => {
   if (!roomPresence.has(roomId)) {
     roomPresence.set(roomId, new Map());
@@ -228,6 +238,47 @@ const emitRoomParticipants = async (roomId) => {
   });
 };
 
+// HTTP 기반 leave/delete에서도 소켓 room을 정리해야, 이미 떠난 사용자가 이후 메시지/참여자 이벤트를 받지 않는다.
+const disconnectUserFromRoom = async (roomId, userId) => {
+  const sockets = await io.in(`user:${String(userId)}`).fetchSockets();
+  sockets.forEach((socket) => {
+    if (!socket.rooms.has(String(roomId))) return;
+    socket.leave(String(roomId));
+    removePresence(String(roomId), String(userId), socket.id);
+  });
+};
+
+const emitRoomMessage = async (roomDoc, messageDoc, clientMessageId = null) => {
+  const roomId = String(roomDoc._id || roomDoc.id || messageDoc.chatRoomId);
+  const memberIds = Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
+  const targetReadStates = await ChatReadState.find({
+    roomId,
+    userId: { $in: memberIds.filter((memberId) => memberId !== messageDoc.senderId) },
+  }).lean();
+  const readStateByUserId = new Map(targetReadStates.map((state) => [String(state.userId), state]));
+  const messageTimestamp = messageDoc.timestamp ? new Date(messageDoc.timestamp) : new Date();
+
+  // unreadCount는 현재 room member 기준으로만 다시 계산해 REST/소켓 숫자가 동일하게 보이도록 맞춘다.
+  const unreadCount = memberIds.filter((memberId) => {
+    if (memberId === messageDoc.senderId) return false;
+    const readState = readStateByUserId.get(String(memberId));
+    if (!readState?.lastReadAt) return true;
+    return new Date(readState.lastReadAt) < messageTimestamp;
+  }).length;
+
+  io.to(roomId).emit('receive_message', {
+    clientMessageId,
+    id: String(messageDoc._id),
+    chatRoomId: roomId,
+    senderId: messageDoc.senderId,
+    senderNickname: messageDoc.senderNickname,
+    type: messageDoc.type,
+    text: messageDoc.text,
+    timestamp: messageTimestamp.toISOString(),
+    unreadCount,
+  });
+};
+
 io.use((socket, next) => {
   try {
     const authToken = socket.handshake?.auth?.token || '';
@@ -288,7 +339,11 @@ app.use(
     requireAuth,
     assertDbConnected,
     emitNotificationCreated,
-    emitFriendshipUpdated,
+    emitRoomUpdated,
+    emitRoomDeleted,
+    emitRoomParticipants,
+    emitRoomMessage,
+    disconnectUserFromRoom,
   })
 );
 
@@ -433,33 +488,7 @@ io.on('connection', (socket) => {
       room.lastMessageAt = message.timestamp;
       await room.save();
 
-      // 새 메시지를 보낸 직후 unreadCount를 계산해 두면 같은 payload를 현재 방/다른 방 UI에서 모두 재사용할 수 있다.
-      // 보낸 사람 자신은 unread 대상이 아니므로 읽음 상태 조회 대상에서도 제외한다.
-      const memberIds = Array.isArray(room.memberIds) ? room.memberIds.map((value) => String(value)) : [];
-      const targetReadStates = await ChatReadState.find({
-        roomId,
-        userId: { $in: memberIds.filter((memberId) => memberId !== socket.user.userId) },
-      }).lean();
-      const readStateByUserId = new Map(targetReadStates.map((state) => [String(state.userId), state]));
-      // 규칙: lastReadAt이 없거나 메시지 시각보다 이전이면 아직 읽지 않은 것으로 본다.
-      const unreadCount = memberIds.filter((memberId) => {
-        if (memberId === socket.user.userId) return false;
-        const readState = readStateByUserId.get(String(memberId));
-        if (!readState?.lastReadAt) return true;
-        return new Date(readState.lastReadAt) < message.timestamp;
-      }).length;
-
-      io.to(roomId).emit('receive_message', {
-        clientMessageId: clientMessageId || null,
-        id: String(message._id),
-        chatRoomId: message.chatRoomId,
-        senderId: message.senderId,
-        senderNickname: message.senderNickname,
-        type: message.type,
-        text: message.text,
-        timestamp: new Date(message.timestamp).toISOString(),
-        unreadCount,
-      });
+      await emitRoomMessage(room, message, clientMessageId || null);
 
       reply({
         ok: true,

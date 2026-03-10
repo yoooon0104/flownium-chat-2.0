@@ -51,6 +51,20 @@ function ChatPanel({
           <ul className="message-list">
             {messages.map((msg, idx) => {
               const isMine = currentUserId && msg.senderId === currentUserId
+              if (msg.type === 'system') {
+                return (
+                  <li key={msg.id || `${msg.timestamp}-${idx}`} className="system">
+                    <p className="system-message">{msg.text}</p>
+                    <p className="time system-time">
+                      {new Date(msg.timestamp).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </li>
+                )
+              }
+
               return (
                 <li key={msg.id || `${msg.timestamp}-${idx}`} className={isMine ? 'mine' : 'other'}>
                   <p className="meta">{msg.senderNickname}</p>

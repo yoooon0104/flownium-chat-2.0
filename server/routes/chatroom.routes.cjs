@@ -1,8 +1,8 @@
-﻿const express = require('express');
+const express = require('express');
 const { sendError } = require('../utils/error-response.cjs');
 
 // ChatRoom REST API를 생성한다.
-// unread count는 사용자별 읽음 상태를 기준으로 계산해 방 목록 응답에 함께 내려준다.
+// 생성/초대/나가기/읽음 상태까지 한 라우터에서 유지해 방 lifecycle 규칙을 서버에서 일관되게 강제한다.
 const createChatroomRouter = ({
   ChatRoom,
   Message,
@@ -13,22 +13,28 @@ const createChatroomRouter = ({
   requireAuth,
   assertDbConnected,
   emitNotificationCreated,
+  emitRoomUpdated,
+  emitRoomDeleted,
+  emitRoomParticipants,
+  emitRoomMessage,
+  disconnectUserFromRoom,
 }) => {
   const router = express.Router();
 
-  // 방 목록 응답 형태를 한곳에서 고정해 두면 create/get 응답이 서로 어긋나지 않는다.
-  // unreadCount는 조회 시점의 현재 사용자 기준 값이므로 기본값을 0으로 둔다.
+  const normalizeUserIds = (values) =>
+    [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean))];
+
+  // 응답 형태를 한곳에서 고정해 두면 REST/소켓의 room 메타가 어긋나지 않는다.
   const toRoomResponse = (roomDoc, unreadCount = 0) => ({
     id: String(roomDoc._id),
     name: roomDoc.name,
     isGroup: Boolean(roomDoc.isGroup),
-    memberIds: Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds : [],
+    memberIds: Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [],
     lastMessage: roomDoc.lastMessage || '',
     lastMessageAt: roomDoc.lastMessageAt ? new Date(roomDoc.lastMessageAt).toISOString() : null,
     unreadCount: Number(unreadCount) || 0,
   });
 
-  // 친구 요청이나 방 초대는 DB 저장만으로 끝내지 않고, 소켓 이벤트까지 같이 보내 즉시 화면에 반영한다.
   const createNotification = async (userId, type, payload) => {
     if (!Notification) return null;
 
@@ -50,7 +56,7 @@ const createChatroomRouter = ({
     return notification;
   };
 
-  // 프론트에서 비친구를 숨기더라도 서버가 다시 검증해야 직접 호출이나 오래된 UI 상태를 막을 수 있다.
+  // 프론트에서 친구만 보여줘도 서버가 다시 확인해야 직접 호출과 오래된 캐시를 막을 수 있다.
   const hasAcceptedFriendship = async (me, targetUserId) => {
     if (!Friendship) return false;
 
@@ -62,11 +68,23 @@ const createChatroomRouter = ({
     return Boolean(friendship);
   };
 
-  // 1:1 방 재사용 규칙: 같은 두 사람만 들어 있는 방이면 direct 성격으로 보고 재사용한다.
-  // 별도 type 필드를 강제하지 않았기 때문에 memberIds 길이 2를 기준으로 판별한다.
+  const assertFriendTargets = async (currentUserId, targetUserIds) => {
+    for (const targetUserId of targetUserIds) {
+      const isFriend = await hasAcceptedFriendship(currentUserId, targetUserId);
+      if (!isFriend) {
+        return { ok: false, targetUserId };
+      }
+    }
+
+    return { ok: true };
+  };
+
+  // 1:1 재사용 규칙은 "같은 두 사람만 있는 방" 기준으로 판단한다.
+  // 별도 room type을 새로 만들지 않고 기존 isGroup=false direct 방을 찾는다.
   const findExistingDirectRoom = async (memberA, memberB) => {
     const rooms = await ChatRoom.find({
       memberIds: { $all: [memberA, memberB] },
+      isGroup: false,
     })
       .sort({ updatedAt: -1 })
       .lean();
@@ -74,10 +92,6 @@ const createChatroomRouter = ({
     return rooms.find((room) => Array.isArray(room.memberIds) && room.memberIds.length === 2) || null;
   };
 
-  // 방 목록 unread 계산 규칙:
-  // - 내가 보낸 메시지는 unread에서 제외
-  // - lastReadAt이 있으면 그 이후 메시지만 unread로 계산
-  // - lastReadAt이 없으면 상대가 보낸 메시지를 전부 unread로 본다.
   const getUnreadCountForRoom = async (roomId, userId, lastReadAt) => {
     const query = {
       chatRoomId: roomId,
@@ -91,10 +105,6 @@ const createChatroomRouter = ({
     return Message.countDocuments(query);
   };
 
-  // 메시지별 unreadCount 계산 규칙:
-  // - 보낸 사람 자신은 unread 대상에서 제외
-  // - 각 멤버의 lastReadAt과 메시지 timestamp를 비교해 아직 읽지 않은 인원 수를 만든다
-  // - 이 값은 채팅창에서 '(숫자) 메시지' 형태로 그대로 쓰인다.
   const buildMessageResponses = (messages, memberIds, readStateByUserId) =>
     messages.map((message) => {
       const timestamp = message.timestamp ? new Date(message.timestamp) : null;
@@ -117,17 +127,74 @@ const createChatroomRouter = ({
       };
     });
 
-  // 채팅방 생성 흐름:
-  // - memberUserIds가 없으면 기존 name 기반 그룹방 생성 호환 로직으로 처리
-  // - 1명 선택이면 기존 2인 방 재사용 또는 새 생성
-  // - 2명 이상 선택이면 그룹방 생성 후 초대 알림을 보낸다.
+  const broadcastRoomUpdated = async (memberIds, roomDoc) => {
+    await Promise.all(
+      memberIds.map((memberId) => emitRoomUpdated?.(String(memberId), toRoomResponse(roomDoc)))
+    );
+  };
+
+  const buildGroupRoomName = (memberUsers) => {
+    const names = memberUsers
+      .map((user) => String(user?.nickname || '').trim())
+      .filter(Boolean)
+      .slice(0, 4);
+
+    return names.length > 0 ? names.join(', ') : '그룹 채팅';
+  };
+
+  // 새로 초대된 사용자는 기존 대화 전체를 unread로 받으면 UX가 깨진다.
+  // 그래서 초대 직전의 lastMessageAt까지만 읽은 것으로 잡고, 이후 시스템 메시지부터 unread를 시작한다.
+  const seedReadStatesForInvitedUsers = async (roomDoc, invitedUserIds) => {
+    if (!Array.isArray(invitedUserIds) || invitedUserIds.length === 0) return;
+
+    const baseline = roomDoc.lastMessageAt
+      ? new Date(roomDoc.lastMessageAt)
+      : new Date(Date.now() - 1000);
+
+    await Promise.all(
+      invitedUserIds.map((userId) =>
+        ChatReadState.findOneAndUpdate(
+          { roomId: String(roomDoc._id), userId: String(userId) },
+          { $set: { lastReadAt: baseline } },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        )
+      )
+    );
+  };
+
+  // 시스템 메시지도 일반 메시지와 같은 저장소를 쓰되, type만 system으로 구분한다.
+  // lastMessage / lastMessageAt도 같이 갱신해야 방 목록 최신 메시지가 시스템 이벤트를 반영한다.
+  const createSystemMessage = async ({ roomDoc, actorUserId, text }) => {
+    const message = await Message.create({
+      chatRoomId: String(roomDoc._id),
+      senderId: String(actorUserId || ''),
+      senderNickname: 'system',
+      type: 'system',
+      text,
+      timestamp: new Date(),
+    });
+
+    roomDoc.lastMessage = message.text;
+    roomDoc.lastMessageAt = message.timestamp;
+    await roomDoc.save();
+
+    await emitRoomMessage?.(roomDoc, message);
+    return message;
+  };
+
+  const deleteRoomResources = async (roomId) => {
+    await Promise.all([
+      Message.deleteMany({ chatRoomId: String(roomId) }),
+      ChatReadState.deleteMany({ roomId: String(roomId) }),
+      ChatRoom.deleteOne({ _id: roomId }),
+    ]);
+  };
+
   router.post('/chatrooms', requireAuth, async (req, res) => {
     const currentUserId = req.user.userId;
     const name = String(req.body?.name || '').trim();
     const rawMemberUserIds = Array.isArray(req.body?.memberUserIds) ? req.body.memberUserIds : null;
-    const normalizedTargetIds = rawMemberUserIds
-      ? [...new Set(rawMemberUserIds.map((value) => String(value || '').trim()).filter(Boolean))]
-      : null;
+    const normalizedTargetIds = rawMemberUserIds ? normalizeUserIds(rawMemberUserIds) : null;
 
     if (!assertDbConnected(res)) {
       return;
@@ -146,6 +213,7 @@ const createChatroomRouter = ({
           memberIds: [currentUserId],
         });
 
+        await broadcastRoomUpdated([currentUserId], room);
         res.status(201).json({ room: toRoomResponse(room) });
         return;
       }
@@ -166,15 +234,13 @@ const createChatroomRouter = ({
         return;
       }
 
-      const targetUserById = new Map(targetUsers.map((user) => [String(user._id), user]));
-
-      for (const targetUserId of normalizedTargetIds) {
-        const isFriend = await hasAcceptedFriendship(currentUserId, targetUserId);
-        if (!isFriend) {
-          sendError(res, 403, 'FRIENDSHIP_REQUIRED', 'friendship is required');
-          return;
-        }
+      const friendCheck = await assertFriendTargets(currentUserId, normalizedTargetIds);
+      if (!friendCheck.ok) {
+        sendError(res, 403, 'FRIENDSHIP_REQUIRED', 'friendship is required');
+        return;
       }
+
+      const targetUserById = new Map(targetUsers.map((user) => [String(user._id), user]));
 
       if (normalizedTargetIds.length === 1) {
         const friendUserId = normalizedTargetIds[0];
@@ -200,18 +266,18 @@ const createChatroomRouter = ({
           },
         });
 
+        await broadcastRoomUpdated(room.memberIds, room);
         res.status(201).json({ room: toRoomResponse(room), reused: false });
         return;
       }
 
-      if (!name) {
-        sendError(res, 400, 'INVALID_ROOM_NAME', 'name is required for group chatrooms');
-        return;
-      }
-
       const memberIds = [currentUserId, ...normalizedTargetIds];
+      const memberUsers = [
+        { _id: currentUserId, nickname: req.user.nickname },
+        ...targetUsers,
+      ];
       const room = await ChatRoom.create({
-        name,
+        name: name || buildGroupRoomName(memberUsers),
         isGroup: true,
         memberIds,
       });
@@ -229,14 +295,227 @@ const createChatroomRouter = ({
         )
       );
 
+      await broadcastRoomUpdated(memberIds, room);
       res.status(201).json({ room: toRoomResponse(room) });
     } catch (error) {
       sendError(res, 500, 'CHATROOM_CREATE_FAILED', error.message || 'failed to create chatroom');
     }
   });
 
-  // 방 목록 조회는 unread count까지 같이 계산한다.
-  // 프론트는 rooms 배열과 totalUnreadCount를 받아 목록 배지와 탭 총합 배지를 한 번에 그린다.
+  router.post('/chatrooms/:id/invite', requireAuth, async (req, res) => {
+    const roomId = String(req.params.id || '').trim();
+    const currentUserId = String(req.user.userId || '').trim();
+    const targetUserIds = normalizeUserIds(req.body?.userIds);
+
+    if (!roomId || targetUserIds.length === 0) {
+      sendError(res, 400, 'INVALID_REQUEST', 'roomId and userIds are required');
+      return;
+    }
+
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const room = await ChatRoom.findById(roomId);
+      if (!room) {
+        sendError(res, 404, 'ROOM_NOT_FOUND', 'chatroom not found');
+        return;
+      }
+
+      if (!room.memberIds.includes(currentUserId)) {
+        sendError(res, 403, 'FORBIDDEN', 'forbidden');
+        return;
+      }
+
+      if (targetUserIds.includes(currentUserId)) {
+        sendError(res, 400, 'INVALID_REQUEST', 'cannot invite yourself');
+        return;
+      }
+
+      const targetUsers = await User.find({ _id: { $in: targetUserIds } }).lean();
+      if (targetUsers.length !== targetUserIds.length) {
+        sendError(res, 404, 'USER_NOT_FOUND', 'one or more users were not found');
+        return;
+      }
+
+      const friendCheck = await assertFriendTargets(currentUserId, targetUserIds);
+      if (!friendCheck.ok) {
+        sendError(res, 403, 'FRIENDSHIP_REQUIRED', 'friendship is required');
+        return;
+      }
+
+      const invitedNames = targetUsers
+        .map((user) => String(user?.nickname || '').trim())
+        .filter(Boolean)
+        .join(', ');
+
+      if (room.isGroup) {
+        const existingMemberSet = new Set(room.memberIds.map((value) => String(value)));
+        const alreadyInRoomIds = targetUserIds.filter((userId) => existingMemberSet.has(userId));
+
+        if (alreadyInRoomIds.length > 0) {
+          sendError(res, 409, 'ALREADY_IN_ROOM', 'one or more users are already in the room');
+          return;
+        }
+
+        await seedReadStatesForInvitedUsers(room, targetUserIds);
+
+        room.memberIds = [...room.memberIds.map((value) => String(value)), ...targetUserIds];
+        room.isGroup = true;
+        await room.save();
+
+        await createSystemMessage({
+          roomDoc: room,
+          actorUserId: currentUserId,
+          text: `${req.user.nickname}님이 ${invitedNames}님을 초대했습니다.`,
+        });
+
+        await Promise.all(
+          targetUserIds.map((targetUserId) =>
+            createNotification(targetUserId, 'room_invite', {
+              roomId: String(room._id),
+              roomName: room.name,
+              inviter: {
+                userId: currentUserId,
+                nickname: req.user.nickname,
+              },
+            })
+          )
+        );
+
+        await broadcastRoomUpdated(room.memberIds, room);
+        await emitRoomParticipants?.(String(room._id));
+
+        res.status(200).json({
+          room: toRoomResponse(room),
+          createdNewRoom: false,
+        });
+        return;
+      }
+
+      const baseMemberIds = room.memberIds.map((value) => String(value));
+      const nextMemberIds = [...baseMemberIds, ...targetUserIds];
+      const nextUsers = [
+        ...targetUsers,
+        ...(await User.find({ _id: { $in: baseMemberIds } }).lean()),
+      ];
+      const nextRoom = await ChatRoom.create({
+        name: buildGroupRoomName(nextUsers),
+        isGroup: true,
+        memberIds: nextMemberIds,
+      });
+
+      await createSystemMessage({
+        roomDoc: nextRoom,
+        actorUserId: currentUserId,
+        text: `${req.user.nickname}님이 ${invitedNames}님을 초대했습니다.`,
+      });
+
+      await Promise.all(
+        targetUserIds.map((targetUserId) =>
+          createNotification(targetUserId, 'room_invite', {
+            roomId: String(nextRoom._id),
+            roomName: nextRoom.name,
+            inviter: {
+              userId: currentUserId,
+              nickname: req.user.nickname,
+            },
+          })
+        )
+      );
+
+      await broadcastRoomUpdated(nextMemberIds, nextRoom);
+      res.status(201).json({
+        room: toRoomResponse(nextRoom),
+        createdNewRoom: true,
+      });
+    } catch (error) {
+      sendError(res, 500, 'CHATROOM_INVITE_FAILED', error.message || 'failed to invite users');
+    }
+  });
+
+  router.post('/chatrooms/:id/leave', requireAuth, async (req, res) => {
+    const roomId = String(req.params.id || '').trim();
+    const currentUserId = String(req.user.userId || '').trim();
+
+    if (!roomId) {
+      sendError(res, 400, 'INVALID_REQUEST', 'roomId is required');
+      return;
+    }
+
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const room = await ChatRoom.findById(roomId);
+      if (!room) {
+        sendError(res, 404, 'ROOM_NOT_FOUND', 'chatroom not found');
+        return;
+      }
+
+      if (!room.memberIds.includes(currentUserId)) {
+        sendError(res, 403, 'FORBIDDEN', 'forbidden');
+        return;
+      }
+
+      const currentMemberIds = room.memberIds.map((value) => String(value));
+
+      if (!room.isGroup) {
+        await Promise.all(
+          currentMemberIds.map((memberId) => disconnectUserFromRoom?.(String(roomId), String(memberId)))
+        );
+        await deleteRoomResources(roomId);
+        currentMemberIds.forEach((memberId) => {
+          emitRoomDeleted?.(memberId, roomId);
+        });
+
+        res.status(200).json({
+          roomId,
+          deleted: true,
+        });
+        return;
+      }
+
+      const nextMemberIds = currentMemberIds.filter((memberId) => memberId !== currentUserId);
+      await disconnectUserFromRoom?.(roomId, currentUserId);
+      await ChatReadState.deleteOne({ roomId, userId: currentUserId });
+
+      if (nextMemberIds.length === 0) {
+        await deleteRoomResources(roomId);
+        emitRoomDeleted?.(currentUserId, roomId);
+
+        res.status(200).json({
+          roomId,
+          deleted: true,
+        });
+        return;
+      }
+
+      room.memberIds = nextMemberIds;
+      room.isGroup = true;
+      await room.save();
+
+      await createSystemMessage({
+        roomDoc: room,
+        actorUserId: currentUserId,
+        text: `${req.user.nickname}님이 나갔습니다.`,
+      });
+
+      await broadcastRoomUpdated(nextMemberIds, room);
+      emitRoomDeleted?.(currentUserId, roomId);
+      await emitRoomParticipants?.(roomId);
+
+      res.status(200).json({
+        room: toRoomResponse(room),
+        deleted: false,
+      });
+    } catch (error) {
+      sendError(res, 500, 'CHATROOM_LEAVE_FAILED', error.message || 'failed to leave room');
+    }
+  });
+
   router.get('/chatrooms', requireAuth, async (req, res) => {
     if (!assertDbConnected(res)) {
       return;
@@ -256,9 +535,9 @@ const createChatroomRouter = ({
       const readStateByRoomId = new Map(readStates.map((state) => [state.roomId, state]));
       const roomResponses = await Promise.all(
         rooms.map(async (room) => {
-          const roomId = String(room._id);
-          const readState = readStateByRoomId.get(roomId);
-          const unreadCount = await getUnreadCountForRoom(roomId, req.user.userId, readState?.lastReadAt || null);
+          const currentRoomId = String(room._id);
+          const readState = readStateByRoomId.get(currentRoomId);
+          const unreadCount = await getUnreadCountForRoom(currentRoomId, req.user.userId, readState?.lastReadAt || null);
           return toRoomResponse(room, unreadCount);
         })
       );
@@ -270,8 +549,6 @@ const createChatroomRouter = ({
     }
   });
 
-  // 메시지 히스토리 조회 시점에도 unreadCount를 다시 계산한다.
-  // 그래야 새로고침 후에도 메시지 옆 unread 숫자를 동일하게 복원할 수 있다.
   router.get('/chatrooms/:id/messages', requireAuth, async (req, res) => {
     const roomId = String(req.params.id || '').trim();
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
@@ -363,4 +640,3 @@ const createChatroomRouter = ({
 };
 
 module.exports = createChatroomRouter;
-

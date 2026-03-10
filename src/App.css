@@ -620,6 +620,35 @@
   gap: 6px;
 }
 
+.participants-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.participants-inline-button {
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(92deg, #5b5cff 0%, #7a3cff 100%);
+  color: #f5f7ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.participants-inline-button:disabled {
+  background: #ebeef2;
+  color: #9aa2ac;
+}
+
+.participants-inline-button.danger {
+  background: #edf1f7;
+  color: #b9303f;
+}
+
 .participants-row {
   display: flex;
   align-items: center;
@@ -702,6 +731,12 @@
   max-width: 72%;
 }
 
+.message-list li.system {
+  align-self: center;
+  max-width: min(88%, 420px);
+  text-align: center;
+}
+
 .message-list li .meta {
   margin: 0 0 2px;
   font-size: 11px;
@@ -722,6 +757,20 @@
   margin: 4px 0 0;
   font-size: 11px;
   color: #929aa6;
+}
+
+.system-message {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #eef1f8;
+  color: #536174;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.system-time {
+  text-align: center;
 }
 
 .bubble-row {
