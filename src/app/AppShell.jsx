@@ -47,6 +47,7 @@ const toTimeLabel = (value) => {
 
 function AppShell() {
   const messagesEndRef = useRef(null)
+  const shouldScrollToBottomRef = useRef(false)
   const [themePreference, setThemePreference] = useState(() => {
     if (typeof window === 'undefined') return 'system'
     return localStorage.getItem(THEME_PREFERENCE_KEY) || 'system'
@@ -121,8 +122,12 @@ function AppShell() {
   const {
     messages,
     isLoadingHistory,
+    isLoadingOlderHistory,
+    hasMoreHistory,
     historyError,
+    lastMessageMutation,
     loadMessageHistory,
+    loadOlderMessageHistory,
     appendMessage,
     removeMessageByClientMessageId,
     clearMessages,
@@ -216,6 +221,7 @@ function AppShell() {
   // 3) 방을 실제로 열어본 시점으로 읽음 처리
   // 이 순서를 지켜야 새로 입장한 방의 unread 배지가 바로 정리된다.
   const handleSocketRoomJoined = useCallback((nextRoomId, payload) => {
+    shouldScrollToBottomRef.current = true
     setJoinedRoomId(nextRoomId)
     setIsMobileChatView(true)
     setIsMobileNotificationView(false)
@@ -261,6 +267,7 @@ function AppShell() {
   }, [])
 
   const clearActiveRoom = useCallback(() => {
+    shouldScrollToBottomRef.current = false
     setJoinedRoomId('')
     setParticipants([])
     setIsParticipantsMenuOpen(false)
@@ -330,10 +337,21 @@ function AppShell() {
     setCurrentRoom(joinedRoomId)
   }, [joinedRoomId, setCurrentRoom])
 
+  const previousRoomIdRef = useRef('')
+
   useEffect(() => {
-    if (!messagesEndRef.current) return
-    messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages, joinedRoomId, isLoadingHistory])
+    if (!messagesEndRef.current || isLoadingHistory || isLoadingOlderHistory) return
+
+    const roomChanged = shouldScrollToBottomRef.current || previousRoomIdRef.current !== joinedRoomId
+    const appendedNewMessage = lastMessageMutation === 'append'
+
+    if (joinedRoomId && (roomChanged || appendedNewMessage)) {
+      messagesEndRef.current.scrollIntoView({ behavior: roomChanged ? 'auto' : 'smooth', block: 'end' })
+      shouldScrollToBottomRef.current = false
+    }
+
+    previousRoomIdRef.current = joinedRoomId
+  }, [isLoadingHistory, isLoadingOlderHistory, joinedRoomId, lastMessageMutation, messages.length])
 
   useEffect(() => {
     if (!accessToken || !chatApi) return
@@ -726,10 +744,13 @@ function AppShell() {
           }}
           errorMessage={errorMessage || friendErrorMessage || notificationErrorMessage}
           isLoadingHistory={isLoadingHistory}
+          isLoadingOlderHistory={isLoadingOlderHistory}
+          hasMoreHistory={hasMoreHistory}
           historyError={historyError}
           messages={messages}
           currentUserId={currentUser?.id || ''}
           messagesEndRef={messagesEndRef}
+          onLoadOlderMessages={() => void loadOlderMessageHistory(joinedRoomId)}
           text={text}
           onTextChange={setText}
           onComposerKeyUp={handleComposerKeyUp}

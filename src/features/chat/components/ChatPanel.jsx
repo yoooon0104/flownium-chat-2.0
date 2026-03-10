@@ -1,7 +1,8 @@
+import { useEffect, useRef } from 'react'
 import ParticipantsMenu from './ParticipantsMenu'
 
 // 채팅 본문 패널: 헤더/메시지/입력창을 조합하고 모바일 뒤로가기를 처리한다.
-// unread 숫자는 메시지별 unreadCount를 그대로 받아 '(숫자) 메시지' 형태로 렌더링한다.
+// 상단으로 스크롤하면 이전 메시지를 추가 조회하고, 기존 스크롤 위치는 유지한다.
 function ChatPanel({
   isMobileChatView,
   activeRoom,
@@ -10,16 +11,39 @@ function ChatPanel({
   participantsProps,
   errorMessage,
   isLoadingHistory,
+  isLoadingOlderHistory,
+  hasMoreHistory,
   historyError,
   messages,
   currentUserId,
   messagesEndRef,
+  onLoadOlderMessages,
   text,
   onTextChange,
   onComposerKeyUp,
   onSendMessage,
   canSend,
 }) {
+  const historyViewportRef = useRef(null)
+  const restoreScrollRef = useRef(null)
+
+  useEffect(() => {
+    const viewport = historyViewportRef.current
+    if (!viewport || restoreScrollRef.current == null || isLoadingOlderHistory) return
+
+    const previousScrollHeight = restoreScrollRef.current
+    viewport.scrollTop = viewport.scrollHeight - previousScrollHeight
+    restoreScrollRef.current = null
+  }, [isLoadingOlderHistory, messages.length])
+
+  const handleHistoryScroll = (event) => {
+    const viewport = event.currentTarget
+    if (!hasMoreHistory || isLoadingHistory || isLoadingOlderHistory || viewport.scrollTop > 48) return
+
+    restoreScrollRef.current = viewport.scrollHeight
+    onLoadOlderMessages?.()
+  }
+
   return (
     <section className={`chat-panel ${isMobileChatView ? 'mobile-active' : ''} grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[28px] border border-[var(--border-strong)] bg-[var(--panel-bg)] shadow-[var(--shadow-panel)] backdrop-blur`}>
       <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-[var(--border-soft)] px-4 py-4 md:px-5">
@@ -44,9 +68,12 @@ function ChatPanel({
         <ParticipantsMenu {...participantsProps} />
       </div>
 
-      <div className="min-h-0 overflow-auto bg-[linear-gradient(180deg,var(--panel-soft)_0%,transparent_100%)] px-4 py-4 md:px-5">
+      <div
+        ref={historyViewportRef}
+        className="min-h-0 overflow-auto bg-[linear-gradient(180deg,var(--panel-soft)_0%,transparent_100%)] px-4 py-4 md:px-5"
+        onScroll={handleHistoryScroll}
+      >
         {errorMessage && <p className="mb-3 text-sm text-rose-300">오류: {errorMessage}</p>}
-        {isLoadingHistory && <p className="mb-3 text-sm text-[var(--text-secondary)]">이전 메시지를 불러오는 중입니다.</p>}
         {historyError && <p className="mb-3 text-sm text-amber-300">{historyError}</p>}
 
         {messages.length === 0 ? (
