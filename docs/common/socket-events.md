@@ -116,6 +116,19 @@
 }
 ```
 
+### friendship_updated
+```json
+{
+  "userId": "userId",
+  "reason": "friend_request_accepted"
+}
+```
+
+규칙:
+- 친구 요청 생성/수락/거절/차단 시 양쪽 사용자 전용 room으로 전송
+- 프론트는 이 이벤트를 받으면 `fetchFriends()`와 `fetchNotifications()`를 다시 호출
+- 친구 목록/알림 허브를 새로고침 없이 맞추기 위한 동기화 이벤트
+
 ### error
 MVP2-A 1차 표준:
 
