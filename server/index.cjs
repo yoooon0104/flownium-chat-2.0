@@ -119,6 +119,12 @@ const emitNotificationRead = (userId, notification) => {
   });
 };
 
+// 친구 요청/수락/거절은 요청자와 대상자 화면이 동시에 바뀐다.
+// 세부 항목을 직접 patch하는 대신, 양쪽이 목록을 다시 읽도록 최소 이벤트만 보낸다.
+const emitFriendshipUpdated = (userId, payload = {}) => {
+  io.to(`user:${String(userId)}`).emit('friendship_updated', payload);
+};
+
 const addPresence = (roomId, userId, socketId) => {
   if (!roomPresence.has(roomId)) {
     roomPresence.set(roomId, new Map());
@@ -275,6 +281,7 @@ app.use(
     requireAuth,
     assertDbConnected,
     emitNotificationCreated,
+    emitFriendshipUpdated,
   })
 );
 
@@ -287,6 +294,7 @@ app.use(
     requireAuth,
     assertDbConnected,
     emitNotificationCreated,
+    emitFriendshipUpdated,
   })
 );
 
@@ -456,4 +464,9 @@ start().catch((error) => {
   console.error('Failed to start server:', error.message);
   process.exit(1);
 });
+
+
+
+
+
 
