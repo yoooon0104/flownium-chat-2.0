@@ -14,6 +14,7 @@ import FriendActionSheet from '../features/friends/components/FriendActionSheet'
 import { useFriends } from '../features/friends/hooks/useFriends'
 import ProfileModal from '../features/user/components/ProfileModal'
 import SettingsModal from '../features/user/components/SettingsModal'
+import SettingsScreen from '../features/user/components/SettingsScreen'
 import { useNotifications } from '../features/notifications/hooks/useNotifications'
 import NotificationsScreen from '../features/notifications/components/NotificationsScreen'
 import MobileBottomTabBar from '../features/navigation/components/MobileBottomTabBar'
@@ -64,6 +65,7 @@ function AppShell() {
   const [text, setText] = useState('')
   const [isMobileChatView, setIsMobileChatView] = useState(false)
   const [isMobileNotificationView, setIsMobileNotificationView] = useState(false)
+  const [isMobileSettingsView, setIsMobileSettingsView] = useState(false)
   const [activeTab, setActiveTab] = useState('friends')
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -158,6 +160,7 @@ function AppShell() {
     setText('')
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     setIsParticipantsMenuOpen(false)
     setIsNotificationMenuOpen(false)
     setIsCreateRoomModalOpen(false)
@@ -198,6 +201,7 @@ function AppShell() {
     setJoinedRoomId(nextRoomId)
     setIsMobileChatView(true)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     setIsParticipantsMenuOpen(false)
 
     // room_participants 이벤트가 뒤늦게 오더라도, 방 입장 직후 헤더와 참여자 목록이
@@ -322,6 +326,7 @@ function AppShell() {
 
     setIsCreateRoomModalOpen(false)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     void fetchNotifications()
     if (result.roomId) {
       emitJoinRoom(result.roomId)
@@ -338,6 +343,7 @@ function AppShell() {
     setActiveTab('rooms')
     setSelectedMobileFriend(null)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     void fetchNotifications()
     if (result.roomId) {
       emitJoinRoom(result.roomId)
@@ -429,8 +435,9 @@ function AppShell() {
   // 알림 화면이 열려 있으면 notifications를 우선으로 보고, 그 외에는 Friends/Rooms 탭 상태를 그대로 따른다.
   const mobileNavActiveItem = useMemo(() => {
     if (isMobileNotificationView) return 'notifications'
+    if (isMobileSettingsView) return 'settings'
     return activeTab === 'rooms' ? 'rooms' : 'friends'
-  }, [activeTab, isMobileNotificationView])
+  }, [activeTab, isMobileNotificationView, isMobileSettingsView])
 
   // 모바일 하단 탭은 단순 화면 전환만 담당한다.
   // 실제 데이터는 기존 Friends/Rooms/Notifications 화면이 그대로 사용하므로, 여기서는 관련 상태만 정리한다.
@@ -438,6 +445,7 @@ function AppShell() {
     setActiveTab('friends')
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     setIsNotificationMenuOpen(false)
   }, [])
 
@@ -445,21 +453,23 @@ function AppShell() {
     setActiveTab('rooms')
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     setIsNotificationMenuOpen(false)
   }, [])
 
   const handleSelectMobileNotifications = useCallback(() => {
     setIsMobileChatView(false)
     setIsMobileNotificationView(true)
+    setIsMobileSettingsView(false)
     setIsNotificationMenuOpen(false)
   }, [])
 
   const handleSelectMobileSettings = useCallback(() => {
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
+    setIsMobileSettingsView(true)
     setIsNotificationMenuOpen(false)
     setIsUserMenuOpen(false)
-    setIsSettingsModalOpen(true)
   }, [])
 
   const filteredFriends = useMemo(() => {
@@ -511,6 +521,7 @@ function AppShell() {
         <RoomPanel
           isMobileChatView={isMobileChatView}
           isMobileNotificationView={isMobileNotificationView}
+          isMobileSettingsView={isMobileSettingsView}
           isMobileViewport={isMobileViewport}
           activeTab={activeTab}
           onChangeTab={setActiveTab}
@@ -603,6 +614,14 @@ function AppShell() {
             onBack={() => setIsMobileNotificationView(false)}
           />
         )}
+
+        {isMobileSettingsView && (
+          <SettingsScreen
+            user={currentUser}
+            onSubmit={updateProfileNickname}
+            onBack={() => setIsMobileSettingsView(false)}
+          />
+        )}
       </section>
 
       {isMobileViewport && !isMobileChatView && (
@@ -648,7 +667,7 @@ function AppShell() {
       />
 
       <SettingsModal
-        isOpen={isSettingsModalOpen}
+        isOpen={isSettingsModalOpen && !isMobileViewport}
         user={currentUser}
         onClose={() => setIsSettingsModalOpen(false)}
         onSubmit={updateProfileNickname}

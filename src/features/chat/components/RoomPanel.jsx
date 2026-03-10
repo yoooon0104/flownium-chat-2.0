@@ -22,6 +22,7 @@ const getFriendSectionLabel = (friend) => {
 function RoomPanel({
   isMobileChatView,
   isMobileNotificationView,
+  isMobileSettingsView,
   isMobileViewport,
   activeTab,
   onChangeTab,
@@ -74,7 +75,7 @@ function RoomPanel({
   }, [filteredFriends])
 
   return (
-    <aside className={`room-panel ${isMobileChatView || isMobileNotificationView ? 'mobile-hidden' : ''}`}>
+    <aside className={`room-panel ${isMobileChatView || isMobileNotificationView || isMobileSettingsView ? 'mobile-hidden' : ''}`}>
       <div className="panel-profile-header">
         <button type="button" className="panel-profile" onClick={onOpenProfile}>
           <span className="panel-profile-avatar">
