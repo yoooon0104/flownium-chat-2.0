@@ -800,6 +800,7 @@
 }
 
 .message-list li.mine .bubble {
+  text-align: left;
   background: linear-gradient(92deg, #5b5cff 0%, #7a3cff 100%);
   border-color: rgba(91, 92, 255, 0.35);
   color: #f5f7ff;

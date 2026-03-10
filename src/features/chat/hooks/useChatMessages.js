@@ -1,4 +1,40 @@
-﻿import { useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
+
+const getMessageIdentity = (message) => {
+  if (message?.id) return `id:${message.id}`
+  if (message?.clientMessageId) return `client:${message.clientMessageId}`
+  return `ts:${message?.timestamp || ''}:${message?.senderId || ''}:${message?.text || ''}`
+}
+
+const sortMessagesByTimestamp = (messages) => {
+  return [...messages].sort((left, right) => {
+    return new Date(left?.timestamp || 0).getTime() - new Date(right?.timestamp || 0).getTime()
+  })
+}
+
+const mergeMessageLists = (historyMessages, currentMessages) => {
+  const mergedByIdentity = new Map()
+
+  historyMessages.forEach((message) => {
+    mergedByIdentity.set(getMessageIdentity(message), message)
+  })
+
+  currentMessages.forEach((message) => {
+    const identity = getMessageIdentity(message)
+    const existingMessage = mergedByIdentity.get(identity)
+    if (!existingMessage) {
+      mergedByIdentity.set(identity, message)
+      return
+    }
+
+    mergedByIdentity.set(identity, {
+      ...existingMessage,
+      ...message,
+    })
+  })
+
+  return sortMessagesByTimestamp([...mergedByIdentity.values()])
+}
 
 // 메시지 히스토리 조회와 실시간 목록 업데이트를 분리한다.
 export const useChatMessages = ({ chatApi }) => {
@@ -24,7 +60,13 @@ export const useChatMessages = ({ chatApi }) => {
       return
     }
 
-    setMessages(Array.isArray(body?.messages) ? body.messages : [])
+    setMessages((prev) => {
+      const historyMessages = Array.isArray(body?.messages) ? body.messages : []
+
+      // room 재입장/재연결 직후에는 히스토리 요청과 실시간 이벤트가 겹칠 수 있다.
+      // 이때 단순 replace를 하면 방금 도착한 메시지와 read-count 갱신이 사라질 수 있으므로 merge로 보존한다.
+      return mergeMessageLists(historyMessages, prev)
+    })
     setIsLoadingHistory(false)
   }, [chatApi])
 
@@ -77,4 +119,3 @@ export const useChatMessages = ({ chatApi }) => {
     clearMessages,
   }
 }
-
