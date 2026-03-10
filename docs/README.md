@@ -1,6 +1,6 @@
 ﻿# 문서 인덱스
 
-업데이트: 2026-03-09
+업데이트: 2026-03-10
 
 ## 문서 구조 원칙
 
@@ -17,9 +17,11 @@
 
 1. `docs/common/project-overview.md`
 2. `docs/common/wbs.md`
-3. `docs/operations/deploy-runbook.md`
-4. `docs/common/env-policy.md`
-5. `docs/common/api-spec.md`
+3. `docs/common/ui-plan.md`
+4. `docs/common/api-spec.md`
+5. `docs/common/socket-events.md`
+6. `docs/operations/deploy-runbook.md`
+7. `docs/common/env-policy.md`
 
 ## common
 

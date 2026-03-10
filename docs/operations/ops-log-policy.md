@@ -1,6 +1,6 @@
 ﻿# Ops Log Policy (운영 로그/장애 기준)
 
-업데이트: 2026-03-09
+업데이트: 2026-03-10
 
 ## 1) 목적
 
@@ -79,6 +79,10 @@
 2. OAuth 설정 불일치
 - 확인 로그: `error.code`, `status`, `message`
 - 대표 원인: Vercel/Render env 불일치, 카카오 콘솔 설정 누락
+
+3. 실시간 동기화 누락
+- 확인 로그: `scope=socket`, `event=receive_message|notification_created|friendship_updated`
+- 대표 원인: 프론트 소켓 리스너 누락, 현재 방/다른 방 분기 오류, 재조회 트리거 누락
 
 ## 7) Incident 기록 템플릿
 
