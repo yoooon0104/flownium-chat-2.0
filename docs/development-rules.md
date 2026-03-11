@@ -47,6 +47,7 @@ These rules apply to any contributor working on the codebase.
    - `docs/planning/object-spec.md`
    - `docs/common/wbs.md`
 3. If the project direction or milestone status changes, update overview and WBS documents together.
+4. If a task changes code, docs, validation status, or release readiness, add or update a task-specific worklog in `.codex/worklogs/` in the same task.
 
 ## 6. Encoding Rules
 
