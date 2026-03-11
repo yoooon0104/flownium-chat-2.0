@@ -54,14 +54,43 @@ const assertDbConnected = (res) => {
   return true;
 };
 
-const toRoomResponse = (roomDoc) => ({
-  id: String(roomDoc._id),
-  name: roomDoc.name,
-  isGroup: Boolean(roomDoc.isGroup),
-  memberIds: Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds : [],
-  lastMessage: roomDoc.lastMessage || '',
-  lastMessageAt: roomDoc.lastMessageAt ? new Date(roomDoc.lastMessageAt).toISOString() : null,
-});
+const isDeletedUser = (userDoc) => String(userDoc?.accountStatus || 'active') === 'deleted';
+
+const findDeletedMemberIds = async (memberIds) => {
+  const normalizedMemberIds = Array.isArray(memberIds)
+    ? memberIds.map((value) => String(value))
+    : [];
+
+  if (normalizedMemberIds.length === 0) {
+    return [];
+  }
+
+  const deletedUsers = await User.find({
+    _id: { $in: normalizedMemberIds },
+    accountStatus: 'deleted',
+  })
+    .select({ _id: 1 })
+    .lean();
+
+  return deletedUsers.map((user) => String(user._id));
+};
+
+const toRoomResponse = async (roomDoc) => {
+  const memberIds = Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
+  const deletedMemberIds = await findDeletedMemberIds(memberIds);
+
+  return {
+    id: String(roomDoc._id),
+    name: roomDoc.name,
+    isGroup: Boolean(roomDoc.isGroup),
+    memberIds,
+    lastMessage: roomDoc.lastMessage || '',
+    lastMessageAt: roomDoc.lastMessageAt ? new Date(roomDoc.lastMessageAt).toISOString() : null,
+    deletedMemberIds,
+    hasDeletedMember: deletedMemberIds.length > 0,
+    directChatDisabled: !roomDoc.isGroup && deletedMemberIds.length > 0,
+  };
+};
 
 const toNotificationResponse = (notificationDoc) => ({
   id: String(notificationDoc._id || notificationDoc.id),
@@ -77,7 +106,7 @@ const extractBearerToken = (req) => {
   return raw.replace(/^Bearer\s+/i, '').trim();
 };
 
-const requireAuth = (req, res, next) => {
+const requireAuth = async (req, res, next) => {
   try {
     const token = extractBearerToken(req);
     if (!token) {
@@ -90,7 +119,18 @@ const requireAuth = (req, res, next) => {
       return;
     }
 
-    req.user = verifyAccessToken(token, JWT_SECRET);
+    const auth = verifyAccessToken(token, JWT_SECRET);
+    const user = await User.findById(auth.userId).select({ _id: 1, nickname: 1, accountStatus: 1 }).lean();
+    if (!user || isDeletedUser(user)) {
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+      return;
+    }
+
+    req.user = {
+      ...auth,
+      userId: String(user._id),
+      nickname: user.nickname,
+    };
     next();
   } catch (_error) {
     sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
@@ -208,7 +248,7 @@ const buildRoomParticipants = async (roomId) => {
   const memberIds = Array.isArray(room.memberIds) ? room.memberIds : [];
   const objectIdMemberIds = memberIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
   const users = await User.find({ _id: { $in: objectIdMemberIds } })
-    .select({ _id: 1, nickname: 1 })
+    .select({ _id: 1, nickname: 1, accountStatus: 1 })
     .lean();
 
   const userById = new Map(users.map((u) => [String(u._id), u]));
@@ -216,11 +256,13 @@ const buildRoomParticipants = async (roomId) => {
 
   return memberIds.map((memberId) => {
     const found = userById.get(memberId);
-    const online = Boolean(onlineMap.get(memberId)?.size);
+    const deleted = isDeletedUser(found);
+    const online = deleted ? false : Boolean(onlineMap.get(memberId)?.size);
 
     return {
       userId: memberId,
       nickname: found?.nickname || memberId,
+      isDeleted: deleted,
       online,
     };
   });
@@ -289,7 +331,7 @@ const emitMessageUpdated = async (roomDoc, messageDoc) => {
   io.to(payload.chatRoomId).emit('message_updated', payload);
 };
 
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   try {
     const authToken = socket.handshake?.auth?.token || '';
     const bearerHeader = String(socket.handshake?.headers?.authorization || '');
@@ -303,7 +345,17 @@ io.use((socket, next) => {
       return next(new Error('server auth misconfigured'));
     }
 
-    socket.user = verifyAccessToken(token, JWT_SECRET);
+    const auth = verifyAccessToken(token, JWT_SECRET);
+    const user = await User.findById(auth.userId).select({ _id: 1, nickname: 1, accountStatus: 1 }).lean();
+    if (!user || isDeletedUser(user)) {
+      return next(new Error('unauthorized'));
+    }
+
+    socket.user = {
+      ...auth,
+      userId: String(user._id),
+      nickname: user.nickname,
+    };
     return next();
   } catch (_error) {
     return next(new Error('unauthorized'));
@@ -433,7 +485,7 @@ io.on('connection', (socket) => {
 
         socket.emit('room_joined', {
           roomId,
-          room: toRoomResponse(room),
+          room: await toRoomResponse(room),
           participants,
         });
 
@@ -491,6 +543,19 @@ io.on('connection', (socket) => {
           ok: false,
           code: 'FORBIDDEN',
           message: 'forbidden',
+          clientMessageId: clientMessageId || null,
+        });
+        return;
+      }
+
+      // 1:1 상대가 탈퇴한 방은 기록만 열람 가능하고 새 메시지는 막는다.
+      const deletedMemberIds = await findDeletedMemberIds(room.memberIds);
+      if (!room.isGroup && deletedMemberIds.some((memberId) => memberId !== socket.user.userId)) {
+        emitSocketError(socket, 'DELETED_MEMBER', '탈퇴한 회원입니다.');
+        reply({
+          ok: false,
+          code: 'DELETED_MEMBER',
+          message: '탈퇴한 회원입니다.',
           clientMessageId: clientMessageId || null,
         });
         return;

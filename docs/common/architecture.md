@@ -26,7 +26,7 @@
 
 3. `domain/`
 - `AuthSession`: 토큰 로드/저장/삭제
-- `UserProfile`: 사용자 정규화/표기 규칙 (`email`, `nickname`, `profileImage`)
+- `UserProfile`: 사용자 정규화/표기 규칙 (`email`, `nickname`, `profileImage`, `isDeleted`)
 
 4. `services/`
 - `api/authApi`, `api/chatApi`
@@ -64,12 +64,12 @@
 10. 메시지 목록은 `before` 커서 기반으로 이전 메시지 추가 로드
 11. 알림 허브/모바일 알림 화면에서 친구 요청과 초대 처리
 12. 설정 화면/모달에서 닉네임과 테마(light/dark/system) 변경
-13. 회원탈퇴 시 친구/방/알림/읽음 상태를 함께 정리하고 로그인 게이트로 복귀
+13. 회원탈퇴 시 사용자 문서를 tombstone 상태로 바꾸고 친구/방/알림/읽음 상태를 함께 정리한 뒤 로그인 게이트로 복귀
 
 ## 데이터 핵심 필드
 
-- `User`: `kakaoId`, `email`, `nickname`, `profileImage`, `refreshTokenHash`
-- `ChatRoom`: `name`, `memberIds`, `lastMessage`, `lastMessageAt`
+- `User`: `kakaoId`, `email`, `nickname`, `profileImage`, `accountStatus`, `deletedAt`, `refreshTokenHash`
+- `ChatRoom`: `name`, `memberIds`, `lastMessage`, `lastMessageAt`, `deletedMemberIds`(응답 가공 필드), `directChatDisabled`(응답 가공 필드)
 - `Message`: `chatRoomId`, `senderId`, `type`, `text`, `timestamp`
 - `Friendship`: `requesterId`, `addresseeId`, `pairKey`, `status`
 - `Notification`: `userId`, `type`, `payload`, `isRead`, `readAt`
@@ -93,6 +93,8 @@
   - 새 방 생성/초대/나가기 뒤 방 목록 메타 재조회 트리거
 - `room_deleted`
   - 삭제되거나 내가 떠난 방을 목록/상세에서 제거하는 트리거
+- `DELETED_MEMBER`
+  - direct 상대가 탈퇴한 방에서 메시지 전송을 막는 소켓 에러 코드
 
 ## 운영 보정 로직
 
@@ -107,3 +109,4 @@
 - presence는 메모리 기반(서버 재시작 시 초기화)
 - unread 감소/증가 흐름은 실제 친구 계정 2개 이상 기준 추가 검증 필요
 - 설정은 모바일 별도 화면 + 데스크톱 모달 구조이며 닉네임/테마 변경과 회원탈퇴를 지원
+- 탈퇴 회원 재로그인은 다시 signup flow를 거쳐 활성화되며, tombstone 기간 동안 accepted friendship과 direct room 맥락은 유지된다

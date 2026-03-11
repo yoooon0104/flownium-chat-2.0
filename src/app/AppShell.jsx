@@ -447,6 +447,11 @@ function AppShell() {
 
   const startDirectChat = useCallback(async (friend) => {
     if (!friend?.id) return
+    if (friend?.isDeleted) {
+      setErrorMessage('탈퇴한 회원입니다.')
+      setSelectedMobileFriend(null)
+      return
+    }
 
     const result = await createRoom({ memberUserIds: [friend.id] })
     if (!result.ok) return
@@ -459,7 +464,7 @@ function AppShell() {
     if (result.roomId) {
       emitJoinRoom(result.roomId)
     }
-  }, [createRoom, emitJoinRoom, fetchNotifications])
+  }, [createRoom, emitJoinRoom, fetchNotifications, setErrorMessage])
 
   const handleRequestFriend = useCallback(async (targetUserId) => {
     await requestFriend(targetUserId)
@@ -519,6 +524,10 @@ function AppShell() {
     return rooms.find((room) => room.id === joinedRoomId) || null
   }, [rooms, joinedRoomId])
 
+  const composerDisabledReason = activeRoom?.directChatDisabled
+    ? '탈퇴한 회원입니다.'
+    : ''
+
   const roomMemberCount = Array.isArray(activeRoom?.memberIds)
     ? activeRoom.memberIds.length
     : Array.isArray(participants)
@@ -528,7 +537,13 @@ function AppShell() {
   const optimisticUnreadCount = Math.max(roomMemberCount - 1, 0)
 
 
-  const canSend = Boolean(isConnected && joinedRoomId && !isLoadingHistory && text.trim().length > 0)
+  const canSend = Boolean(
+    isConnected &&
+    joinedRoomId &&
+    !isLoadingHistory &&
+    !activeRoom?.directChatDisabled &&
+    text.trim().length > 0
+  )
 
   const handleSendMessage = useCallback(async () => {
     const normalized = text.trim()
@@ -635,6 +650,7 @@ function AppShell() {
         nickname: item.counterpart.nickname || '',
         email: item.counterpart.email || '',
         profileImage: item.counterpart.profileImage || '',
+        isDeleted: item.counterpart.isDeleted === true,
       }))
       .sort((a, b) => {
         const left = `${a.nickname} ${a.email}`.trim()
@@ -659,14 +675,20 @@ function AppShell() {
         nickname: item.counterpart.nickname || '',
         email: item.counterpart.email || '',
         profileImage: item.counterpart.profileImage || '',
+        isDeleted: item.counterpart.isDeleted === true,
       }))
-      .filter((friend) => !currentMemberIds.has(friend.id))
+      .filter((friend) => !currentMemberIds.has(friend.id) && !friend.isDeleted)
       .sort((a, b) => {
         const left = `${a.nickname} ${a.email}`.trim()
         const right = `${b.nickname} ${b.email}`.trim()
         return left.localeCompare(right, 'ko')
       })
   }, [acceptedFriends, activeRoom?.memberIds])
+
+  const creatableFriends = useMemo(
+    () => filteredFriends.filter((friend) => !friend.isDeleted),
+    [filteredFriends]
+  )
 
   if (isInitializing) {
     return <LoginGate isLoading authError={error} onStartKakaoLogin={startKakaoLogin} />
@@ -770,7 +792,7 @@ function AppShell() {
             currentUserId: currentUser?.id || '',
             onOpenInvite: () => setIsInviteFriendsModalOpen(true),
             onLeaveRoom: () => void handleLeaveRoom(),
-            canInvite: inviteableFriends.length > 0,
+            canInvite: !activeRoom?.directChatDisabled && inviteableFriends.length > 0,
           }}
           errorMessage={errorMessage || friendErrorMessage || notificationErrorMessage}
           isLoadingHistory={isLoadingHistory}
@@ -787,6 +809,7 @@ function AppShell() {
           onComposerKeyUp={handleComposerKeyUp}
           onSendMessage={handleSendMessage}
           canSend={canSend}
+          composerDisabledReason={composerDisabledReason}
         />
 
         {isMobileNotificationView && (
@@ -825,12 +848,12 @@ function AppShell() {
           onSelectSettings={handleSelectMobileSettings}
         />
       )}
-      <CreateRoomModal
-        isOpen={isCreateRoomModalOpen}
-        friends={filteredFriends}
-        errorMessage={errorMessage}
-        onClose={() => setIsCreateRoomModalOpen(false)}
-        onSubmit={handleCreateRoomSubmit}
+        <CreateRoomModal
+          isOpen={isCreateRoomModalOpen}
+          friends={creatableFriends}
+          errorMessage={errorMessage}
+          onClose={() => setIsCreateRoomModalOpen(false)}
+          onSubmit={handleCreateRoomSubmit}
       />
 
       <InviteFriendsModal

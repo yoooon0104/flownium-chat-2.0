@@ -14,6 +14,8 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - `email: string` (선택)
 - `nickname: string` (필수)
 - `profileImage: string` (선택)
+- `accountStatus: 'active' | 'deleted'`
+- `deletedAt: date|null`
 - `refreshTokenHash: string` (선택)
 - `createdAt: date`
 - `updatedAt: date`
@@ -23,7 +25,8 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - 카카오 로그인 시 조회 후 없으면 생성
 - 카카오 응답 기준으로 `email`, `nickname`, `profileImage`를 동기화
 - `PATCH /auth/profile`로 닉네임 수정 가능
-- `DELETE /auth/account` 호출 시 사용자 문서를 삭제하고 관련 관계 데이터 정리를 시작
+- `DELETE /auth/account` 호출 시 사용자 문서를 tombstone 상태로 전환하고 관련 관계 데이터 정리를 시작
+- tombstone 사용자는 `signupCompletedAt`이 비워져 재로그인 시 다시 signup flow로 진입
 
 ### 검증 규칙
 
@@ -131,6 +134,9 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - `memberIds: string[]`
 - `lastMessage: string`
 - `lastMessageAt: date|null`
+- `deletedMemberIds?: string[]` (응답 가공 필드)
+- `hasDeletedMember?: boolean` (응답 가공 필드)
+- `directChatDisabled?: boolean` (응답 가공 필드)
 - `createdAt: date`
 - `updatedAt: date`
 
@@ -146,7 +152,8 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - 메시지 전송 시 `lastMessage`, `lastMessageAt` 갱신
 - 기존 1:1 방을 직접 그룹으로 변형하지 않고 새 그룹방 생성
 - 초대/나가기는 시스템 메시지로 기록되어 `lastMessage`, `lastMessageAt`를 함께 갱신
-- 회원탈퇴 시 direct 방은 삭제하고, group 방은 탈퇴 사용자를 `memberIds`에서 제거
+- 회원탈퇴 시 direct 방은 유지하고, group 방은 탈퇴 사용자를 `memberIds`에서 제거
+- direct 방에 탈퇴 회원이 남아 있으면 `directChatDisabled=true`로 내려 보내고 새 메시지 전송은 차단
 
 ### 검증 규칙
 
@@ -279,7 +286,7 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 
 - `accessToken: string`
 - `refreshToken: string`
-- `user: { id, email, nickname, profileImage }`
+- `user: { id, email, nickname, profileImage, isDeleted }`
 - `pendingSignup`
 
 ### 생성/갱신 규칙

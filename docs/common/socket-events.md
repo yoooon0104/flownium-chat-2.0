@@ -34,6 +34,7 @@
 
 동작:
 - 메시지 DB 저장
+- direct 방에 탈퇴 회원이 남아 있으면 전송을 막고 `DELETED_MEMBER` 에러를 반환
 - 방의 `lastMessage`, `lastMessageAt` 갱신
 - `receive_message` 브로드캐스트
 - ack 응답으로 전송 성공/실패를 호출자에게 즉시 반환
@@ -69,7 +70,10 @@ ack 실패:
     "isGroup": true,
     "memberIds": ["u1", "u2"],
     "lastMessage": "",
-    "lastMessageAt": null
+    "lastMessageAt": null,
+    "deletedMemberIds": [],
+    "hasDeletedMember": false,
+    "directChatDisabled": false
   }
 }
 ```
@@ -79,8 +83,8 @@ ack 실패:
 {
   "roomId": "chatroomObjectId",
   "participants": [
-    { "userId": "u1", "nickname": "alice", "online": true },
-    { "userId": "u2", "nickname": "bob", "online": false }
+    { "userId": "u1", "nickname": "alice", "isDeleted": false, "online": true },
+    { "userId": "u2", "nickname": "bob", "isDeleted": true, "online": false }
   ]
 }
 ```
@@ -216,4 +220,4 @@ MVP2-A 1차 표준:
 ```
 
 - `details`는 선택 필드입니다.
-- 주요 코드: `INVALID_REQUEST`, `DB_NOT_CONNECTED`, `ROOM_NOT_FOUND`, `FORBIDDEN`, `ROOM_JOIN_FAILED`, `MESSAGE_PROCESS_FAILED`
+- 주요 코드: `INVALID_REQUEST`, `DB_NOT_CONNECTED`, `ROOM_NOT_FOUND`, `FORBIDDEN`, `ROOM_JOIN_FAILED`, `MESSAGE_PROCESS_FAILED`, `DELETED_MEMBER`

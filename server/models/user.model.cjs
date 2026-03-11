@@ -50,6 +50,17 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // 탈퇴 회원은 문서를 지우지 않고 tombstone 상태로 남겨 기존 친구/채팅 맥락을 유지한다.
+    accountStatus: {
+      type: String,
+      enum: ['active', 'deleted'],
+      default: 'active',
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
     // refresh token 원문 대신 해시를 저장해 토큰 탈취 위험을 낮춘다.
     refreshTokenHash: {
       type: String,

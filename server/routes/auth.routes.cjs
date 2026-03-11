@@ -38,6 +38,27 @@ const createAuthRouter = ({
     return raw.replace(/^Bearer\s+/i, '').trim();
   };
 
+  const isDeletedUser = (userDoc) => String(userDoc?.accountStatus || 'active') === 'deleted';
+
+  const findDeletedMemberIds = async (memberIds) => {
+    const normalizedMemberIds = Array.isArray(memberIds)
+      ? memberIds.map((value) => String(value))
+      : [];
+
+    if (normalizedMemberIds.length === 0) {
+      return [];
+    }
+
+    const deletedUsers = await User.find({
+      _id: { $in: normalizedMemberIds },
+      accountStatus: 'deleted',
+    })
+      .select({ _id: 1 })
+      .lean();
+
+    return deletedUsers.map((user) => String(user._id));
+  };
+
   // DB 사용자 문서를 클라이언트 응답 포맷으로 변환한다.
   const toClientUser = (userDoc) => ({
     id: String(userDoc._id),
@@ -45,6 +66,7 @@ const createAuthRouter = ({
     email: userDoc.email || '',
     nickname: userDoc.nickname,
     profileImage: userDoc.profileImage || '',
+    isDeleted: isDeletedUser(userDoc),
   });
 
   // 로그인 성공 공통 응답: 토큰 발급/해시 저장을 한곳에서 처리한다.
@@ -61,15 +83,23 @@ const createAuthRouter = ({
     });
   };
 
-  const toRoomResponse = (roomDoc) => ({
-    id: String(roomDoc._id),
-    name: roomDoc.name,
-    isGroup: Boolean(roomDoc.isGroup),
-    memberIds: Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [],
-    lastMessage: roomDoc.lastMessage || '',
-    lastMessageAt: roomDoc.lastMessageAt ? new Date(roomDoc.lastMessageAt).toISOString() : null,
-    unreadCount: 0,
-  });
+  const toRoomResponse = async (roomDoc) => {
+    const memberIds = Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
+    const deletedMemberIds = await findDeletedMemberIds(memberIds);
+
+    return {
+      id: String(roomDoc._id),
+      name: roomDoc.name,
+      isGroup: Boolean(roomDoc.isGroup),
+      memberIds,
+      lastMessage: roomDoc.lastMessage || '',
+      lastMessageAt: roomDoc.lastMessageAt ? new Date(roomDoc.lastMessageAt).toISOString() : null,
+      unreadCount: 0,
+      deletedMemberIds,
+      hasDeletedMember: deletedMemberIds.length > 0,
+      directChatDisabled: !roomDoc.isGroup && deletedMemberIds.length > 0,
+    };
+  };
 
   const deleteRoomResources = async (roomId) => {
     await Promise.all([
@@ -82,6 +112,7 @@ const createAuthRouter = ({
   // 회원탈퇴 시 남는 찌꺼기를 줄이기 위해, 친구/방/알림의 관련 사용자에게 즉시 재조회 신호를 보낸다.
   const cleanupUserAccount = async (userDoc) => {
     const userId = String(userDoc._id);
+    const now = new Date();
     const rooms = await ChatRoom.find({ memberIds: userId });
     const friendships = await Friendship.find({
       $or: [{ requesterId: userId }, { addresseeId: userId }],
@@ -102,11 +133,16 @@ const createAuthRouter = ({
         : [];
 
       if (!room.isGroup) {
+        await disconnectUserFromRoom?.(roomId, userId);
+        await ChatReadState.deleteOne({ roomId, userId });
+
+        const nextRoomPayload = await toRoomResponse(room);
         await Promise.all(
-          currentMemberIds.map((memberId) => disconnectUserFromRoom?.(roomId, memberId))
+          currentMemberIds
+            .filter((memberId) => memberId !== userId)
+            .map((memberId) => emitRoomUpdated?.(memberId, nextRoomPayload))
         );
-        await deleteRoomResources(roomId);
-        currentMemberIds.forEach((memberId) => emitRoomDeleted?.(memberId, roomId));
+        await emitRoomParticipants?.(roomId);
         continue;
       }
 
@@ -125,7 +161,7 @@ const createAuthRouter = ({
       await room.save();
 
       await Promise.all(
-        nextMemberIds.map((memberId) => emitRoomUpdated?.(memberId, toRoomResponse(room)))
+        nextMemberIds.map(async (memberId) => emitRoomUpdated?.(memberId, await toRoomResponse(room)))
       );
       emitRoomDeleted?.(userId, roomId);
       await emitRoomParticipants?.(roomId);
@@ -133,6 +169,7 @@ const createAuthRouter = ({
 
     await Promise.all([
       Friendship.deleteMany({
+        status: { $ne: 'accepted' },
         $or: [{ requesterId: userId }, { addresseeId: userId }],
       }),
       Notification.deleteMany({
@@ -143,7 +180,20 @@ const createAuthRouter = ({
         ],
       }),
       ChatReadState.deleteMany({ userId }),
-      User.deleteOne({ _id: userId }),
+      User.updateOne(
+        { _id: userId },
+        {
+          $set: {
+            accountStatus: 'deleted',
+            deletedAt: now,
+            email: '',
+            profileImage: '',
+            refreshTokenHash: null,
+            signupCompletedAt: null,
+            agreedToTermsAt: null,
+          },
+        }
+      ),
     ]);
 
     relatedFriendUserIds.forEach((targetUserId) => {
@@ -189,7 +239,7 @@ const createAuthRouter = ({
       const existingUser = await User.findOne({ kakaoId: kakaoUser.kakaoId });
 
       // 가입이 완료된 사용자는 즉시 로그인 처리하고 최신 로그인 시점만 갱신한다.
-      if (existingUser && existingUser.signupCompletedAt) {
+      if (existingUser && existingUser.signupCompletedAt && !isDeletedUser(existingUser)) {
         existingUser.lastLoginAt = new Date();
         existingUser.email = kakaoUser.email || existingUser.email || '';
         // 1차 정책: 프로필 이미지는 카카오 원본을 우선 반영한다.
@@ -265,6 +315,8 @@ const createAuthRouter = ({
             signupCompletedAt: now,
             agreedToTermsAt: now,
             nicknameUpdatedAt: now,
+            accountStatus: 'active',
+            deletedAt: null,
           },
         },
         {
@@ -302,7 +354,7 @@ const createAuthRouter = ({
     try {
       const { userId } = verifyRefreshToken(refreshToken, config.JWT_REFRESH_SECRET);
       const refreshTokenHash = hashToken(refreshToken);
-      const user = await User.findOne({ _id: userId, refreshTokenHash });
+      const user = await User.findOne({ _id: userId, refreshTokenHash, accountStatus: { $ne: 'deleted' } });
 
       if (!user) {
         sendError(res, 401, 'INVALID_REFRESH_TOKEN', 'refresh token is not recognized');
@@ -331,7 +383,7 @@ const createAuthRouter = ({
       const auth = verifyAccessToken(accessToken, config.JWT_SECRET);
       const user = await User.findById(auth.userId);
 
-      if (!user) {
+      if (!user || isDeletedUser(user)) {
         sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
         return;
       }
@@ -359,7 +411,7 @@ const createAuthRouter = ({
       const nickname = validateNickname(req.body?.nickname);
 
       const user = await User.findById(auth.userId);
-      if (!user) {
+      if (!user || isDeletedUser(user)) {
         sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
         return;
       }
@@ -396,7 +448,7 @@ const createAuthRouter = ({
       const auth = verifyAccessToken(accessToken, config.JWT_SECRET);
       const user = await User.findById(auth.userId);
 
-      if (!user) {
+      if (!user || isDeletedUser(user)) {
         sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
         return;
       }

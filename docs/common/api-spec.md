@@ -40,7 +40,8 @@ MVP2-A 1차 표준:
     "kakaoId": "kakaoId",
     "email": "user@example.com",
     "nickname": "닉네임",
-    "profileImage": ""
+    "profileImage": "",
+    "isDeleted": false
   },
   "accessToken": "jwt",
   "refreshToken": "jwt"
@@ -114,7 +115,8 @@ MVP2-A 1차 표준:
     "kakaoId": "kakaoId",
     "email": "user@example.com",
     "nickname": "닉네임",
-    "profileImage": ""
+    "profileImage": "",
+    "isDeleted": false
   }
 }
 ```
@@ -143,7 +145,8 @@ MVP2-A 1차 표준:
     "kakaoId": "kakaoId",
     "email": "user@example.com",
     "nickname": "새닉네임",
-    "profileImage": ""
+    "profileImage": "",
+    "isDeleted": false
   }
 }
 ```
@@ -158,10 +161,11 @@ MVP2-A 1차 표준:
 - 현재 인증 사용자를 탈퇴 처리
 - 헤더: `Authorization: Bearer <accessToken>`
 - 처리 범위:
-  - 사용자 문서 삭제
-  - 친구 관계 삭제
+  - 사용자 문서는 tombstone(`accountStatus=deleted`) 상태로 유지
+  - accepted 친구 관계는 tombstone 표시용으로 유지
+  - pending/rejected/blocked 친구 관계 삭제
   - 내 알림/읽음 상태 삭제
-  - 내가 참여 중인 direct 방 삭제
+  - 내가 참여 중인 direct 방은 유지하고 상대방 쪽에서 tombstone 상태로 표시
   - 내가 참여 중인 group 방에서 멤버 제거
   - 내가 마지막 멤버인 group 방은 삭제
 
@@ -186,6 +190,7 @@ MVP2-A 1차 표준:
 ### GET /api/friends/search?keyword=
 - 이메일/닉네임 기준 사용자 검색
 - 자기 자신 제외
+- 탈퇴 회원은 검색 결과에서 제외
 - 검색 결과에 현재 친구 상태 포함
 
 응답 예시:
@@ -198,7 +203,8 @@ MVP2-A 1차 표준:
         "id": "userId",
         "email": "friend@example.com",
         "nickname": "kim",
-        "profileImage": ""
+        "profileImage": "",
+        "isDeleted": false
       },
       "friendship": {
         "id": "friendshipId",
@@ -221,6 +227,7 @@ MVP2-A 1차 표준:
   - `accepted`
   - `pendingReceived`
   - `pendingSent`
+- `accepted[].counterpart.isDeleted === true` 인 경우 tombstone 친구 항목으로 렌더링
 
 대표 오류:
 - `500 FRIEND_LIST_FAILED`
@@ -337,6 +344,7 @@ MVP2-A 1차 표준:
 - 요청 payload의 중복 `userIds`는 서버에서 dedupe
 - direct(`isGroup=false`) 방이면 기존 방을 유지하고 새 다인방을 생성
 - group(`isGroup=true`) 방이면 기존 방 `memberIds`에 즉시 멤버 추가
+- direct 방에 탈퇴 회원이 남아 있으면 초대 확장 불가
 - 자동 생성형 그룹명은 초대 후 현재 멤버 기준으로 다시 계산
 - 멤버 변경 시 시스템 메시지와 `lastMessage`, `lastMessageAt` 갱신
 
@@ -357,7 +365,10 @@ MVP2-A 1차 표준:
     "memberIds": ["u1", "u2", "u3"],
     "lastMessage": "alice님이 charlie님을 초대했습니다.",
     "lastMessageAt": "2026-03-10T12:00:00.000Z",
-    "unreadCount": 0
+    "unreadCount": 0,
+    "deletedMemberIds": [],
+    "hasDeletedMember": false,
+    "directChatDisabled": false
   },
   "createdNewRoom": true
 }
@@ -370,6 +381,7 @@ MVP2-A 1차 표준:
 - `404 ROOM_NOT_FOUND`
 - `404 USER_NOT_FOUND`
 - `409 ALREADY_IN_ROOM`
+- `409 DELETED_MEMBER`
 - `500 CHATROOM_INVITE_FAILED`
 - `503 DB_NOT_CONNECTED`
 
@@ -397,7 +409,10 @@ MVP2-A 1차 표준:
     "memberIds": ["u2", "u3"],
     "lastMessage": "alice님이 나갔습니다.",
     "lastMessageAt": "2026-03-10T12:05:00.000Z",
-    "unreadCount": 0
+    "unreadCount": 0,
+    "deletedMemberIds": [],
+    "hasDeletedMember": false,
+    "directChatDisabled": false
   },
   "deleted": false
 }
@@ -414,6 +429,7 @@ MVP2-A 1차 표준:
 - 현재 사용자가 참여 중인 방 목록 조회
 - 정렬: `lastMessageAt desc` -> `createdAt desc`
 - 응답에 방별 `unreadCount`, 전체 `totalUnreadCount` 포함
+- direct 방에 탈퇴 회원이 남아 있으면 `deletedMemberIds`, `hasDeletedMember`, `directChatDisabled`가 함께 내려온다
 
 응답 예시:
 ```json
@@ -426,7 +442,10 @@ MVP2-A 1차 표준:
       "memberIds": ["u1", "u2"],
       "lastMessage": "안녕하세요",
       "lastMessageAt": "2026-03-09T12:00:00.000Z",
-      "unreadCount": 3
+      "unreadCount": 3,
+      "deletedMemberIds": ["u2"],
+      "hasDeletedMember": true,
+      "directChatDisabled": true
     }
   ],
   "totalUnreadCount": 5

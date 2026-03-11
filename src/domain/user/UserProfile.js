@@ -8,6 +8,7 @@ export const UserProfile = {
       email: String(safe.email || '').trim().toLowerCase(),
       nickname: String(safe.nickname || '').trim(),
       profileImage: String(safe.profileImage || '').trim(),
+      isDeleted: safe.isDeleted === true,
     }
   },
 

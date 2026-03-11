@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import ParticipantsMenu from './ParticipantsMenu'
 
-// 채팅 본문 패널: 헤더/메시지/입력창을 조합하고 모바일 뒤로가기를 처리한다.
-// 상단으로 스크롤하면 이전 메시지를 추가 조회하고, 기존 스크롤 위치는 유지한다.
+// 채팅 본문 패널은 히스토리, 참여자 메뉴, 입력창을 한곳에서 조합한다.
+// direct 상대가 탈퇴한 경우에도 기록은 보여주되 입력만 막아 tombstone UX를 유지한다.
 function ChatPanel({
   isMobileChatView,
   activeRoom,
@@ -24,6 +24,7 @@ function ChatPanel({
   onComposerKeyUp,
   onSendMessage,
   canSend,
+  composerDisabledReason,
 }) {
   const historyViewportRef = useRef(null)
   const restoreScrollRef = useRef(null)
@@ -62,7 +63,7 @@ function ChatPanel({
             {activeRoom?.name || '채팅방을 선택해 주세요'}
           </h3>
           <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
-            {joinedRoomId ? `방 ID: ${joinedRoomId}` : '좌측 패널에서 채팅방을 선택하면 대화를 시작할 수 있다.'}
+            {joinedRoomId ? `방 ID: ${joinedRoomId}` : '좌측 패널에서 채팅방을 선택하면 대화를 시작할 수 있습니다.'}
           </p>
         </div>
 
@@ -134,13 +135,16 @@ function ChatPanel({
       </div>
 
       <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4 md:px-5">
+        {composerDisabledReason && (
+          <p className="col-span-2 text-sm font-medium text-[var(--text-secondary)]">{composerDisabledReason}</p>
+        )}
         <input
           className="h-12 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] px-4 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-brand-primary/40 focus:bg-[var(--panel-bg)]"
           value={text}
           onChange={(event) => onTextChange(event.target.value)}
           onKeyUp={onComposerKeyUp}
-          placeholder={joinedRoomId ? '메시지를 입력해 주세요' : '먼저 채팅방에 입장해 주세요'}
-          disabled={!joinedRoomId}
+          placeholder={composerDisabledReason || (joinedRoomId ? '메시지를 입력해 주세요.' : '먼저 채팅방에 입장해 주세요.')}
+          disabled={!joinedRoomId || Boolean(composerDisabledReason)}
         />
         <button
           type="button"
