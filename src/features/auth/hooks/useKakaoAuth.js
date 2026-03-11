@@ -121,6 +121,37 @@ export const useKakaoAuth = (apiBaseUrl) => {
     throw new Error(resolveErrorMessage(first.body, '프로필 업데이트에 실패했습니다.'))
   }, [accessToken, authApi, refreshAccessToken])
 
+  const deleteAccount = useCallback(async () => {
+    const currentToken = AuthSession.load().accessToken || accessToken
+    if (!currentToken) {
+      throw new Error('로그인이 필요합니다.')
+    }
+
+    const first = await authApi.deleteAccount(currentToken)
+    if (first.ok) {
+      clearSession('')
+      return true
+    }
+
+    if (first.status === 401) {
+      const refreshed = await refreshAccessToken()
+      if (!refreshed) {
+        throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.')
+      }
+
+      const retriedToken = AuthSession.load().accessToken
+      const retried = await authApi.deleteAccount(retriedToken)
+      if (retried.ok) {
+        clearSession('')
+        return true
+      }
+
+      throw new Error(resolveErrorMessage(retried.body, '회원탈퇴 처리에 실패했습니다.'))
+    }
+
+    throw new Error(resolveErrorMessage(first.body, '회원탈퇴 처리에 실패했습니다.'))
+  }, [accessToken, authApi, clearSession, refreshAccessToken])
+
   const startKakaoLogin = useCallback(() => {
     if (!kakaoAuthorizeUrl) {
       setError('카카오 로그인 설정이 비어 있습니다. VITE_KAKAO_* 값을 확인하세요.')
@@ -236,6 +267,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     refreshAccessToken,
     completeSignup,
     updateProfileNickname,
+    deleteAccount,
     clearSession,
   }
 }

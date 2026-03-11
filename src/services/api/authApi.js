@@ -57,11 +57,23 @@ export const createAuthApi = (apiBaseUrl) => {
     return { ok: response.ok, status: response.status, body }
   }
 
+  const deleteAccount = async (accessToken) => {
+    const response = await fetch(`${apiBaseUrl}/auth/account`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
   return {
     getKakaoCallback,
     refresh,
     completeSignup,
     getMe,
     updateProfile,
+    deleteAccount,
   }
 }

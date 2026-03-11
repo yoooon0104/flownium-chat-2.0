@@ -321,7 +321,17 @@ app.use(
   '/auth',
   createAuthRouter({
     User,
+    Friendship,
+    ChatRoom,
+    Message,
+    ChatReadState,
+    Notification,
     assertDbConnected,
+    disconnectUserFromRoom,
+    emitFriendshipUpdated,
+    emitRoomUpdated,
+    emitRoomDeleted,
+    emitRoomParticipants,
     config: {
       JWT_SECRET,
       JWT_REFRESH_SECRET,

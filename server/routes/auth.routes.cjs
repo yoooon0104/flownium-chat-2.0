@@ -15,7 +15,22 @@ const {
 const { sendError } = require('../utils/error-response.cjs');
 
 // 인증 관련 라우터를 의존성 주입 방식으로 생성한다.
-const createAuthRouter = ({ User, assertDbConnected, config, logger = console }) => {
+const createAuthRouter = ({
+  User,
+  Friendship,
+  ChatRoom,
+  Message,
+  ChatReadState,
+  Notification,
+  assertDbConnected,
+  disconnectUserFromRoom,
+  emitFriendshipUpdated,
+  emitRoomUpdated,
+  emitRoomDeleted,
+  emitRoomParticipants,
+  config,
+  logger = console,
+}) => {
   const router = express.Router();
 
   const extractBearerToken = (req) => {
@@ -43,6 +58,99 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
       user: toClientUser(user),
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+    });
+  };
+
+  const toRoomResponse = (roomDoc) => ({
+    id: String(roomDoc._id),
+    name: roomDoc.name,
+    isGroup: Boolean(roomDoc.isGroup),
+    memberIds: Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [],
+    lastMessage: roomDoc.lastMessage || '',
+    lastMessageAt: roomDoc.lastMessageAt ? new Date(roomDoc.lastMessageAt).toISOString() : null,
+    unreadCount: 0,
+  });
+
+  const deleteRoomResources = async (roomId) => {
+    await Promise.all([
+      Message.deleteMany({ chatRoomId: String(roomId) }),
+      ChatReadState.deleteMany({ roomId: String(roomId) }),
+      ChatRoom.deleteOne({ _id: roomId }),
+    ]);
+  };
+
+  // 회원탈퇴 시 남는 찌꺼기를 줄이기 위해, 친구/방/알림의 관련 사용자에게 즉시 재조회 신호를 보낸다.
+  const cleanupUserAccount = async (userDoc) => {
+    const userId = String(userDoc._id);
+    const rooms = await ChatRoom.find({ memberIds: userId });
+    const friendships = await Friendship.find({
+      $or: [{ requesterId: userId }, { addresseeId: userId }],
+    }).lean();
+
+    const relatedFriendUserIds = [
+      ...new Set(
+        friendships
+          .flatMap((friendship) => [String(friendship.requesterId), String(friendship.addresseeId)])
+          .filter((targetUserId) => targetUserId && targetUserId !== userId)
+      ),
+    ];
+
+    for (const room of rooms) {
+      const roomId = String(room._id);
+      const currentMemberIds = Array.isArray(room.memberIds)
+        ? room.memberIds.map((memberId) => String(memberId))
+        : [];
+
+      if (!room.isGroup) {
+        await Promise.all(
+          currentMemberIds.map((memberId) => disconnectUserFromRoom?.(roomId, memberId))
+        );
+        await deleteRoomResources(roomId);
+        currentMemberIds.forEach((memberId) => emitRoomDeleted?.(memberId, roomId));
+        continue;
+      }
+
+      const nextMemberIds = currentMemberIds.filter((memberId) => memberId !== userId);
+      await disconnectUserFromRoom?.(roomId, userId);
+      await ChatReadState.deleteOne({ roomId, userId });
+
+      if (nextMemberIds.length === 0) {
+        await deleteRoomResources(roomId);
+        currentMemberIds.forEach((memberId) => emitRoomDeleted?.(memberId, roomId));
+        continue;
+      }
+
+      room.memberIds = nextMemberIds;
+      room.isGroup = true;
+      await room.save();
+
+      await Promise.all(
+        nextMemberIds.map((memberId) => emitRoomUpdated?.(memberId, toRoomResponse(room)))
+      );
+      emitRoomDeleted?.(userId, roomId);
+      await emitRoomParticipants?.(roomId);
+    }
+
+    await Promise.all([
+      Friendship.deleteMany({
+        $or: [{ requesterId: userId }, { addresseeId: userId }],
+      }),
+      Notification.deleteMany({
+        $or: [
+          { userId },
+          { 'payload.requester.userId': userId },
+          { 'payload.inviter.userId': userId },
+        ],
+      }),
+      ChatReadState.deleteMany({ userId }),
+      User.deleteOne({ _id: userId }),
+    ]);
+
+    relatedFriendUserIds.forEach((targetUserId) => {
+      emitFriendshipUpdated?.(targetUserId, {
+        type: 'account_deleted',
+        userId,
+      });
     });
   };
 
@@ -269,6 +377,46 @@ const createAuthRouter = ({ User, assertDbConnected, config, logger = console })
       }
 
       sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+    }
+  });
+
+  // 회원탈퇴는 사용자 문서뿐 아니라 친구/채팅/알림 데이터도 함께 정리한다.
+  router.delete('/account', async (req, res) => {
+    const accessToken = extractBearerToken(req);
+    if (!accessToken) {
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+      return;
+    }
+
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const auth = verifyAccessToken(accessToken, config.JWT_SECRET);
+      const user = await User.findById(auth.userId);
+
+      if (!user) {
+        sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
+        return;
+      }
+
+      await cleanupUserAccount(user);
+
+      res.status(200).json({
+        deleted: true,
+        userId: String(user._id),
+      });
+    } catch (error) {
+      if (error?.name === 'JsonWebTokenError' || error?.name === 'TokenExpiredError') {
+        sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+        return;
+      }
+
+      logger.error('[auth:delete/account] failed', {
+        message: error.message,
+      });
+      sendError(res, 500, 'ACCOUNT_DELETE_FAILED', 'failed to delete account');
     }
   });
 
