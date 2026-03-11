@@ -41,12 +41,12 @@ Follow-up:
 
 - Required:
   - use `validate.md`
+  - use `worklog-update.md` if code, docs, validation status, or handoff context changed
 - Conditional:
   - use `docs-sync.md` if contracts, screens, architecture, or object meaning changed
   - use `realtime-verify.md` if the feature affects unread, notifications, presence, direct room reuse, group room flow, or socket behavior
 - Optional:
   - use `deliver.md` for final reporting
-  - use `worklog-update.md` if the branch may be handed off or the task history should be preserved
 
 Output format:
 
