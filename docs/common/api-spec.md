@@ -417,7 +417,7 @@ MVP2-A 1차 표준:
 - 현재 사용자가 해당 방 멤버여야 함
 - 쿼리:
   - `limit` (기본 50, 최대 100)
-  - `before` (선택, ISO datetime, 이 시각보다 오래된 메시지 페이지 조회)
+  - `before` (선택, `timestamp|messageId` 형식 커서, 이 커서보다 오래된 메시지 페이지 조회)
 - 각 메시지 응답에 메시지별 `unreadCount` 포함
 - `type`은 `text | system`
 
@@ -427,7 +427,7 @@ MVP2-A 1차 표준:
   "roomId": "chatroomId",
   "count": 2,
   "hasMore": true,
-  "nextCursor": "2026-03-09T11:50:00.000Z",
+  "nextCursor": "2026-03-09T11:50:00.000Z|65ec3c1f9c0a1b2c3d4e5f67",
   "messages": [
     {
       "id": "messageId",

@@ -22,6 +22,28 @@ const createChatroomRouter = ({
 }) => {
   const router = express.Router();
 
+  const encodeMessageCursor = (messageDoc) => {
+    if (!messageDoc?.timestamp || !messageDoc?._id) return null;
+    return `${new Date(messageDoc.timestamp).toISOString()}|${String(messageDoc._id)}`;
+  };
+
+  const decodeMessageCursor = (value) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return null;
+
+    const separatorIndex = normalized.lastIndexOf('|');
+    if (separatorIndex <= 0 || separatorIndex === normalized.length - 1) return null;
+
+    const timestamp = new Date(normalized.slice(0, separatorIndex));
+    const messageId = normalized.slice(separatorIndex + 1).trim();
+    if (Number.isNaN(timestamp.getTime()) || !messageId) return null;
+
+    return {
+      timestamp,
+      messageId,
+    };
+  };
+
   const normalizeUserIds = (values) =>
     [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean))];
 
@@ -570,15 +592,15 @@ const createChatroomRouter = ({
     const roomId = String(req.params.id || '').trim();
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
     const beforeRaw = String(req.query.before || '').trim();
-    const beforeDate = beforeRaw ? new Date(beforeRaw) : null;
+    const beforeCursor = beforeRaw ? decodeMessageCursor(beforeRaw) : null;
 
     if (!roomId) {
       sendError(res, 400, 'INVALID_REQUEST', 'roomId is required');
       return;
     }
 
-    if (beforeRaw && (!beforeDate || Number.isNaN(beforeDate.getTime()))) {
-      sendError(res, 400, 'INVALID_REQUEST', 'before must be a valid datetime');
+    if (beforeRaw && !beforeCursor) {
+      sendError(res, 400, 'INVALID_REQUEST', 'before must be a valid cursor');
       return;
     }
 
@@ -599,12 +621,15 @@ const createChatroomRouter = ({
       }
 
       const messageQuery = { chatRoomId: roomId };
-      if (beforeDate) {
-        messageQuery.timestamp = { $lt: beforeDate };
+      if (beforeCursor) {
+        messageQuery.$or = [
+          { timestamp: { $lt: beforeCursor.timestamp } },
+          { timestamp: beforeCursor.timestamp, _id: { $lt: beforeCursor.messageId } },
+        ];
       }
 
       const messages = await Message.find(messageQuery)
-        .sort({ timestamp: -1 })
+        .sort({ timestamp: -1, _id: -1 })
         .limit(limit + 1)
         .lean();
 
@@ -626,7 +651,7 @@ const createChatroomRouter = ({
         count: messageResponses.length,
         messages: messageResponses,
         hasMore,
-        nextCursor: oldestMessage?.timestamp ? new Date(oldestMessage.timestamp).toISOString() : null,
+        nextCursor: encodeMessageCursor(oldestMessage),
       });
     } catch (_error) {
       sendError(res, 500, 'MESSAGE_FETCH_FAILED', 'failed to fetch messages');
