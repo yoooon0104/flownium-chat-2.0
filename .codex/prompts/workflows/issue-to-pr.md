@@ -94,6 +94,7 @@ Prepare:
 - validation
 - branch / commit status
 - PR or compare link status
+- issue closure line (`Closes #<issue-number>` when applicable)
 
 Only if the user explicitly asks:
 
@@ -101,6 +102,11 @@ Only if the user explicitly asks:
 2. commit
 3. push
 4. create PR
+
+If a PR is created for a tracked issue:
+
+1. include a closing keyword such as `Closes #123` in the PR body
+2. verify the issue number is correct before creating the PR
 
 ## Follow-up
 

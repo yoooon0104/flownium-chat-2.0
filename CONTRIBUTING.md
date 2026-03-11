@@ -30,6 +30,7 @@ This document defines the collaboration workflow for the Flownium Chat project.
 4. No unrelated files are mixed into the branch.
 5. Validation results are recorded in the PR summary.
 6. A task-specific worklog under `.codex/worklogs/` is added or updated when the task changed code, docs, validation status, or release readiness.
+7. If the PR resolves a GitHub Issue, include a closing keyword such as `Closes #123` in the PR body.
 
 ## 4. PR Summary Format
 
@@ -58,6 +59,9 @@ Branch / Commit
 
 PR  
 - <pull request url or compare url>
+
+Issue Closure  
+- <`Closes #123` or `None`>
 
 ## 5. Merge and Incident Rules
 
