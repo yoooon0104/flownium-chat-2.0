@@ -63,6 +63,7 @@ function AppShell() {
     refreshAccessToken,
     completeSignup,
     updateProfileNickname,
+    deleteAccount,
     clearSession,
   } = useKakaoAuth(API_BASE_URL)
 
@@ -465,6 +466,12 @@ function AppShell() {
     void fetchNotifications()
   }, [fetchNotifications, requestFriend])
 
+  const handleDeleteAccount = useCallback(async () => {
+    await deleteAccount()
+    disconnectSocket()
+    handleLogout()
+  }, [deleteAccount, disconnectSocket, handleLogout])
+
   const handleRespondFriendRequest = useCallback(async (requestId, action) => {
     await respondToFriendRequest(requestId, action)
     void fetchNotifications()
@@ -801,6 +808,7 @@ function AppShell() {
             themePreference={themePreference}
             onChangeTheme={handleChangeTheme}
             onSubmit={updateProfileNickname}
+            onDeleteAccount={handleDeleteAccount}
             onBack={() => setIsMobileSettingsView(false)}
           />
         )}
@@ -864,6 +872,7 @@ function AppShell() {
         onChangeTheme={handleChangeTheme}
         onClose={() => setIsSettingsModalOpen(false)}
         onSubmit={updateProfileNickname}
+        onDeleteAccount={handleDeleteAccount}
       />
     </main>
   )

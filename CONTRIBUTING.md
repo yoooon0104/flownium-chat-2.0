@@ -29,6 +29,7 @@ This document defines the collaboration workflow for the Flownium Chat project.
 3. Korean comments and documents are saved in UTF-8.
 4. No unrelated files are mixed into the branch.
 5. Validation results are recorded in the PR summary.
+6. A task-specific worklog under `.codex/worklogs/` is added or updated when the task changed code, docs, validation status, or release readiness.
 
 ## 4. PR Summary Format
 

@@ -154,6 +154,31 @@ MVP2-A 1차 표준:
 - `404 USER_NOT_FOUND`
 - `503 DB_NOT_CONNECTED`
 
+### DELETE /auth/account
+- 현재 인증 사용자를 탈퇴 처리
+- 헤더: `Authorization: Bearer <accessToken>`
+- 처리 범위:
+  - 사용자 문서 삭제
+  - 친구 관계 삭제
+  - 내 알림/읽음 상태 삭제
+  - 내가 참여 중인 direct 방 삭제
+  - 내가 참여 중인 group 방에서 멤버 제거
+  - 내가 마지막 멤버인 group 방은 삭제
+
+응답:
+```json
+{
+  "deleted": true,
+  "userId": "userId"
+}
+```
+
+대표 오류:
+- `401 UNAUTHORIZED`
+- `404 USER_NOT_FOUND`
+- `500 ACCOUNT_DELETE_FAILED`
+- `503 DB_NOT_CONNECTED`
+
 ## 친구
 
 모든 친구/알림/채팅방 API는 `Authorization: Bearer <accessToken>` 헤더가 필요합니다.

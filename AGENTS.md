@@ -47,6 +47,7 @@ Agents must review `docs/development-rules.md` before changing code, documentati
 1. Share PR information only after commit and push are both complete.
 2. Reports must include changed files, summary, validation, branch/commit, and PR or compare link.
 3. If something failed or was not applied, state that first and clearly.
+4. When a task changes code, docs, validation status, or release readiness, update a task-specific worklog under `.codex/worklogs/` in the same task.
 
 ## 5. Validation Baseline
 
