@@ -4,7 +4,7 @@
 
 ## 시스템 구조
 
-클라이언트(React + Vite)
+클라이언트(React + Vite + Tailwind CSS)
 -> `AppShell` (조립 전용)
 -> `features/*` hooks/components
 -> `services/*` (REST/Socket)
@@ -18,11 +18,11 @@
 
 2. `features/`
 - `auth`: `LoginGate`, `SignupOnboarding`, `useKakaoAuth`
-- `chat`: `RoomPanel`, `ChatPanel`, `CreateRoomModal`, `useChatRooms`, `useChatMessages`, `useChatSocket`
+- `chat`: `RoomPanel`, `ChatPanel`, `CreateRoomModal`, `InviteFriendsModal`, `ParticipantsMenu`, `useChatRooms`, `useChatMessages`, `useChatSocket`
 - `friends`: `AddFriendModal`, `FriendActionSheet`, `useFriends`
 - `notifications`: `NotificationMenu`, `NotificationsScreen`, `useNotifications`
 - `navigation`: `MobileBottomTabBar`
-- `user`: `UserMenu`, `ProfileModal`, `SettingsModal`
+- `user`: `UserMenu`, `ProfileModal`, `SettingsModal`, `SettingsScreen`
 
 3. `domain/`
 - `AuthSession`: 토큰 로드/저장/삭제
@@ -32,11 +32,18 @@
 - `api/authApi`, `api/chatApi`
 - `socket/chatSocketClient`
 
+## 테마 / 스타일 구조
+
+- Tailwind CSS가 전역에 연결되어 있으며 `src/index.css`에서 `@tailwind base/components/utilities`를 로드한다.
+- `tailwind.config.js`에는 브랜드 컬러와 `Sora` 폰트가 등록되어 있다.
+- 전역 CSS 변수는 `data-resolved-theme="light|dark"` 기준으로 light/dark 값을 분기한다.
+- `AppShell`은 `themePreference`(`light | dark | system`)를 localStorage에 저장하고 시스템 다크모드와 동기화한다.
+
 ## 백엔드 구조
 
 - `server/index.cjs`: 서버 엔트리 + 소켓 이벤트
 - `routes/auth.routes.cjs`: 카카오/온보딩/refresh/me/profile
-- `routes/chatroom.routes.cjs`: 채팅방 생성/초대/나가기/메시지/read 상태 REST
+- `routes/chatroom.routes.cjs`: 채팅방 생성/초대/나가기/메시지/read 상태 REST + 커서 기반 메시지 페이지네이션
 - `routes/friend.routes.cjs`: 친구 검색/요청/수락/거절/차단
 - `routes/notification.routes.cjs`: 알림 목록/읽음 처리
 - `services/auth.service.cjs`: JWT/해시/signup 토큰 검증
@@ -54,7 +61,9 @@
 7. 채팅방 조회/입장/메시지 송수신
 8. `room_participants`로 전체 멤버 + 온라인 상태 표시
 9. 채팅 상세에서 친구 초대/나가기 처리
-10. 알림 허브/모바일 알림 화면에서 친구 요청과 초대 처리
+10. 메시지 목록은 `before` 커서 기반으로 이전 메시지 추가 로드
+11. 알림 허브/모바일 알림 화면에서 친구 요청과 초대 처리
+12. 설정 화면/모달에서 닉네임과 테마(light/dark/system) 변경
 
 ## 데이터 핵심 필드
 
@@ -71,6 +80,8 @@
 - `receive_message`
   - 현재 방이면 본문 즉시 반영
   - 다른 방이면 방 목록/unread 재조회 트리거
+- `message_updated`
+  - 읽음 처리 후 기존 메시지의 unread count를 같은 `id` 기준으로 merge
 - `notification_created`, `notification_read`
   - 알림 허브/모바일 알림 화면 재조회 트리거
 - `friendship_updated`
@@ -93,5 +104,5 @@
 - 관리자/초대/강퇴 정책 미구현
 - 초대 승인 절차/강퇴 정책은 아직 없음(친구 검증 후 즉시 반영)
 - presence는 메모리 기반(서버 재시작 시 초기화)
-- unread 감소/증가 흐름은 실제 친구 계정 2개 기준 추가 검증 필요
-- 설정은 모바일 별도 화면 + 데스크톱 모달 구조
+- unread 감소/증가 흐름은 실제 친구 계정 2개 이상 기준 추가 검증 필요
+- 설정은 모바일 별도 화면 + 데스크톱 모달 구조이며 닉네임/테마 설정만 지원

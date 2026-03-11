@@ -99,7 +99,7 @@ ack 실패:
     "name": "프로젝트 회의방",
     "isGroup": true,
     "memberIds": ["u1", "u2", "u3"],
-    "lastMessage": "alice님이 bob님을 초대했습니다.",
+    "lastMessage": "alice님이 bob를 초대했습니다.",
     "lastMessageAt": "2026-03-10T12:00:00.000Z"
   }
 }

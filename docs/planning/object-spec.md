@@ -22,7 +22,7 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 
 - 카카오 로그인 시 조회 후 없으면 생성
 - 카카오 응답 기준으로 `email`, `nickname`, `profileImage`를 동기화
-- `PATCH /auth/profile`로 닉네임/프로필 이미지 수정 가능
+- `PATCH /auth/profile`로 닉네임 수정 가능
 
 ### 검증 규칙
 
@@ -135,14 +135,20 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - 1명 선택 시 기존 2인 방이 있으면 재사용
 - 없으면 새 2인 방 생성
 - 2명 이상 선택 시 그룹방 생성
+- 기존 1:1 방에 친구를 초대하면 기존 방은 유지하고 새 다인방 생성
+- 기존 그룹방에 친구를 초대하면 현재 방 `memberIds`에 즉시 반영
+- direct(`isGroup=false`) 방은 한 명이라도 나가면 삭제
+- group(`isGroup=true`) 방은 멤버가 0명이 될 때만 삭제
 - 메시지 전송 시 `lastMessage`, `lastMessageAt` 갱신
 - 기존 1:1 방을 직접 그룹으로 변형하지 않고 새 그룹방 생성
+- 초대/나가기는 시스템 메시지로 기록되어 `lastMessage`, `lastMessageAt`를 함께 갱신
 
 ### 검증 규칙
 
 - `memberIds` 중복 방지
 - 방 생성 시 현재 사용자 포함
 - 친구 기반 생성 정책은 서버에서 한 번 더 검증
+- 그룹방 초대 시 이미 멤버인 사용자는 `ALREADY_IN_ROOM`
 
 ### 인덱스/성능
 
@@ -154,11 +160,15 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 
 - `GET /api/chatrooms`
 - `POST /api/chatrooms`
+- `POST /api/chatrooms/:id/invite`
+- `POST /api/chatrooms/:id/leave`
 - `GET /api/chatrooms/:id/messages`
 - `PATCH /api/chatrooms/:id/read`
 - `join_room`
 - `room_joined`
 - `room_participants`
+- `room_updated`
+- `room_deleted`
 
 ## 5) Message
 
@@ -178,8 +188,10 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 ### 생성/갱신 규칙
 
 - `send_message` 시 생성
+- 초대/나가기 시 `type: 'system'` 메시지 생성
 - 실시간 수신 payload에 `unreadCount` 포함 가능
 - optimistic UI에서는 `clientMessageId`로 임시 메시지를 실제 메시지로 치환
+- 읽음 처리 후 `message_updated` 이벤트로 기존 메시지의 `unreadCount`만 갱신 가능
 
 ### 검증 규칙
 
@@ -196,6 +208,7 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - `GET /api/chatrooms/:id/messages`
 - `send_message`
 - `receive_message`
+- `message_updated`
 
 ## 6) ChatReadState
 
@@ -213,6 +226,7 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - 방 진입 후 히스토리 로드가 끝나면 읽음 처리
 - 현재 방에서 상대 메시지를 받으면 즉시 읽음 처리
 - 다른 방 메시지는 unread 증가만 하고 읽음 처리하지 않음
+- 초대받아 새로 들어온 사용자는 초대 직전 `lastMessageAt` 기준으로 초기 read state를 seed할 수 있음
 
 ### 검증 규칙
 
