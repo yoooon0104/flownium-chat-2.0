@@ -8,6 +8,7 @@
 - Pushes are not allowed unless the user explicitly asks for them.
 - PR creation is not allowed unless the user explicitly asks for it.
 - GitHub Issue creation is not allowed unless the user explicitly asks for it.
+- Merge is never allowed unless the user explicitly asks for it.
 - Validation is required after the fix.
 
 This workflow is for taking a review finding and turning it into a minimal verified fix.
@@ -15,6 +16,7 @@ This workflow is for taking a review finding and turning it into a minimal verif
 ## Step 1: Review Finding Intake
 
 Input:
+
 - one or more review findings
 
 Tasks:
@@ -66,9 +68,11 @@ Output:
 Run the narrowest useful validation.
 
 Typical checks:
+
 - `npm run build`
 - `node --check server/index.cjs`
 - narrower route or model checks if that is the touched surface
+- realtime verification planning if the fix affects unread, notification, or socket flow
 
 Output:
 
@@ -83,6 +87,18 @@ Output:
 
 Only if the user explicitly asks:
 
-1. commit
-2. push
-3. create PR summary or PR
+1. update worklog
+2. commit
+3. push
+4. create PR summary or PR
+
+## Follow-up
+
+- Required:
+  - use `validate.md`
+- Conditional:
+  - use `docs-sync.md` if the fix changed documented behavior or contracts
+  - use `realtime-verify.md` if the fix affects realtime behavior
+- Optional:
+  - use `deliver.md`
+  - use `worklog-update.md`

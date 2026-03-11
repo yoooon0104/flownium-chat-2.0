@@ -1,102 +1,114 @@
-﻿# Workflow: Issue -> Implementation -> PR
+# Workflow: Issue -> PR
 
 ## Permission Scope
 
 - Code changes are allowed.
-- Documentation changes are allowed when they are required to keep the repository synchronized with the implementation.
-- Commits are allowed when the workflow reaches a completed implementation state.
-- Pushes are allowed only when the user explicitly asks for them.
-- PR creation is allowed only when the user explicitly asks for it.
+- Documentation changes are allowed when directly required by the implemented issue.
+- Commits are not allowed unless the user explicitly asks for them.
+- Pushes are not allowed unless the user explicitly asks for them.
+- PR creation is not allowed unless the user explicitly asks for it.
 - GitHub Issue creation is not allowed unless the user explicitly asks for it.
-- Validation is required before completion.
+- Merge is never allowed unless the user explicitly asks for it.
+- Validation is required after implementation.
 
-This workflow describes how an AI agent should convert a GitHub Issue into an implementation pull request.
+This workflow is for taking a concrete issue from implementation through validation and PR-ready reporting.
 
-## Step 1: Issue Analysis
+## Step 1: Issue Intake
 
 Input:
-- GitHub Issue
+
+- issue body
+- acceptance criteria
+- referenced files or failing behavior
 
 Tasks:
 
-1. Read the issue description.
-2. Identify related components.
-3. Identify affected files.
-4. Identify risks.
-5. Generate an implementation plan.
+1. Restate the target behavior.
+2. Identify non-goals and guardrails.
+3. Identify likely code, docs, and validation scope.
 
 Output:
 
-- problem summary
-- implementation plan
-- affected files
+- clarified issue scope
+- acceptance criteria
+- likely touched areas
 
 ---
 
-## Step 2: Implementation
+## Step 2: Minimal Implementation Plan
 
-Follow rules in:
+Tasks:
 
-- `AGENTS.md`
-- `docs/development-rules.md`
+1. Identify the related files.
+2. Propose the smallest implementation path.
+3. Identify required documentation updates if any.
 
-Implementation rules:
+Output:
 
-- make minimal changes
-- avoid unrelated refactors
-- maintain API compatibility unless the issue explicitly requires a contract change
+- affected files
+- affected docs
+- minimal plan
 
-After coding run:
+---
+
+## Step 3: Implementation
+
+Rules:
+
+1. Make minimal changes.
+2. Avoid unrelated refactors.
+3. Keep implementation and documentation synchronized when behavior contracts change.
+
+Output:
+
+- changed files
+- implementation summary
+
+---
+
+## Step 4: Validation
+
+Run the narrowest useful validation.
+
+Typical checks:
 
 - `npm run build`
-
-Server validation when needed:
-
 - `node --check server/index.cjs`
+- narrower checks for touched backend files
+- realtime verification planning if the change affects unread, notifications, or presence
+
+Output:
+
+- validation results
+- remaining risks
 
 ---
 
-## Step 3: Code Review
+## Step 5: Delivery
 
-Run an internal review using:
+Prepare:
 
-- `.codex/prompts/review.md`
+- changed files
+- summary
+- impact
+- validation
+- branch / commit status
+- PR or compare link status
 
-Check for:
+Only if the user explicitly asks:
 
-- regressions
-- logic errors
-- API compatibility issues
-- missing documentation updates
+1. update worklog
+2. commit
+3. push
+4. create PR
 
----
+## Follow-up
 
-## Step 4: PR Creation
-
-Create a PR summary using this format:
-
-Title
-<feature or fix title>
-
-Summary
-<problem description>
-
-Changed Files
-- <file path>
-
-What’s Included
-- <implementation details>
-
-Impact
-- <affected components>
-
-Validation
-- <lint/build/test results>
-
-Branch / Commit
-- Branch: <branch-name>
-- Commit: <commit-sha>
-- Push: <remote status>
-
-PR
-- <pull request url or compare url>
+- Required:
+  - use `validate.md`
+- Conditional:
+  - use `docs-sync.md` if the issue implementation changed contracts, screens, architecture, or object meaning
+  - use `realtime-verify.md` if the issue implementation affects realtime behavior
+- Optional:
+  - use `deliver.md`
+  - use `worklog-update.md`

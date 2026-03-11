@@ -8,6 +8,7 @@
 - Pushes are not allowed.
 - PR creation is not allowed.
 - GitHub Issue creation is allowed only when the user explicitly asks for it.
+- Merge is never allowed.
 - Review findings and issue drafts only.
 
 This workflow is for converting code review findings into issue candidates or issue drafts.
@@ -15,6 +16,7 @@ This workflow is for converting code review findings into issue candidates or is
 ## Step 1: Review Intake
 
 Input:
+
 - review findings
 - diff, branch, PR, or changed files
 
@@ -65,6 +67,8 @@ Acceptance criteria
 
 Suggested fix direction
 
+Suggested validation
+
 Priority
 
 ---
@@ -79,3 +83,13 @@ Only if the user explicitly asks:
 If the user did not explicitly ask:
 
 - stop at issue drafts
+
+## Follow-up
+
+- Required:
+  - none
+- Conditional:
+  - use `workflows/issue-to-pr.md` if an approved issue should move into implementation
+- Optional:
+  - use `deliver.md`
+  - use `worklog-update.md`
