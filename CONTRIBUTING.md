@@ -31,6 +31,7 @@ This document defines the collaboration workflow for the Flownium Chat project.
 5. Validation results are recorded in the PR summary.
 6. A task-specific worklog under `.codex/worklogs/` is added or updated when the task changed code, docs, validation status, or release readiness.
 7. If the PR resolves a GitHub Issue, include a closing keyword such as `Closes #123` in the PR body.
+8. If GitHub CLI is installed but `gh` is not available on PATH, use `C:\Program Files\GitHub CLI\gh.exe`.
 
 ## 4. PR Summary Format
 
