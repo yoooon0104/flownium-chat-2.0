@@ -51,7 +51,8 @@ function ParticipantsMenu({
                 return (
                   <li key={participant.userId} className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]">
                     <span className="min-w-0 truncate">{participant.nickname}{isMe ? ' (나)' : ''}</span>
-                    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${participant.online ? 'border-brand-accent/30 bg-brand-accent/10 text-brand-accent' : 'border-[var(--border-soft)] bg-[var(--surface-elevated)] text-[var(--text-secondary)]'}`}>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${participant.online ? 'border-brand-primary/15 bg-brand-primary/8 text-[var(--text-primary)]' : 'border-[var(--border-soft)]/60 bg-[color-mix(in_srgb,var(--surface-elevated)_72%,transparent)] text-[color:color-mix(in_srgb,var(--text-secondary)_72%,transparent)]'}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${participant.online ? 'bg-brand-primary/70' : 'bg-[color:color-mix(in_srgb,var(--text-tertiary)_55%,transparent)]'}`} />
                       {participant.online ? 'online' : 'offline'}
                     </span>
                   </li>
@@ -63,7 +64,7 @@ function ParticipantsMenu({
           <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--border-soft)] pt-3">
             <button
               type="button"
-              className="h-10 rounded-2xl border border-brand-primary/25 bg-[var(--cta-bg)] text-xs font-semibold text-[var(--cta-text)] shadow-[var(--shadow-glow)] transition hover:brightness-105 disabled:border-[var(--border-soft)] disabled:bg-[var(--surface-muted)] disabled:text-[var(--text-secondary)] disabled:shadow-none"
+              className="cta-button h-10 rounded-2xl border text-xs font-semibold shadow-[var(--shadow-glow)] transition"
               onClick={onOpenInvite}
               disabled={!joinedRoomId || !canInvite}
             >
@@ -71,7 +72,18 @@ function ParticipantsMenu({
             </button>
             <button
               type="button"
-              className="h-10 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-xs font-semibold text-rose-300 transition hover:border-rose-300/40 hover:bg-rose-400/10 disabled:text-[var(--text-secondary)]"
+              className="h-10 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] disabled:text-[var(--text-secondary)]"
+              onClick={() => onToggle(false)}
+              disabled={!joinedRoomId}
+            >
+              취소
+            </button>
+          </div>
+
+          <div className="mt-2 border-t border-[var(--border-soft)] pt-3">
+            <button
+              type="button"
+              className="h-10 w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-xs font-semibold text-rose-300 transition hover:border-rose-300/40 hover:bg-rose-400/10 disabled:text-[var(--text-secondary)]"
               onClick={onLeaveRoom}
               disabled={!joinedRoomId}
             >

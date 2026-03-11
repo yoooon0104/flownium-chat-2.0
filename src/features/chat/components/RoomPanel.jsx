@@ -94,7 +94,7 @@ function RoomPanel({
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-brand-primary/25 bg-[var(--cta-bg)] text-xl font-bold leading-none text-[var(--cta-text)] shadow-[var(--shadow-glow)] transition hover:brightness-105"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-brand-primary/20 bg-[var(--surface-elevated)] text-xl font-bold leading-none text-brand-primary shadow-[0_10px_22px_rgba(91,92,255,0.12)] transition hover:border-brand-primary/35 hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,var(--surface-elevated))] hover:text-brand-primary"
             aria-label="친구 추가"
             onClick={onOpenAddFriend}
           >
@@ -239,7 +239,7 @@ function RoomPanel({
 
       <button
         type="button"
-        className="absolute bottom-4 right-4 inline-flex h-14 w-14 items-center justify-center rounded-full border border-brand-primary/25 bg-[var(--cta-bg)] text-[30px] font-semibold leading-none text-[var(--cta-text)] shadow-[var(--shadow-glow)] transition hover:scale-[1.02] hover:brightness-105"
+        className="cta-button absolute bottom-4 right-4 inline-flex h-14 w-14 items-center justify-center rounded-full border text-[30px] font-semibold leading-none shadow-[var(--shadow-glow)] transition hover:scale-[1.02]"
         aria-label="새 채팅 만들기"
         onClick={onOpenCreateRoom}
       >
