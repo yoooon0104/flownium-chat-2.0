@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import '../App.css'
 import LoginGate from '../features/auth/components/LoginGate'
 import SignupOnboarding from '../features/auth/components/SignupOnboarding'
@@ -124,8 +124,10 @@ function AppShell() {
     isLoadingHistory,
     isLoadingOlderHistory,
     hasMoreHistory,
+    hasLoadedInitialHistory,
     historyError,
     lastMessageMutation,
+    prepareMessageHistory,
     loadMessageHistory,
     loadOlderMessageHistory,
     appendMessage,
@@ -171,6 +173,7 @@ function AppShell() {
     notificationsLoading,
     notificationErrorMessage,
     fetchNotifications,
+    markNotificationRead,
     markAllNotificationsRead,
     clearNotifications,
   } = useNotifications({ chatApi })
@@ -222,6 +225,7 @@ function AppShell() {
   // 이 순서를 지켜야 새로 입장한 방의 unread 배지가 바로 정리된다.
   const handleSocketRoomJoined = useCallback((nextRoomId, payload) => {
     shouldScrollToBottomRef.current = true
+    prepareMessageHistory()
     setJoinedRoomId(nextRoomId)
     setIsMobileChatView(true)
     setIsMobileNotificationView(false)
@@ -236,7 +240,7 @@ function AppShell() {
       await loadMessageHistory(nextRoomId)
       await markRoomRead(nextRoomId)
     })()
-  }, [loadMessageHistory, markRoomRead])
+  }, [loadMessageHistory, markRoomRead, prepareMessageHistory])
 
   // 실시간 메시지 수신 분기:
   // - 현재 열려 있는 방이면 본문에 바로 append
@@ -339,7 +343,7 @@ function AppShell() {
 
   const previousRoomIdRef = useRef('')
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!messagesEndRef.current || isLoadingHistory || isLoadingOlderHistory) return
 
     const roomChanged = shouldScrollToBottomRef.current || previousRoomIdRef.current !== joinedRoomId
@@ -413,11 +417,17 @@ function AppShell() {
   const joinRoom = useCallback((roomId) => {
     if (!roomId) return
 
+    shouldScrollToBottomRef.current = true
+    prepareMessageHistory()
+    setJoinedRoomId(roomId)
+    setIsMobileChatView(true)
+    setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
     setErrorMessage('')
     setParticipants([])
     setIsParticipantsMenuOpen(false)
     emitJoinRoom(roomId)
-  }, [emitJoinRoom, setErrorMessage])
+  }, [emitJoinRoom, prepareMessageHistory, setErrorMessage])
 
 
   const handleCreateRoomSubmit = useCallback(async (payload) => {
@@ -459,6 +469,18 @@ function AppShell() {
     await respondToFriendRequest(requestId, action)
     void fetchNotifications()
   }, [fetchNotifications, respondToFriendRequest])
+
+  const handleOpenRoomInvite = useCallback(async (notification) => {
+    const roomId = String(notification?.payload?.roomId || '').trim()
+    if (!roomId) return
+
+    await markNotificationRead(notification.id)
+    setActiveTab('rooms')
+    setIsNotificationMenuOpen(false)
+    setIsMobileNotificationView(false)
+    setIsMobileSettingsView(false)
+    emitJoinRoom(roomId)
+  }, [emitJoinRoom, markNotificationRead])
 
   const handleInviteFriends = useCallback(async (userIds) => {
     if (!joinedRoomId) return { ok: false }
@@ -705,6 +727,7 @@ function AppShell() {
           pendingSent={pendingSent}
           notificationErrorMessage={notificationErrorMessage}
           onRespondFriendRequest={handleRespondFriendRequest}
+          onOpenRoomInvite={handleOpenRoomInvite}
           isUserMenuOpen={isUserMenuOpen}
           onToggleUserMenu={setIsUserMenuOpen}
           onOpenProfile={() => {
@@ -746,6 +769,7 @@ function AppShell() {
           isLoadingHistory={isLoadingHistory}
           isLoadingOlderHistory={isLoadingOlderHistory}
           hasMoreHistory={hasMoreHistory}
+          hasLoadedInitialHistory={hasLoadedInitialHistory}
           historyError={historyError}
           messages={messages}
           currentUserId={currentUser?.id || ''}
@@ -766,6 +790,7 @@ function AppShell() {
             pendingReceived={pendingReceived}
             notificationErrorMessage={notificationErrorMessage}
             onRespondFriendRequest={handleRespondFriendRequest}
+            onOpenRoomInvite={handleOpenRoomInvite}
             onBack={() => setIsMobileNotificationView(false)}
           />
         )}

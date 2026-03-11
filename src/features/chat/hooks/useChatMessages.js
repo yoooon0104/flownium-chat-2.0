@@ -42,16 +42,26 @@ export const useChatMessages = ({ chatApi }) => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [isLoadingOlderHistory, setIsLoadingOlderHistory] = useState(false)
   const [hasMoreHistory, setHasMoreHistory] = useState(false)
+  const [hasLoadedInitialHistory, setHasLoadedInitialHistory] = useState(false)
   const [historyCursor, setHistoryCursor] = useState('')
   const [historyError, setHistoryError] = useState('')
   const [lastMessageMutation, setLastMessageMutation] = useState('')
 
+  const prepareMessageHistory = useCallback(() => {
+    setMessages([])
+    setIsLoadingHistory(true)
+    setIsLoadingOlderHistory(false)
+    setHasMoreHistory(false)
+    setHasLoadedInitialHistory(false)
+    setHistoryCursor('')
+    setHistoryError('')
+    setLastMessageMutation('')
+  }, [])
+
   const loadMessageHistory = useCallback(async (roomId) => {
     if (!chatApi || !roomId) return
 
-    setIsLoadingHistory(true)
-    setHistoryError('')
-    setMessages([])
+    prepareMessageHistory()
 
     const { ok, status, body } = await chatApi.getRoomMessages(roomId, { limit: 50 })
     if (!ok) {
@@ -63,6 +73,7 @@ export const useChatMessages = ({ chatApi }) => {
       setHasMoreHistory(false)
       setHistoryCursor('')
       setIsLoadingHistory(false)
+      setHasLoadedInitialHistory(true)
       return
     }
 
@@ -77,7 +88,8 @@ export const useChatMessages = ({ chatApi }) => {
     })
     setLastMessageMutation('history')
     setIsLoadingHistory(false)
-  }, [chatApi])
+    setHasLoadedInitialHistory(true)
+  }, [chatApi, prepareMessageHistory])
 
   const loadOlderMessageHistory = useCallback(async (roomId) => {
     if (!chatApi || !roomId || !historyCursor || isLoadingHistory || isLoadingOlderHistory || !hasMoreHistory) return
@@ -151,6 +163,7 @@ export const useChatMessages = ({ chatApi }) => {
     setIsLoadingHistory(false)
     setIsLoadingOlderHistory(false)
     setHasMoreHistory(false)
+    setHasLoadedInitialHistory(false)
     setHistoryCursor('')
     setLastMessageMutation('')
   }, [])
@@ -160,8 +173,10 @@ export const useChatMessages = ({ chatApi }) => {
     isLoadingHistory,
     isLoadingOlderHistory,
     hasMoreHistory,
+    hasLoadedInitialHistory,
     historyError,
     lastMessageMutation,
+    prepareMessageHistory,
     setHistoryError,
     loadMessageHistory,
     loadOlderMessageHistory,
