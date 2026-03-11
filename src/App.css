@@ -279,6 +279,25 @@
   color: var(--brand-text);
 }
 
+.cta-button {
+  border-color: color-mix(in srgb, var(--brand-primary) 32%, var(--border-soft));
+  background-color: color-mix(in srgb, var(--brand-primary) 12%, var(--surface-elevated));
+  background-image: var(--cta-bg);
+  color: var(--cta-text);
+}
+
+.cta-button:hover {
+  filter: brightness(1.05);
+}
+
+.cta-button:disabled {
+  border-color: var(--border-soft);
+  background-color: var(--surface-muted);
+  background-image: none;
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+
 .single-column-actions {
   grid-template-columns: 1fr;
 }
