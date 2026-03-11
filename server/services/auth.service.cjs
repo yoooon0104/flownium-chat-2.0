@@ -6,6 +6,58 @@ const hashToken = (token) => {
   return crypto.createHash('sha256').update(String(token)).digest('hex');
 };
 
+const normalizeEmail = (rawEmail) => {
+  return String(rawEmail || '').trim().toLowerCase();
+};
+
+const generateVerificationCode = () => {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+};
+
+const hashSecret = async (secret) => {
+  const normalizedSecret = String(secret || '');
+  const salt = crypto.randomBytes(16).toString('hex');
+
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(normalizedSecret, salt, 64, (error, derivedKey) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(`${salt}:${derivedKey.toString('hex')}`);
+    });
+  });
+};
+
+const verifySecret = async (secret, hashedSecret) => {
+  const normalizedSecret = String(secret || '');
+  const [salt, storedHash] = String(hashedSecret || '').split(':');
+
+  if (!salt || !storedHash) {
+    return false;
+  }
+
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(normalizedSecret, salt, 64, (error, derivedKey) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      const storedBuffer = Buffer.from(storedHash, 'hex');
+      const derivedBuffer = Buffer.from(derivedKey);
+
+      if (storedBuffer.length !== derivedBuffer.length) {
+        resolve(false);
+        return;
+      }
+
+      resolve(crypto.timingSafeEqual(storedBuffer, derivedBuffer));
+    });
+  });
+};
+
 // 사용자 문서를 바탕으로 access/refresh JWT를 동시에 발급한다.
 const issueJwtTokens = (userDoc, config) => {
   const {
@@ -51,12 +103,17 @@ const issueSignupToken = (payload, config) => {
     throw new Error('JWT signup secret is not configured');
   }
 
+  const provider = String(payload.provider || 'kakao').trim().toLowerCase();
+  const providerUserId = String(payload.providerUserId || payload.kakaoId || '').trim();
+
   return jwt.sign(
     {
       tokenType: 'signup',
-      kakaoId: String(payload.kakaoId || '').trim(),
+      provider,
+      providerUserId,
       profileImage: String(payload.profileImage || '').trim(),
       kakaoNickname: String(payload.kakaoNickname || '').trim(),
+      email: normalizeEmail(payload.email),
     },
     JWT_SIGNUP_SECRET,
     { expiresIn: SIGNUP_TOKEN_EXPIRES_IN }
@@ -93,18 +150,40 @@ const verifyRefreshToken = (token, refreshSecret) => {
 // signup 토큰은 tokenType=signup인지 추가 검증한다.
 const verifySignupToken = (token, signupSecret) => {
   const decoded = jwt.verify(token, signupSecret);
-  const kakaoId = String(decoded.kakaoId || '').trim();
+  const provider = String(decoded.provider || 'kakao').trim().toLowerCase();
+  const providerUserId = String(decoded.providerUserId || decoded.kakaoId || '').trim();
   const tokenType = String(decoded.tokenType || '').trim();
 
-  if (!kakaoId || tokenType !== 'signup') {
+  if (!provider || !providerUserId || tokenType !== 'signup') {
     throw new Error('invalid signup token');
   }
 
   return {
-    kakaoId,
+    provider,
+    providerUserId,
+    email: normalizeEmail(decoded.email),
     profileImage: String(decoded.profileImage || '').trim(),
     kakaoNickname: String(decoded.kakaoNickname || '').trim(),
   };
+};
+
+const validateEmail = (rawEmail) => {
+  const email = normalizeEmail(rawEmail);
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailPattern.test(email)) {
+    throw new Error('invalid email');
+  }
+
+  return email;
+};
+
+const validatePassword = (rawPassword) => {
+  const password = String(rawPassword || '');
+  if (password.length < 8 || password.length > 72) {
+    throw new Error('password must be between 8 and 72 characters');
+  }
+  return password;
 };
 
 // 닉네임 입력값을 공통 규칙으로 검증/정규화한다.
@@ -118,10 +197,16 @@ const validateNickname = (rawNickname) => {
 
 module.exports = {
   hashToken,
+  normalizeEmail,
+  generateVerificationCode,
+  hashSecret,
+  verifySecret,
   issueJwtTokens,
   issueSignupToken,
+  validateEmail,
   verifyAccessToken,
   verifyRefreshToken,
   verifySignupToken,
   validateNickname,
+  validatePassword,
 };

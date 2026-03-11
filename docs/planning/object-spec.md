@@ -10,7 +10,7 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 ### 필드
 
 - `id: string` (필수)
-- `kakaoId: string` (필수, unique)
+- `kakaoId: string` (레거시 호환 필드, 더 이상 로그인 기준 아님)
 - `email: string` (선택)
 - `nickname: string` (필수)
 - `profileImage: string` (선택)
@@ -22,21 +22,20 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 
 ### 생성/갱신 규칙
 
-- 카카오 로그인 시 조회 후 없으면 생성
+- 카카오 로그인 시 직접 `kakaoId`로 조회하지 않고 `AuthIdentity(provider='kakao')`로 사용자 식별
 - 카카오 응답 기준으로 `email`, `nickname`, `profileImage`를 동기화
 - `PATCH /auth/profile`로 닉네임 수정 가능
 - `DELETE /auth/account` 호출 시 사용자 문서를 tombstone 상태로 전환하고 관련 관계 데이터 정리를 시작
-- tombstone 사용자는 `signupCompletedAt`이 비워져 재로그인 시 다시 signup flow로 진입
+- tombstone 사용자는 `signupCompletedAt`이 비워지고, 로그인 identity가 제거되어 재진입 시 기존 사용자 복구 대신 새 가입 흐름으로 진입
 
 ### 검증 규칙
 
-- `kakaoId` unique 보장
+- `User` 본체는 특정 로그인 수단에 직접 종속되지 않음
 - 닉네임 길이/문자 검증
 - 이메일은 없을 수 있으므로 nullable 처리
 
 ### 인덱스/성능
 
-- `kakaoId` unique index
 - 이메일 검색 고도화가 필요하면 `email` index 검토
 
 ### API/소켓 매핑
@@ -308,31 +307,72 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - `/auth/account`
 - 소켓 handshake auth token
 
-## 9) 예정 도메인: AuthIdentity
+## 9) AuthIdentity
 
 ### 목적
 
-- 서비스 사용자 본체(`User`)와 로그인 수단을 분리하기 위한 계획 도메인
+- 서비스 사용자 본체(`User`)와 로그인 수단을 분리하는 실제 인증 도메인
 
-### 예상 필드
+### 필드
 
 - `id: string`
 - `userId: string`
 - `provider: 'kakao' | 'email' | ...`
 - `providerUserId: string`
 - `providerEmail?: string`
+- `secretHash?: string`
+- `verifiedAt?: date|null`
 - `lastLoginAt: date|null`
 - `createdAt: date`
 - `updatedAt: date`
 
-### 예상 규칙
+### 생성/갱신 규칙
 
 - 하나의 `User`는 여러 `AuthIdentity`를 가질 수 있다.
 - 카카오는 간편로그인 수단으로만 저장한다.
-- 회원탈퇴 시 tombstone `User`는 유지하되, `AuthIdentity`는 비활성 또는 제거한다.
-- 재가입 시 기존 tombstone `User` 복구 대신 새 `User` + 새 `AuthIdentity` 생성을 목표로 한다.
+- 이메일 회원가입은 `AuthIdentity(email)`로 저장한다.
+- 카카오 최초 로그인 시 기존 active legacy `User.kakaoId`가 있으면 첫 로그인에서 `AuthIdentity(kakao)`로 승격한다.
+- 이메일 회원가입은 인증 성공 시점에만 `User + AuthIdentity(email)`를 생성한다.
+- 회원탈퇴 시 tombstone `User`는 유지하되, `AuthIdentity`는 제거한다.
+- 재가입 시 기존 tombstone `User` 복구 대신 새 `User` + 새 `AuthIdentity`를 생성한다.
 
-## 10) 예정 도메인: AnonymousRoom / AnonymousParticipant / GuestSession
+### 검증 규칙
+
+- `(provider, providerUserId)` 조합은 unique
+- 삭제된 사용자에 연결된 로그인 수단은 재사용하지 않는다
+
+## 10) EmailVerification
+
+### 목적
+
+- 이메일 회원가입 중 인증 전 임시 입력값을 저장하는 도메인
+
+### 필드
+
+- `email: string`
+- `codeHash: string`
+- `passwordHash: string`
+- `nickname: string`
+- `expiresAt: date`
+- `resendAvailableAt: date`
+- `verifiedAt: date|null`
+- `attemptCount: number`
+- `createdAt: date`
+- `updatedAt: date`
+
+### 생성/갱신 규칙
+
+- 이메일 회원가입 시작 시 생성 또는 갱신한다.
+- 인증 성공 전까지는 실제 `User`를 만들지 않는다.
+- 인증 성공 시 `EmailVerification`은 삭제한다.
+- 개발 단계에서는 서버 로그/DB에서 인증 코드를 확인한다.
+
+### 검증 규칙
+
+- 이메일별 pending 인증은 1건만 유지한다.
+- 인증 코드는 6자리, 10분 만료, 60초 재발송 제한을 적용한다.
+
+## 11) 예정 도메인: AnonymousRoom / AnonymousParticipant / GuestSession
 
 ### 목적
 

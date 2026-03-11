@@ -7,6 +7,8 @@ const path = require('path');
 const { Server } = require('socket.io');
 const Message = require('./models/message.model.cjs');
 const User = require('./models/user.model.cjs');
+const AuthIdentity = require('./models/authidentity.model.cjs');
+const EmailVerification = require('./models/emailverification.model.cjs');
 const ChatRoom = require('./models/chatroom.model.cjs');
 const ChatReadState = require('./models/chatreadstate.model.cjs');
 const { Friendship } = require('./models/friendship.model.cjs');
@@ -224,6 +226,24 @@ const dropLegacyChatRoomIndexIfExists = async () => {
   }
 };
 
+// 이전 MVP에서 사용하던 User.kakaoId unique 인덱스는 AuthIdentity 분리 이후 더 이상 유지하지 않는다.
+const dropLegacyUserKakaoIdIndexIfExists = async () => {
+  try {
+    const indexes = await User.collection.indexes();
+    const hasLegacyKakaoIndex = indexes.some((index) => index.name === 'kakaoId_1');
+
+    if (hasLegacyKakaoIndex) {
+      await User.collection.dropIndex('kakaoId_1');
+      console.log('Dropped legacy index: users.kakaoId_1');
+    }
+  } catch (error) {
+    const knownNoIndexError = error?.codeName === 'IndexNotFound' || error?.code === 27;
+    if (!knownNoIndexError) {
+      console.warn('Failed to drop legacy kakaoId index:', error.message);
+    }
+  }
+};
+
 const collectJoinedRoomIds = (socket) => {
   const joinedRooms = [];
   socket.rooms.forEach((roomId) => {
@@ -373,6 +393,8 @@ app.use(
   '/auth',
   createAuthRouter({
     User,
+    AuthIdentity,
+    EmailVerification,
     Friendship,
     ChatRoom,
     Message,
@@ -385,6 +407,7 @@ app.use(
     emitRoomDeleted,
     emitRoomParticipants,
     config: {
+      NODE_ENV: process.env.NODE_ENV || 'development',
       JWT_SECRET,
       JWT_REFRESH_SECRET,
       JWT_SIGNUP_SECRET,
@@ -617,6 +640,7 @@ async function start() {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
     await dropLegacyChatRoomIndexIfExists();
+    await dropLegacyUserKakaoIdIndexIfExists();
   } else {
     console.log('MONGODB_URI not set. Starting without database connection.');
   }

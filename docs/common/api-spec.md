@@ -29,6 +29,8 @@ MVP2-A 1차 표준:
 
 ### GET /auth/kakao/callback?code=
 - 카카오 인가 코드를 교환합니다.
+- 서버는 `AuthIdentity(provider='kakao')` 기준으로 기존 사용자를 식별합니다.
+- legacy `User.kakaoId` 사용자는 첫 로그인 시 identity로 점진 마이그레이션합니다.
 - 응답 분기:
 
 1) 가입 완료 사용자
@@ -37,7 +39,7 @@ MVP2-A 1차 표준:
   "resultType": "LOGIN_SUCCESS",
   "user": {
     "id": "userId",
-    "kakaoId": "kakaoId",
+    "kakaoId": "",
     "email": "user@example.com",
     "nickname": "닉네임",
     "profileImage": "",
@@ -69,6 +71,8 @@ MVP2-A 1차 표준:
 
 ### POST /auth/signup/complete
 - 최초 로그인 사용자의 가입 의사 + 닉네임 설정 완료
+- signup token 안의 `provider` / `providerUserId` 기준으로 `AuthIdentity`를 생성하거나 기존 active 사용자를 연결합니다.
+- tombstone 계정은 복구하지 않고 새 `User`를 생성합니다.
 
 요청:
 ```json
@@ -86,6 +90,86 @@ MVP2-A 1차 표준:
 - `400 TERMS_NOT_AGREED`
 - `400 INVALID_NICKNAME`
 - `401 INVALID_SIGNUP_TOKEN`
+- `503 DB_NOT_CONNECTED`
+
+### POST /auth/email/signup/start
+- 이메일 회원가입 시작
+- 입력값을 검증하고 이메일 인증용 pending record를 생성 또는 갱신
+- 개발 단계에서는 인증 코드를 서버 로그/DB에서 확인
+
+요청:
+```json
+{
+  "email": "user@example.com",
+  "password": "password123",
+  "nickname": "사용자닉네임"
+}
+```
+
+응답:
+```json
+{
+  "email": "user@example.com",
+  "expiresAt": "2026-03-11T15:10:00.000Z",
+  "resendAvailableAt": "2026-03-11T15:01:00.000Z"
+}
+```
+
+- 개발 환경에서는 위 응답에 `debugCode`가 추가될 수 있음
+
+대표 오류:
+- `400 INVALID_EMAIL`
+- `400 INVALID_PASSWORD`
+- `400 INVALID_NICKNAME`
+- `409 EMAIL_ALREADY_REGISTERED`
+- `429 VERIFICATION_RESEND_COOLDOWN`
+- `500 EMAIL_SIGNUP_START_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+### POST /auth/email/signup/verify
+- 이메일 + 인증 코드를 검증하고 성공 시 `User + AuthIdentity(email)` 생성 후 즉시 로그인
+
+요청:
+```json
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+
+응답: `LOGIN_SUCCESS` 구조와 동일
+
+대표 오류:
+- `400 INVALID_EMAIL`
+- `400 INVALID_REQUEST`
+- `400 INVALID_VERIFICATION_CODE`
+- `404 VERIFICATION_NOT_FOUND`
+- `409 EMAIL_ALREADY_REGISTERED`
+- `410 VERIFICATION_CODE_EXPIRED`
+- `500 EMAIL_SIGNUP_VERIFY_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+### POST /auth/email/login
+- verified email identity 기준으로 이메일 로그인
+
+요청:
+```json
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+```
+
+응답: `LOGIN_SUCCESS` 구조와 동일
+
+대표 오류:
+- `400 INVALID_EMAIL`
+- `400 INVALID_PASSWORD`
+- `401 INVALID_EMAIL_PASSWORD`
+- `403 ACCOUNT_NOT_AVAILABLE`
+- `403 EMAIL_NOT_VERIFIED`
+- `404 EMAIL_NOT_REGISTERED`
+- `500 EMAIL_LOGIN_FAILED`
 - `503 DB_NOT_CONNECTED`
 
 ### POST /auth/refresh
@@ -112,7 +196,7 @@ MVP2-A 1차 표준:
 {
   "user": {
     "id": "userId",
-    "kakaoId": "kakaoId",
+    "kakaoId": "",
     "email": "user@example.com",
     "nickname": "닉네임",
     "profileImage": "",
@@ -142,7 +226,7 @@ MVP2-A 1차 표준:
 {
   "user": {
     "id": "userId",
-    "kakaoId": "kakaoId",
+    "kakaoId": "",
     "email": "user@example.com",
     "nickname": "새닉네임",
     "profileImage": "",
@@ -162,6 +246,7 @@ MVP2-A 1차 표준:
 - 헤더: `Authorization: Bearer <accessToken>`
 - 처리 범위:
   - 사용자 문서는 tombstone(`accountStatus=deleted`) 상태로 유지
+  - 로그인 수단(`AuthIdentity`)은 제거
   - accepted 친구 관계는 tombstone 표시용으로 유지
   - pending/rejected/blocked 친구 관계 삭제
   - 내 알림/읽음 상태 삭제
