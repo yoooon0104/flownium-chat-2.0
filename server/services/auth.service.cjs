@@ -51,12 +51,17 @@ const issueSignupToken = (payload, config) => {
     throw new Error('JWT signup secret is not configured');
   }
 
+  const provider = String(payload.provider || 'kakao').trim().toLowerCase();
+  const providerUserId = String(payload.providerUserId || payload.kakaoId || '').trim();
+
   return jwt.sign(
     {
       tokenType: 'signup',
-      kakaoId: String(payload.kakaoId || '').trim(),
+      provider,
+      providerUserId,
       profileImage: String(payload.profileImage || '').trim(),
       kakaoNickname: String(payload.kakaoNickname || '').trim(),
+      email: String(payload.email || '').trim().toLowerCase(),
     },
     JWT_SIGNUP_SECRET,
     { expiresIn: SIGNUP_TOKEN_EXPIRES_IN }
@@ -93,15 +98,18 @@ const verifyRefreshToken = (token, refreshSecret) => {
 // signup 토큰은 tokenType=signup인지 추가 검증한다.
 const verifySignupToken = (token, signupSecret) => {
   const decoded = jwt.verify(token, signupSecret);
-  const kakaoId = String(decoded.kakaoId || '').trim();
+  const provider = String(decoded.provider || 'kakao').trim().toLowerCase();
+  const providerUserId = String(decoded.providerUserId || decoded.kakaoId || '').trim();
   const tokenType = String(decoded.tokenType || '').trim();
 
-  if (!kakaoId || tokenType !== 'signup') {
+  if (!provider || !providerUserId || tokenType !== 'signup') {
     throw new Error('invalid signup token');
   }
 
   return {
-    kakaoId,
+    provider,
+    providerUserId,
+    email: String(decoded.email || '').trim().toLowerCase(),
     profileImage: String(decoded.profileImage || '').trim(),
     kakaoNickname: String(decoded.kakaoNickname || '').trim(),
   };

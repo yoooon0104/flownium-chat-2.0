@@ -50,17 +50,20 @@
 - `services/kakao.service.cjs`: 카카오 외부 API 연동(이메일 포함)
 - `utils/error-response.cjs`: 공통 HTTP 에러 응답 포맷
 
+## 인증 구조
+
+- `User`는 서비스 내부 사용자 본체를 유지한다.
+- `AuthIdentity`가 카카오 등 외부 로그인 수단을 담당한다.
+- 카카오는 회원 본체가 아니라 간편로그인 수단으로만 관리한다.
+- 기존 legacy `User.kakaoId` 사용자는 첫 카카오 로그인에서 `AuthIdentity(kakao)`로 점진 마이그레이션한다.
+- 탈퇴한 tombstone `User`는 유지하되, 연결된 로그인 수단은 제거한다.
+- 같은 카카오 계정 재가입은 기존 tombstone 계정 복구가 아니라 새 `User` 생성 흐름으로 간다.
+
 ## 다음 인증 구조(계획)
 
-- 현재는 `User`가 카카오 로그인 식별자까지 직접 보유하고 있다.
-- 다음 단계에서는 `User`와 `AuthIdentity`를 분리한다.
-- 목표:
-  - `User`는 서비스 내부 사용자 본체 유지
-  - `AuthIdentity`는 `provider`, `providerUserId`, `userId` 매핑 담당
-  - 카카오는 간편로그인 수단으로만 관리
-  - 기본 회원가입 도입 시 소셜 로그인과 충돌하지 않게 구성
-- 탈퇴한 tombstone `User`는 유지하되, 연결된 로그인 수단은 재사용되지 않도록 설계한다.
-- 재가입은 기존 tombstone 계정 복구가 아니라 새 `User` 생성 정책을 목표로 한다.
+- 기본 회원가입 도입 시 `AuthIdentity(email)` 같은 추가 로그인 수단을 연결한다.
+- 계정 연결/병합 정책은 이후 별도 작업으로 정의한다.
+- 기본 회원가입/간편로그인 공존 시에도 `User.id`는 친구/채팅/history의 고정 식별자로 유지한다.
 
 ## 인증/채팅 흐름
 
@@ -80,7 +83,8 @@
 
 ## 데이터 핵심 필드
 
-- `User`: `kakaoId`, `email`, `nickname`, `profileImage`, `accountStatus`, `deletedAt`, `refreshTokenHash`
+- `User`: `email`, `nickname`, `profileImage`, `accountStatus`, `deletedAt`, `refreshTokenHash`
+- `AuthIdentity`: `userId`, `provider`, `providerUserId`, `providerEmail`, `lastLoginAt`
 - `ChatRoom`: `name`, `memberIds`, `lastMessage`, `lastMessageAt`, `deletedMemberIds`(응답 가공 필드), `directChatDisabled`(응답 가공 필드)
 - `Message`: `chatRoomId`, `senderId`, `type`, `text`, `timestamp`
 - `Friendship`: `requesterId`, `addresseeId`, `pairKey`, `status`
@@ -111,6 +115,7 @@
 ## 운영 보정 로직
 
 - 서버 시작 시 `chatrooms.roomKey_1` 레거시 유니크 인덱스 자동 삭제
+- 서버 시작 시 `users.kakaoId_1` 레거시 유니크 인덱스 자동 삭제
 - 목적: 과거 스키마 잔재로 인한 `E11000 duplicate key` 오류 완화
 
 ## 현재 제약
@@ -121,7 +126,7 @@
 - presence는 메모리 기반(서버 재시작 시 초기화)
 - unread 감소/증가 흐름은 실제 친구 계정 2개 이상 기준 추가 검증 필요
 - 설정은 모바일 별도 화면 + 데스크톱 모달 구조이며 닉네임/테마 변경과 회원탈퇴를 지원
-- 탈퇴 회원 재로그인은 다시 signup flow를 거쳐 활성화되며, tombstone 기간 동안 accepted friendship과 direct room 맥락은 유지된다
+- 기본 회원가입 UI/연결/병합 정책은 아직 미구현
 
 ## 익명방 확장 방향(계획)
 

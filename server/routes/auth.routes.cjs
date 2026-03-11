@@ -17,6 +17,7 @@ const { sendError } = require('../utils/error-response.cjs');
 // 인증 관련 라우터를 의존성 주입 방식으로 생성한다.
 const createAuthRouter = ({
   User,
+  AuthIdentity,
   Friendship,
   ChatRoom,
   Message,
@@ -62,18 +63,64 @@ const createAuthRouter = ({
   // DB 사용자 문서를 클라이언트 응답 포맷으로 변환한다.
   const toClientUser = (userDoc) => ({
     id: String(userDoc._id),
-    kakaoId: userDoc.kakaoId,
+    kakaoId: userDoc.kakaoId || '',
     email: userDoc.email || '',
     nickname: userDoc.nickname,
     profileImage: userDoc.profileImage || '',
     isDeleted: isDeletedUser(userDoc),
   });
 
+  const findIdentity = async (provider, providerUserId) => {
+    return AuthIdentity.findOne({
+      provider: String(provider || '').trim().toLowerCase(),
+      providerUserId: String(providerUserId || '').trim(),
+    });
+  };
+
+  // 레거시 kakaoId 기반 사용자도 첫 로그인 시 identity로 승격해 점진적으로 이전한다.
+  const migrateLegacyKakaoIdentityIfNeeded = async (kakaoUser) => {
+    const existingIdentity = await findIdentity('kakao', kakaoUser.kakaoId);
+    if (existingIdentity) {
+      return existingIdentity;
+    }
+
+    const legacyUser = await User.findOne({ kakaoId: kakaoUser.kakaoId });
+    if (!legacyUser || isDeletedUser(legacyUser)) {
+      return null;
+    }
+
+    return AuthIdentity.findOneAndUpdate(
+      {
+        provider: 'kakao',
+        providerUserId: kakaoUser.kakaoId,
+      },
+      {
+        $set: {
+          userId: legacyUser._id,
+          providerEmail: kakaoUser.email || legacyUser.email || '',
+          lastLoginAt: new Date(),
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+  };
+
   // 로그인 성공 공통 응답: 토큰 발급/해시 저장을 한곳에서 처리한다.
-  const respondLoginSuccess = async (res, user) => {
+  const respondLoginSuccess = async (res, user, identity = null) => {
     const tokens = issueJwtTokens(user, config);
     user.refreshTokenHash = hashToken(tokens.refreshToken);
     await user.save();
+    if (identity) {
+      identity.lastLoginAt = new Date();
+      if (!identity.providerEmail && user.email) {
+        identity.providerEmail = user.email;
+      }
+      await identity.save();
+    }
 
     res.status(200).json({
       resultType: 'LOGIN_SUCCESS',
@@ -168,6 +215,7 @@ const createAuthRouter = ({
     }
 
     await Promise.all([
+      AuthIdentity.deleteMany({ userId }),
       Friendship.deleteMany({
         status: { $ne: 'accepted' },
         $or: [{ requesterId: userId }, { addresseeId: userId }],
@@ -186,6 +234,7 @@ const createAuthRouter = ({
           $set: {
             accountStatus: 'deleted',
             deletedAt: now,
+            kakaoId: '',
             email: '',
             profileImage: '',
             refreshTokenHash: null,
@@ -236,7 +285,8 @@ const createAuthRouter = ({
       });
       const kakaoUser = await fetchKakaoUserProfile(kakaoToken.access_token);
 
-      const existingUser = await User.findOne({ kakaoId: kakaoUser.kakaoId });
+      const identity = await migrateLegacyKakaoIdentityIfNeeded(kakaoUser);
+      const existingUser = identity ? await User.findById(identity.userId) : null;
 
       // 가입이 완료된 사용자는 즉시 로그인 처리하고 최신 로그인 시점만 갱신한다.
       if (existingUser && existingUser.signupCompletedAt && !isDeletedUser(existingUser)) {
@@ -245,13 +295,14 @@ const createAuthRouter = ({
         // 1차 정책: 프로필 이미지는 카카오 원본을 우선 반영한다.
         existingUser.profileImage = kakaoUser.profileImage || existingUser.profileImage || '';
         await existingUser.save();
-        await respondLoginSuccess(res, existingUser);
+        await respondLoginSuccess(res, existingUser, identity);
         return;
       }
 
       const signupToken = issueSignupToken(
         {
-          kakaoId: kakaoUser.kakaoId,
+          provider: 'kakao',
+          providerUserId: kakaoUser.kakaoId,
           email: kakaoUser.email,
           profileImage: kakaoUser.profileImage,
           kakaoNickname: kakaoUser.nickname,
@@ -300,33 +351,91 @@ const createAuthRouter = ({
     }
 
     try {
-      const { kakaoId, email, profileImage, kakaoNickname } = verifySignupToken(signupToken, config.JWT_SIGNUP_SECRET);
+      const {
+        provider,
+        providerUserId,
+        email,
+        profileImage,
+        kakaoNickname,
+      } = verifySignupToken(signupToken, config.JWT_SIGNUP_SECRET);
       const nickname = validateNickname(req.body?.nickname || kakaoNickname);
       const now = new Date();
+      let identity = await findIdentity(provider, providerUserId);
+      let user = identity ? await User.findById(identity.userId) : null;
 
-      const user = await User.findOneAndUpdate(
-        { kakaoId },
-        {
-          $set: {
-            email: String(email || '').trim().toLowerCase(),
-            nickname,
-            profileImage: profileImage || '',
-            lastLoginAt: now,
-            signupCompletedAt: now,
-            agreedToTermsAt: now,
-            nicknameUpdatedAt: now,
-            accountStatus: 'active',
-            deletedAt: null,
-          },
-        },
-        {
-          upsert: true,
-          new: true,
-          setDefaultsOnInsert: true,
+      // 레거시 kakaoId 사용자는 첫 가입 완료 시점에 identity를 생성하고 사용자 문서를 재사용한다.
+      if (!identity && provider === 'kakao') {
+        const legacyUser = await User.findOne({
+          kakaoId: providerUserId,
+          accountStatus: { $ne: 'deleted' },
+        });
+
+        if (legacyUser) {
+          user = legacyUser;
+          identity = await AuthIdentity.findOneAndUpdate(
+            {
+              provider,
+              providerUserId,
+            },
+            {
+              $set: {
+                userId: legacyUser._id,
+                providerEmail: String(email || '').trim().toLowerCase(),
+                lastLoginAt: now,
+              },
+            },
+            {
+              upsert: true,
+              new: true,
+              setDefaultsOnInsert: true,
+            }
+          );
         }
-      );
+      }
 
-      await respondLoginSuccess(res, user);
+      if (!user || isDeletedUser(user)) {
+        user = await User.create({
+          email: String(email || '').trim().toLowerCase(),
+          nickname,
+          profileImage: profileImage || '',
+          lastLoginAt: now,
+          signupCompletedAt: now,
+          agreedToTermsAt: now,
+          nicknameUpdatedAt: now,
+          accountStatus: 'active',
+          deletedAt: null,
+          kakaoId: provider === 'kakao' ? '' : '',
+        });
+      } else {
+        user.email = String(email || '').trim().toLowerCase();
+        user.nickname = nickname;
+        user.profileImage = profileImage || '';
+        user.lastLoginAt = now;
+        user.signupCompletedAt = now;
+        user.agreedToTermsAt = now;
+        user.nicknameUpdatedAt = now;
+        user.accountStatus = 'active';
+        user.deletedAt = null;
+        user.kakaoId = '';
+        await user.save();
+      }
+
+      if (!identity) {
+        identity = await AuthIdentity.create({
+          userId: user._id,
+          provider,
+          providerUserId,
+          providerEmail: String(email || '').trim().toLowerCase(),
+          lastLoginAt: now,
+        });
+      } else {
+        identity.userId = user._id;
+        identity.providerEmail = String(email || '').trim().toLowerCase();
+        identity.lastLoginAt = now;
+        await identity.save();
+      }
+
+      await respondLoginSuccess(res, user, identity);
     } catch (error) {
       const message = String(error.message || '').toLowerCase();
       if (message.includes('nickname must be between')) {

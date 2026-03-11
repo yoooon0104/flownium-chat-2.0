@@ -1,13 +1,11 @@
 ﻿const mongoose = require('mongoose');
 
-// 사용자 스키마: 카카오 식별자와 로그인/리프레시 토큰 상태를 관리한다.
+// 사용자 스키마: 서비스 내부 사용자 본체와 로그인/리프레시 토큰 상태를 관리한다.
 const userSchema = new mongoose.Schema(
   {
     kakaoId: {
       type: String,
-      required: true,
-      unique: true,
-      index: true,
+      default: '',
       trim: true,
     },
     // 카카오 계정 이메일(동의 범위에 따라 비어 있을 수 있음)

@@ -29,6 +29,8 @@ MVP2-A 1차 표준:
 
 ### GET /auth/kakao/callback?code=
 - 카카오 인가 코드를 교환합니다.
+- 서버는 `AuthIdentity(provider='kakao')` 기준으로 기존 사용자를 식별합니다.
+- legacy `User.kakaoId` 사용자는 첫 로그인 시 identity로 점진 마이그레이션합니다.
 - 응답 분기:
 
 1) 가입 완료 사용자
@@ -37,7 +39,7 @@ MVP2-A 1차 표준:
   "resultType": "LOGIN_SUCCESS",
   "user": {
     "id": "userId",
-    "kakaoId": "kakaoId",
+    "kakaoId": "",
     "email": "user@example.com",
     "nickname": "닉네임",
     "profileImage": "",
@@ -69,6 +71,8 @@ MVP2-A 1차 표준:
 
 ### POST /auth/signup/complete
 - 최초 로그인 사용자의 가입 의사 + 닉네임 설정 완료
+- signup token 안의 `provider` / `providerUserId` 기준으로 `AuthIdentity`를 생성하거나 기존 active 사용자를 연결합니다.
+- tombstone 계정은 복구하지 않고 새 `User`를 생성합니다.
 
 요청:
 ```json
@@ -112,7 +116,7 @@ MVP2-A 1차 표준:
 {
   "user": {
     "id": "userId",
-    "kakaoId": "kakaoId",
+    "kakaoId": "",
     "email": "user@example.com",
     "nickname": "닉네임",
     "profileImage": "",
@@ -142,7 +146,7 @@ MVP2-A 1차 표준:
 {
   "user": {
     "id": "userId",
-    "kakaoId": "kakaoId",
+    "kakaoId": "",
     "email": "user@example.com",
     "nickname": "새닉네임",
     "profileImage": "",
@@ -162,6 +166,7 @@ MVP2-A 1차 표준:
 - 헤더: `Authorization: Bearer <accessToken>`
 - 처리 범위:
   - 사용자 문서는 tombstone(`accountStatus=deleted`) 상태로 유지
+  - 로그인 수단(`AuthIdentity`)은 제거
   - accepted 친구 관계는 tombstone 표시용으로 유지
   - pending/rejected/blocked 친구 관계 삭제
   - 내 알림/읽음 상태 삭제
