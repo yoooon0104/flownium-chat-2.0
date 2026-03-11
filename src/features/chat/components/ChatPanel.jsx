@@ -13,6 +13,7 @@ function ChatPanel({
   isLoadingHistory,
   isLoadingOlderHistory,
   hasMoreHistory,
+  hasLoadedInitialHistory,
   historyError,
   messages,
   currentUserId,
@@ -76,7 +77,7 @@ function ChatPanel({
         {errorMessage && <p className="mb-3 text-sm text-rose-300">오류: {errorMessage}</p>}
         {historyError && <p className="mb-3 text-sm text-amber-300">{historyError}</p>}
 
-        {messages.length === 0 ? (
+        {!isLoadingHistory && hasLoadedInitialHistory && messages.length === 0 ? (
           <p className="text-sm text-[var(--text-secondary)]">표시할 메시지가 없습니다.</p>
         ) : (
           <ul className="flex flex-col gap-3">

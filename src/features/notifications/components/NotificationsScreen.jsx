@@ -1,8 +1,28 @@
-﻿const toCreatedLabel = (value) => {
+const toCreatedLabel = (value) => {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toLocaleString()
+}
+
+const getNotificationTitle = (item) => {
+  if (item?.type === 'room_invite') return '방 초대'
+  if (item?.type === 'friend_request') return '친구 요청'
+  return String(item?.type || '알림')
+}
+
+const getNotificationSummary = (item) => {
+  if (item?.type === 'room_invite') {
+    const inviterName = String(item?.payload?.inviter?.nickname || '').trim() || '알 수 없는 사용자'
+    const roomName = String(item?.payload?.roomName || '').trim() || '이름 없는 채팅방'
+    return `${inviterName}님이 ${roomName}에 초대했습니다.`
+  }
+
+  if (item?.type === 'friend_request') {
+    return String(item?.payload?.requester?.nickname || '').trim() || '새 친구 요청이 도착했습니다.'
+  }
+
+  return '추가 정보 없음'
 }
 
 // 모바일 알림 화면은 처리할 요청과 최근 알림만 보여준다.
@@ -14,6 +34,7 @@ function NotificationsScreen({
   pendingReceived,
   notificationErrorMessage,
   onRespondFriendRequest,
+  onOpenRoomInvite,
   onBack,
 }) {
   return (
@@ -58,10 +79,21 @@ function NotificationsScreen({
             {notifications.map((item) => (
               <li key={item.id} className={`notification-row ${item.isRead ? 'read' : 'unread'}`}>
                 <div className="notification-main">
-                  <strong>{item.type === 'room_invite' ? '방 초대' : item.type === 'friend_request' ? '친구 요청' : item.type}</strong>
-                  <small>{item.payload?.roomName || item.payload?.requester?.nickname || '추가 정보 없음'}</small>
+                  <strong>{getNotificationTitle(item)}</strong>
+                  <small>{getNotificationSummary(item)}</small>
                   <small>{toCreatedLabel(item.createdAt)}</small>
                 </div>
+                {item.type === 'room_invite' && (
+                  <div className="notification-actions">
+                    <button
+                      type="button"
+                      onClick={() => void onOpenRoomInvite?.(item)}
+                      disabled={!item?.payload?.roomId}
+                    >
+                      방으로 이동
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
