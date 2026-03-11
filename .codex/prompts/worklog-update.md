@@ -42,6 +42,8 @@ Rules:
 5. If nothing meaningful changed, do not create a filler entry.
 6. Do not use the shared project docs log as the default target unless the user explicitly asks for a shared summary log.
 7. Include enough identifiers in the filename or first section so another collaborator can map the log back to the task quickly.
+8. English-first logs are allowed, but you may append a Korean version in the same file when bilingual handoff would help collaboration.
+9. If both languages are included, keep the Korean section below the English section instead of splitting them into separate files.
 
 Follow-up:
 
@@ -71,6 +73,27 @@ Validation
 Open risks
 
 Next
+
+Optional bilingual extension:
+
+```md
+## Korean Notes
+
+### Context (KR)
+- 작업 배경
+
+### Changes (KR)
+- 변경 사항
+
+### Validation (KR)
+- 실행한 검증
+
+### Risks (KR)
+- 남은 리스크
+
+### Next (KR)
+- 다음 액션
+```
 
 Recommended file structure:
 

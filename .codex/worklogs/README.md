@@ -19,6 +19,9 @@ Usage rules
 - record actual work only
 - include validation that was actually executed
 - include the next concrete action when the task is not finished
+- keep English as the default structure when possible
+- if bilingual handoff is useful, add Korean notes in the same file below the English sections
+- do not split English and Korean into separate worklog files for the same task
 
 Suggested structure
 
@@ -41,4 +44,21 @@ Suggested structure
 
 ## Next
 - next concrete step
+
+## Korean Notes
+
+### Context (KR)
+- why this task exists in Korean
+
+### Changes (KR)
+- files changed and key decisions in Korean
+
+### Validation (KR)
+- commands run and results in Korean
+
+### Risks (KR)
+- remaining concerns in Korean
+
+### Next (KR)
+- next concrete step in Korean
 ```
