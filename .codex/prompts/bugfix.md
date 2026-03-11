@@ -37,12 +37,12 @@ Follow-up:
 
 - Required:
   - use `validate.md`
+  - use `worklog-update.md` if code, docs, validation status, or handoff context changed
 - Conditional:
   - use `docs-sync.md` if the fix changes a documented behavior contract, API shape, socket event, or screen flow
   - use `realtime-verify.md` if the fix affects unread, notifications, presence, room join flow, or other realtime behavior
 - Optional:
   - use `deliver.md` for final reporting
-  - use `worklog-update.md` if the task should leave a handoff trail
 
 Output format:
 

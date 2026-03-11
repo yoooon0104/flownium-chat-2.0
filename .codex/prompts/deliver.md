@@ -26,9 +26,9 @@ Rules:
 Follow-up:
 
 - Required:
-  - none
+  - use `worklog-update.md` if the completed work changed code, docs, validation state, or handoff readiness and no task-specific working log has been updated yet
 - Conditional:
-  - use `worklog-update.md` if the final result should leave behind a collaboration record
+  - none
 - Optional:
   - none
 

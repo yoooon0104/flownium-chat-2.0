@@ -106,9 +106,9 @@ Only if the user explicitly asks:
 
 - Required:
   - use `validate.md`
+  - use `worklog-update.md` when implementation, docs, validation state, or handoff readiness changed
 - Conditional:
   - use `docs-sync.md` if the issue implementation changed contracts, screens, architecture, or object meaning
   - use `realtime-verify.md` if the issue implementation affects realtime behavior
 - Optional:
   - use `deliver.md`
-  - use `worklog-update.md`
