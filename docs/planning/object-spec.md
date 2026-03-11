@@ -307,3 +307,62 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - `/auth/me`
 - `/auth/account`
 - 소켓 handshake auth token
+
+## 9) 예정 도메인: AuthIdentity
+
+### 목적
+
+- 서비스 사용자 본체(`User`)와 로그인 수단을 분리하기 위한 계획 도메인
+
+### 예상 필드
+
+- `id: string`
+- `userId: string`
+- `provider: 'kakao' | 'email' | ...`
+- `providerUserId: string`
+- `providerEmail?: string`
+- `lastLoginAt: date|null`
+- `createdAt: date`
+- `updatedAt: date`
+
+### 예상 규칙
+
+- 하나의 `User`는 여러 `AuthIdentity`를 가질 수 있다.
+- 카카오는 간편로그인 수단으로만 저장한다.
+- 회원탈퇴 시 tombstone `User`는 유지하되, `AuthIdentity`는 비활성 또는 제거한다.
+- 재가입 시 기존 tombstone `User` 복구 대신 새 `User` + 새 `AuthIdentity` 생성을 목표로 한다.
+
+## 10) 예정 도메인: AnonymousRoom / AnonymousParticipant / GuestSession
+
+### 목적
+
+- 회원 채팅과 분리된 익명방/비회원 기능 확장을 위한 계획 도메인
+
+### 예상 필드
+
+- `GuestSession`
+  - `id`
+  - `nickname`
+  - `lastSeenAt`
+  - `expiresAt`
+- `AnonymousRoom`
+  - `id`
+  - `title`
+  - `roomToken`
+  - `passwordHash`
+  - `createdByUserId?`
+  - `createdByGuestId?`
+- `AnonymousParticipant`
+  - `roomId`
+  - `participantType: 'user' | 'guest'`
+  - `participantId`
+  - `aliasNickname`
+  - `joinedAt`
+  - `lastSeenAt`
+
+### 예상 규칙
+
+- 비회원은 익명방만 사용 가능하다.
+- 익명방은 URL 토큰 + 비밀번호 기반으로 입장한다.
+- 회원도 익명방에 참여할 수 있지만 방별 익명 닉네임을 사용한다.
+- 비회원은 장기간 미접속 시 삭제하고, 익명방 participant도 함께 정리한다.
