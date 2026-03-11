@@ -1,9 +1,14 @@
 ﻿const express = require('express');
 const {
+  generateVerificationCode,
   hashToken,
+  hashSecret,
   issueJwtTokens,
   issueSignupToken,
   validateNickname,
+  validateEmail,
+  validatePassword,
+  verifySecret,
   verifyAccessToken,
   verifyRefreshToken,
   verifySignupToken,
@@ -18,6 +23,7 @@ const { sendError } = require('../utils/error-response.cjs');
 const createAuthRouter = ({
   User,
   AuthIdentity,
+  EmailVerification,
   Friendship,
   ChatRoom,
   Message,
@@ -76,6 +82,10 @@ const createAuthRouter = ({
       providerUserId: String(providerUserId || '').trim(),
     });
   };
+
+  const EMAIL_VERIFICATION_EXPIRES_IN_MS = 10 * 60 * 1000;
+  const EMAIL_RESEND_COOLDOWN_MS = 60 * 1000;
+  const isDevelopment = String(config.NODE_ENV || '').trim().toLowerCase() !== 'production';
 
   // 레거시 kakaoId 기반 사용자도 첫 로그인 시 identity로 승격해 점진적으로 이전한다.
   const migrateLegacyKakaoIdentityIfNeeded = async (kakaoUser) => {
@@ -444,6 +454,235 @@ const createAuthRouter = ({
       }
 
       sendError(res, 401, 'INVALID_SIGNUP_TOKEN', 'invalid signup token');
+    }
+  });
+
+  // 이메일 회원가입은 인증 전까지 임시 레코드만 만들고, 실제 계정은 인증 성공 시점에 생성한다.
+  router.post('/email/signup/start', async (req, res) => {
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const email = validateEmail(req.body?.email);
+      const password = validatePassword(req.body?.password);
+      const nickname = validateNickname(req.body?.nickname);
+      const now = new Date();
+
+      const [activeEmailIdentity, activeUserWithSameEmail, pendingVerification] = await Promise.all([
+        findIdentity('email', email),
+        User.findOne({ email, accountStatus: { $ne: 'deleted' } }).lean(),
+        EmailVerification.findOne({ email }),
+      ]);
+
+      if (activeEmailIdentity || activeUserWithSameEmail) {
+        sendError(res, 409, 'EMAIL_ALREADY_REGISTERED', 'email is already registered');
+        return;
+      }
+
+      if (pendingVerification?.resendAvailableAt && new Date(pendingVerification.resendAvailableAt) > now) {
+        sendError(res, 429, 'VERIFICATION_RESEND_COOLDOWN', 'verification resend is cooling down', {
+          resendAvailableAt: new Date(pendingVerification.resendAvailableAt).toISOString(),
+        });
+        return;
+      }
+
+      const code = generateVerificationCode();
+      const [codeHash, passwordHash] = await Promise.all([hashSecret(code), hashSecret(password)]);
+      const expiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_EXPIRES_IN_MS);
+      const resendAvailableAt = new Date(now.getTime() + EMAIL_RESEND_COOLDOWN_MS);
+
+      await EmailVerification.findOneAndUpdate(
+        { email },
+        {
+          $set: {
+            email,
+            codeHash,
+            passwordHash,
+            nickname,
+            expiresAt,
+            resendAvailableAt,
+            verifiedAt: null,
+            attemptCount: 0,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        }
+      );
+
+      logger.info('[auth:email/signup/start] verification issued', {
+        email,
+        code,
+        expiresAt: expiresAt.toISOString(),
+      });
+
+      res.status(200).json({
+        email,
+        expiresAt: expiresAt.toISOString(),
+        resendAvailableAt: resendAvailableAt.toISOString(),
+        ...(isDevelopment ? { debugCode: code } : {}),
+      });
+    } catch (error) {
+      const message = String(error.message || '').toLowerCase();
+      if (message.includes('invalid email')) {
+        sendError(res, 400, 'INVALID_EMAIL', 'invalid email');
+        return;
+      }
+      if (message.includes('password must be between')) {
+        sendError(res, 400, 'INVALID_PASSWORD', 'password must be between 8 and 72 characters');
+        return;
+      }
+      if (message.includes('nickname must be between')) {
+        sendError(res, 400, 'INVALID_NICKNAME', 'nickname must be between 2 and 20 characters');
+        return;
+      }
+
+      logger.error('[auth:email/signup/start] failed', { message: error.message });
+      sendError(res, 500, 'EMAIL_SIGNUP_START_FAILED', 'failed to start email signup');
+    }
+  });
+
+  // 이메일 인증 코드가 일치할 때만 실제 사용자와 email identity를 만든다.
+  router.post('/email/signup/verify', async (req, res) => {
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const email = validateEmail(req.body?.email);
+      const code = String(req.body?.code || '').trim();
+
+      if (!code) {
+        sendError(res, 400, 'INVALID_REQUEST', 'code is required');
+        return;
+      }
+
+      const verification = await EmailVerification.findOne({ email });
+      if (!verification) {
+        sendError(res, 404, 'VERIFICATION_NOT_FOUND', 'verification not found');
+        return;
+      }
+
+      const now = new Date();
+      if (new Date(verification.expiresAt) <= now) {
+        await EmailVerification.deleteOne({ _id: verification._id });
+        sendError(res, 410, 'VERIFICATION_CODE_EXPIRED', 'verification code expired');
+        return;
+      }
+
+      const matched = await verifySecret(code, verification.codeHash);
+      if (!matched) {
+        verification.attemptCount = Number(verification.attemptCount || 0) + 1;
+        await verification.save();
+        sendError(res, 400, 'INVALID_VERIFICATION_CODE', 'invalid verification code');
+        return;
+      }
+
+      const [existingIdentity, existingUser] = await Promise.all([
+        findIdentity('email', email),
+        User.findOne({ email, accountStatus: { $ne: 'deleted' } }),
+      ]);
+
+      if (existingIdentity || existingUser) {
+        await EmailVerification.deleteOne({ _id: verification._id });
+        sendError(res, 409, 'EMAIL_ALREADY_REGISTERED', 'email is already registered');
+        return;
+      }
+
+      const user = await User.create({
+        email,
+        nickname: verification.nickname,
+        profileImage: '',
+        lastLoginAt: now,
+        signupCompletedAt: now,
+        agreedToTermsAt: now,
+        nicknameUpdatedAt: now,
+        accountStatus: 'active',
+        deletedAt: null,
+      });
+
+      const identity = await AuthIdentity.create({
+        userId: user._id,
+        provider: 'email',
+        providerUserId: email,
+        providerEmail: email,
+        secretHash: verification.passwordHash,
+        verifiedAt: now,
+        lastLoginAt: now,
+      });
+
+      await EmailVerification.deleteOne({ _id: verification._id });
+      await respondLoginSuccess(res, user, identity);
+    } catch (error) {
+      const message = String(error.message || '').toLowerCase();
+      if (message.includes('invalid email')) {
+        sendError(res, 400, 'INVALID_EMAIL', 'invalid email');
+        return;
+      }
+
+      logger.error('[auth:email/signup/verify] failed', { message: error.message });
+      sendError(res, 500, 'EMAIL_SIGNUP_VERIFY_FAILED', 'failed to verify email signup');
+    }
+  });
+
+  // verified email identity만 이메일 로그인에 사용한다.
+  router.post('/email/login', async (req, res) => {
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const email = validateEmail(req.body?.email);
+      const password = validatePassword(req.body?.password);
+      const identity = await findIdentity('email', email);
+
+      // 이메일 로그인 실패 이유를 구분해 줘야 사용자가 회원가입/인증/비밀번호 단계를 바로 이해할 수 있다.
+      if (!identity) {
+        sendError(res, 404, 'EMAIL_NOT_REGISTERED', '가입되지 않은 이메일입니다.');
+        return;
+      }
+
+      if (!identity?.verifiedAt) {
+        sendError(res, 403, 'EMAIL_NOT_VERIFIED', '이메일 인증을 먼저 완료해주세요.');
+        return;
+      }
+
+      if (!identity?.secretHash) {
+        sendError(res, 401, 'INVALID_EMAIL_LOGIN', '이메일 로그인 정보를 확인할 수 없습니다.');
+        return;
+      }
+
+      const user = await User.findById(identity.userId);
+      if (!user || isDeletedUser(user)) {
+        sendError(res, 403, 'ACCOUNT_NOT_AVAILABLE', '사용할 수 없는 계정입니다.');
+        return;
+      }
+
+      const matched = await verifySecret(password, identity.secretHash);
+      if (!matched) {
+        sendError(res, 401, 'INVALID_EMAIL_PASSWORD', '비밀번호가 올바르지 않습니다.');
+        return;
+      }
+
+      user.lastLoginAt = new Date();
+      await user.save();
+      await respondLoginSuccess(res, user, identity);
+    } catch (error) {
+      const message = String(error.message || '').toLowerCase();
+      if (message.includes('invalid email')) {
+        sendError(res, 400, 'INVALID_EMAIL', 'invalid email');
+        return;
+      }
+      if (message.includes('password must be between')) {
+        sendError(res, 400, 'INVALID_PASSWORD', 'password must be between 8 and 72 characters');
+        return;
+      }
+
+      logger.error('[auth:email/login] failed', { message: error.message });
+      sendError(res, 500, 'EMAIL_LOGIN_FAILED', 'failed to login with email');
     }
   });
 

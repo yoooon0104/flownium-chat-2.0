@@ -92,6 +92,86 @@ MVP2-A 1차 표준:
 - `401 INVALID_SIGNUP_TOKEN`
 - `503 DB_NOT_CONNECTED`
 
+### POST /auth/email/signup/start
+- 이메일 회원가입 시작
+- 입력값을 검증하고 이메일 인증용 pending record를 생성 또는 갱신
+- 개발 단계에서는 인증 코드를 서버 로그/DB에서 확인
+
+요청:
+```json
+{
+  "email": "user@example.com",
+  "password": "password123",
+  "nickname": "사용자닉네임"
+}
+```
+
+응답:
+```json
+{
+  "email": "user@example.com",
+  "expiresAt": "2026-03-11T15:10:00.000Z",
+  "resendAvailableAt": "2026-03-11T15:01:00.000Z"
+}
+```
+
+- 개발 환경에서는 위 응답에 `debugCode`가 추가될 수 있음
+
+대표 오류:
+- `400 INVALID_EMAIL`
+- `400 INVALID_PASSWORD`
+- `400 INVALID_NICKNAME`
+- `409 EMAIL_ALREADY_REGISTERED`
+- `429 VERIFICATION_RESEND_COOLDOWN`
+- `500 EMAIL_SIGNUP_START_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+### POST /auth/email/signup/verify
+- 이메일 + 인증 코드를 검증하고 성공 시 `User + AuthIdentity(email)` 생성 후 즉시 로그인
+
+요청:
+```json
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+
+응답: `LOGIN_SUCCESS` 구조와 동일
+
+대표 오류:
+- `400 INVALID_EMAIL`
+- `400 INVALID_REQUEST`
+- `400 INVALID_VERIFICATION_CODE`
+- `404 VERIFICATION_NOT_FOUND`
+- `409 EMAIL_ALREADY_REGISTERED`
+- `410 VERIFICATION_CODE_EXPIRED`
+- `500 EMAIL_SIGNUP_VERIFY_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+### POST /auth/email/login
+- verified email identity 기준으로 이메일 로그인
+
+요청:
+```json
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+```
+
+응답: `LOGIN_SUCCESS` 구조와 동일
+
+대표 오류:
+- `400 INVALID_EMAIL`
+- `400 INVALID_PASSWORD`
+- `401 INVALID_EMAIL_PASSWORD`
+- `403 ACCOUNT_NOT_AVAILABLE`
+- `403 EMAIL_NOT_VERIFIED`
+- `404 EMAIL_NOT_REGISTERED`
+- `500 EMAIL_LOGIN_FAILED`
+- `503 DB_NOT_CONNECTED`
+
 ### POST /auth/refresh
 - Refresh 토큰 검증 후 Access/Refresh 토큰 재발급
 

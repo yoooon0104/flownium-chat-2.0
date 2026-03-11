@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const Message = require('./models/message.model.cjs');
 const User = require('./models/user.model.cjs');
 const AuthIdentity = require('./models/authidentity.model.cjs');
+const EmailVerification = require('./models/emailverification.model.cjs');
 const ChatRoom = require('./models/chatroom.model.cjs');
 const ChatReadState = require('./models/chatreadstate.model.cjs');
 const { Friendship } = require('./models/friendship.model.cjs');
@@ -393,6 +394,7 @@ app.use(
   createAuthRouter({
     User,
     AuthIdentity,
+    EmailVerification,
     Friendship,
     ChatRoom,
     Message,
@@ -405,6 +407,7 @@ app.use(
     emitRoomDeleted,
     emitRoomParticipants,
     config: {
+      NODE_ENV: process.env.NODE_ENV || 'development',
       JWT_SECRET,
       JWT_REFRESH_SECRET,
       JWT_SIGNUP_SECRET,

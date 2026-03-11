@@ -33,6 +33,36 @@ export const createAuthApi = (apiBaseUrl) => {
     return { ok: response.ok, status: response.status, body }
   }
 
+  const startEmailSignup = async (payload) => {
+    const response = await fetch(`${apiBaseUrl}/auth/email/signup/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
+  const verifyEmailSignup = async (payload) => {
+    const response = await fetch(`${apiBaseUrl}/auth/email/signup/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
+  const loginWithEmail = async (payload) => {
+    const response = await fetch(`${apiBaseUrl}/auth/email/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
   const getMe = async (accessToken) => {
     const response = await fetch(`${apiBaseUrl}/auth/me`, {
       method: 'GET',
@@ -72,6 +102,9 @@ export const createAuthApi = (apiBaseUrl) => {
     getKakaoCallback,
     refresh,
     completeSignup,
+    startEmailSignup,
+    verifyEmailSignup,
+    loginWithEmail,
     getMe,
     updateProfile,
     deleteAccount,

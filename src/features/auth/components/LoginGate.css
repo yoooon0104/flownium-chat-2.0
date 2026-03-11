@@ -67,3 +67,109 @@
 .kakao-login-button:hover {
   background: linear-gradient(92deg, #4f51ff 0%, #6e2fff 72%);
 }
+
+.kakao-login-button:disabled,
+.email-action-button:disabled,
+.secondary-action-button:disabled,
+.auth-mode-toggle button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--brand-subtext);
+  font-size: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(95, 107, 118, 0.24);
+}
+
+.auth-mode-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.auth-mode-toggle button,
+.secondary-action-button {
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(95, 107, 118, 0.24);
+  background: #f5f7ff;
+  color: #233042;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-mode-toggle button.active {
+  border-color: rgba(91, 92, 255, 0.32);
+  background: rgba(91, 92, 255, 0.08);
+  color: #2f37d8;
+}
+
+.auth-form {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-field {
+  display: grid;
+  gap: 6px;
+}
+
+.auth-field span {
+  color: #233042;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.auth-field input {
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid rgba(95, 107, 118, 0.24);
+  padding: 0 12px;
+  font: inherit;
+  color: #1a2230;
+  background: #ffffff;
+}
+
+.auth-field input:disabled {
+  background: #f3f5fb;
+  color: #8b95a3;
+}
+
+.auth-debug-code {
+  margin: -2px 0 0;
+  color: #5f6b76;
+  font-size: 13px;
+}
+
+.auth-debug-code strong {
+  color: #233042;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.email-action-button {
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: #10182b;
+  color: #f5f7ff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.auth-action-group {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}

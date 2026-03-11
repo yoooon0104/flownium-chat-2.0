@@ -43,10 +43,13 @@
 
 - `server/index.cjs`: 서버 엔트리 + 소켓 이벤트
 - `routes/auth.routes.cjs`: 카카오/온보딩/refresh/me/profile/account delete
+- `routes/auth.routes.cjs`: 카카오/온보딩/email signup/email login/refresh/me/profile/account delete
 - `routes/chatroom.routes.cjs`: 채팅방 생성/초대/나가기/메시지/read 상태 REST + 커서 기반 메시지 페이지네이션
 - `routes/friend.routes.cjs`: 친구 검색/요청/수락/거절/차단
 - `routes/notification.routes.cjs`: 알림 목록/읽음 처리
 - `services/auth.service.cjs`: JWT/해시/signup 토큰 검증
+- `models/AuthIdentity`: 로그인 수단 매핑
+- `models/EmailVerification`: 이메일 가입 전 임시 인증 레코드
 - `services/kakao.service.cjs`: 카카오 외부 API 연동(이메일 포함)
 - `utils/error-response.cjs`: 공통 HTTP 에러 응답 포맷
 
@@ -70,8 +73,11 @@
 1. 카카오 로그인
 2. `/auth/kakao/callback` 결과 분기(`LOGIN_SUCCESS` / `SIGNUP_REQUIRED`)
 3. 온보딩 완료 시 `/auth/signup/complete`
-4. 토큰 저장 후 초기 세션 복원 시 `/auth/me` 호출
-5. REST/Socket 인증 시작
+4. 이메일 회원가입 시작 시 `/auth/email/signup/start`
+5. 이메일 인증 완료 시 `/auth/email/signup/verify`
+6. 이메일 로그인 시 `/auth/email/login`
+7. 토큰 저장 후 초기 세션 복원 시 `/auth/me` 호출
+8. REST/Socket 인증 시작
 6. Friends/Rooms 목록 조회
 7. 채팅방 조회/입장/메시지 송수신
 8. `room_participants`로 전체 멤버 + 온라인 상태 표시
@@ -85,6 +91,7 @@
 
 - `User`: `email`, `nickname`, `profileImage`, `accountStatus`, `deletedAt`, `refreshTokenHash`
 - `AuthIdentity`: `userId`, `provider`, `providerUserId`, `providerEmail`, `lastLoginAt`
+- `EmailVerification`: `email`, `codeHash`, `passwordHash`, `nickname`, `expiresAt`, `resendAvailableAt`
 - `ChatRoom`: `name`, `memberIds`, `lastMessage`, `lastMessageAt`, `deletedMemberIds`(응답 가공 필드), `directChatDisabled`(응답 가공 필드)
 - `Message`: `chatRoomId`, `senderId`, `type`, `text`, `timestamp`
 - `Friendship`: `requesterId`, `addresseeId`, `pairKey`, `status`
@@ -127,6 +134,7 @@
 - unread 감소/증가 흐름은 실제 친구 계정 2개 이상 기준 추가 검증 필요
 - 설정은 모바일 별도 화면 + 데스크톱 모달 구조이며 닉네임/테마 변경과 회원탈퇴를 지원
 - 기본 회원가입 UI/연결/병합 정책은 아직 미구현
+- 개발 단계 이메일 인증 코드는 서버 로그/DB로 확인한다
 
 ## 익명방 확장 방향(계획)
 

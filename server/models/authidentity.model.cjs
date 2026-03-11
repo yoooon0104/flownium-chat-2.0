@@ -26,6 +26,14 @@ const authIdentitySchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
+    secretHash: {
+      type: String,
+      default: null,
+    },
+    verifiedAt: {
+      type: Date,
+      default: null,
+    },
     lastLoginAt: {
       type: Date,
       default: null,

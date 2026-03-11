@@ -62,12 +62,16 @@ function AppShell() {
     startKakaoLogin,
     refreshAccessToken,
     completeSignup,
+    startEmailSignup,
+    verifyEmailSignup,
+    loginWithEmail,
+    clearPendingEmailVerification,
     updateProfileNickname,
     deleteAccount,
     clearSession,
   } = useKakaoAuth(API_BASE_URL)
 
-  const { accessToken, user, pendingSignup, isInitializing, error } = authState
+  const { accessToken, user, pendingSignup, pendingEmailVerification, isInitializing, error } = authState
 
   const [joinedRoomId, setJoinedRoomId] = useState('')
   const [participants, setParticipants] = useState([])
@@ -706,7 +710,18 @@ function AppShell() {
   }
 
   if (!accessToken) {
-    return <LoginGate isLoading={false} authError={error} onStartKakaoLogin={startKakaoLogin} />
+    return (
+      <LoginGate
+        isLoading={false}
+        authError={error}
+        pendingEmailVerification={pendingEmailVerification}
+        onStartKakaoLogin={startKakaoLogin}
+        onStartEmailSignup={startEmailSignup}
+        onVerifyEmailSignup={verifyEmailSignup}
+        onLoginWithEmail={loginWithEmail}
+        onClearPendingEmailVerification={clearPendingEmailVerification}
+      />
+    )
   }
 
   return (

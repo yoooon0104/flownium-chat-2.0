@@ -6,6 +6,58 @@ const hashToken = (token) => {
   return crypto.createHash('sha256').update(String(token)).digest('hex');
 };
 
+const normalizeEmail = (rawEmail) => {
+  return String(rawEmail || '').trim().toLowerCase();
+};
+
+const generateVerificationCode = () => {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+};
+
+const hashSecret = async (secret) => {
+  const normalizedSecret = String(secret || '');
+  const salt = crypto.randomBytes(16).toString('hex');
+
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(normalizedSecret, salt, 64, (error, derivedKey) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(`${salt}:${derivedKey.toString('hex')}`);
+    });
+  });
+};
+
+const verifySecret = async (secret, hashedSecret) => {
+  const normalizedSecret = String(secret || '');
+  const [salt, storedHash] = String(hashedSecret || '').split(':');
+
+  if (!salt || !storedHash) {
+    return false;
+  }
+
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(normalizedSecret, salt, 64, (error, derivedKey) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      const storedBuffer = Buffer.from(storedHash, 'hex');
+      const derivedBuffer = Buffer.from(derivedKey);
+
+      if (storedBuffer.length !== derivedBuffer.length) {
+        resolve(false);
+        return;
+      }
+
+      resolve(crypto.timingSafeEqual(storedBuffer, derivedBuffer));
+    });
+  });
+};
+
 // 사용자 문서를 바탕으로 access/refresh JWT를 동시에 발급한다.
 const issueJwtTokens = (userDoc, config) => {
   const {
@@ -61,7 +113,7 @@ const issueSignupToken = (payload, config) => {
       providerUserId,
       profileImage: String(payload.profileImage || '').trim(),
       kakaoNickname: String(payload.kakaoNickname || '').trim(),
-      email: String(payload.email || '').trim().toLowerCase(),
+      email: normalizeEmail(payload.email),
     },
     JWT_SIGNUP_SECRET,
     { expiresIn: SIGNUP_TOKEN_EXPIRES_IN }
@@ -109,10 +161,29 @@ const verifySignupToken = (token, signupSecret) => {
   return {
     provider,
     providerUserId,
-    email: String(decoded.email || '').trim().toLowerCase(),
+    email: normalizeEmail(decoded.email),
     profileImage: String(decoded.profileImage || '').trim(),
     kakaoNickname: String(decoded.kakaoNickname || '').trim(),
   };
+};
+
+const validateEmail = (rawEmail) => {
+  const email = normalizeEmail(rawEmail);
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailPattern.test(email)) {
+    throw new Error('invalid email');
+  }
+
+  return email;
+};
+
+const validatePassword = (rawPassword) => {
+  const password = String(rawPassword || '');
+  if (password.length < 8 || password.length > 72) {
+    throw new Error('password must be between 8 and 72 characters');
+  }
+  return password;
 };
 
 // 닉네임 입력값을 공통 규칙으로 검증/정규화한다.
@@ -126,10 +197,16 @@ const validateNickname = (rawNickname) => {
 
 module.exports = {
   hashToken,
+  normalizeEmail,
+  generateVerificationCode,
+  hashSecret,
+  verifySecret,
   issueJwtTokens,
   issueSignupToken,
+  validateEmail,
   verifyAccessToken,
   verifyRefreshToken,
   verifySignupToken,
   validateNickname,
+  validatePassword,
 };

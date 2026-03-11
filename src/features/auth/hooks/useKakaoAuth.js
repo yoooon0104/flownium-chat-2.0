@@ -10,6 +10,15 @@ const KAKAO_AUTH_CODE_STORAGE_KEY = 'flownium:kakao-auth-code'
 const KAKAO_AUTH_IN_PROGRESS_STORAGE_KEY = 'flownium:kakao-auth-in-progress'
 
 const resolveErrorMessage = (body, fallback) => {
+  const code = String(body?.error?.code || '').trim()
+  if (code === 'EMAIL_NOT_REGISTERED') return '가입되지 않은 이메일입니다. 먼저 회원가입을 진행해주세요.'
+  if (code === 'EMAIL_NOT_VERIFIED') return '이메일 인증을 먼저 완료해주세요.'
+  if (code === 'INVALID_EMAIL_PASSWORD') return '비밀번호가 올바르지 않습니다.'
+  if (code === 'ACCOUNT_NOT_AVAILABLE') return '사용할 수 없는 계정입니다.'
+  if (code === 'EMAIL_ALREADY_REGISTERED') return '이미 가입된 이메일입니다.'
+  if (code === 'INVALID_VERIFICATION_CODE') return '인증 코드가 올바르지 않습니다.'
+  if (code === 'VERIFICATION_CODE_EXPIRED') return '인증 코드가 만료되었습니다. 다시 요청해주세요.'
+  if (code === 'VERIFICATION_RESEND_COOLDOWN') return '인증 코드를 너무 자주 요청하고 있습니다. 잠시 후 다시 시도해주세요.'
   if (body?.error?.message) return String(body.error.message)
   if (typeof body?.error === 'string') return body.error
   return fallback
@@ -31,6 +40,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
   const [refreshToken, setRefreshToken] = useState(initialSession.refreshToken)
   const [user, setUser] = useState(null)
   const [pendingSignup, setPendingSignup] = useState(null)
+  const [pendingEmailVerification, setPendingEmailVerification] = useState(null)
   const [isInitializing, setIsInitializing] = useState(true)
   const [error, setError] = useState('')
 
@@ -52,6 +62,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     setRefreshToken(payload.refreshToken)
     setUser(UserProfile.normalize(payload.user || null))
     setPendingSignup(null)
+    setPendingEmailVerification(null)
     setError('')
   }, [])
 
@@ -61,6 +72,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     setRefreshToken('')
     setUser(null)
     setPendingSignup(null)
+    setPendingEmailVerification(null)
     setError(nextError)
   }, [])
 
@@ -91,6 +103,53 @@ export const useKakaoAuth = (apiBaseUrl) => {
 
     saveSession(body)
   }, [authApi, saveSession])
+
+  const startEmailSignup = useCallback(async (payload) => {
+    const { ok, body } = await authApi.startEmailSignup(payload)
+    if (!ok || !body?.email) {
+      const message = resolveErrorMessage(body, '이메일 회원가입 시작에 실패했습니다.')
+      setError(message)
+      throw new Error(message)
+    }
+
+    setPendingEmailVerification({
+      email: String(body.email || '').trim().toLowerCase(),
+      nickname: String(payload?.nickname || '').trim(),
+      password: String(payload?.password || ''),
+      resendAvailableAt: String(body.resendAvailableAt || ''),
+      expiresAt: String(body.expiresAt || ''),
+      debugCode: String(body.debugCode || ''),
+    })
+    setError('')
+    return body
+  }, [authApi])
+
+  const verifyEmailSignup = useCallback(async (payload) => {
+    const { ok, body } = await authApi.verifyEmailSignup(payload)
+    if (!ok || !body?.accessToken || !body?.refreshToken) {
+      const message = resolveErrorMessage(body, '이메일 인증에 실패했습니다.')
+      setError(message)
+      throw new Error(message)
+    }
+
+    saveSession(body)
+  }, [authApi, saveSession])
+
+  const loginWithEmail = useCallback(async (payload) => {
+    const { ok, body } = await authApi.loginWithEmail(payload)
+    if (!ok || !body?.accessToken || !body?.refreshToken) {
+      const message = resolveErrorMessage(body, '이메일 로그인에 실패했습니다.')
+      setError(message)
+      throw new Error(message)
+    }
+
+    saveSession(body)
+  }, [authApi, saveSession])
+
+  const clearPendingEmailVerification = useCallback(() => {
+    setPendingEmailVerification(null)
+    setError('')
+  }, [])
 
   const updateProfileNickname = useCallback(async (nickname) => {
     const currentToken = AuthSession.load().accessToken || accessToken
@@ -259,6 +318,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
       refreshToken,
       user,
       pendingSignup,
+      pendingEmailVerification,
       isInitializing,
       error,
     },
@@ -266,6 +326,10 @@ export const useKakaoAuth = (apiBaseUrl) => {
     startKakaoLogin,
     refreshAccessToken,
     completeSignup,
+    startEmailSignup,
+    verifyEmailSignup,
+    loginWithEmail,
+    clearPendingEmailVerification,
     updateProfileNickname,
     deleteAccount,
     clearSession,

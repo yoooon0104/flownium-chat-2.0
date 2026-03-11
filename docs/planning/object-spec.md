@@ -320,6 +320,8 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - `provider: 'kakao' | 'email' | ...`
 - `providerUserId: string`
 - `providerEmail?: string`
+- `secretHash?: string`
+- `verifiedAt?: date|null`
 - `lastLoginAt: date|null`
 - `createdAt: date`
 - `updatedAt: date`
@@ -328,7 +330,9 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 
 - 하나의 `User`는 여러 `AuthIdentity`를 가질 수 있다.
 - 카카오는 간편로그인 수단으로만 저장한다.
+- 이메일 회원가입은 `AuthIdentity(email)`로 저장한다.
 - 카카오 최초 로그인 시 기존 active legacy `User.kakaoId`가 있으면 첫 로그인에서 `AuthIdentity(kakao)`로 승격한다.
+- 이메일 회원가입은 인증 성공 시점에만 `User + AuthIdentity(email)`를 생성한다.
 - 회원탈퇴 시 tombstone `User`는 유지하되, `AuthIdentity`는 제거한다.
 - 재가입 시 기존 tombstone `User` 복구 대신 새 `User` + 새 `AuthIdentity`를 생성한다.
 
@@ -337,7 +341,38 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - `(provider, providerUserId)` 조합은 unique
 - 삭제된 사용자에 연결된 로그인 수단은 재사용하지 않는다
 
-## 10) 예정 도메인: AnonymousRoom / AnonymousParticipant / GuestSession
+## 10) EmailVerification
+
+### 목적
+
+- 이메일 회원가입 중 인증 전 임시 입력값을 저장하는 도메인
+
+### 필드
+
+- `email: string`
+- `codeHash: string`
+- `passwordHash: string`
+- `nickname: string`
+- `expiresAt: date`
+- `resendAvailableAt: date`
+- `verifiedAt: date|null`
+- `attemptCount: number`
+- `createdAt: date`
+- `updatedAt: date`
+
+### 생성/갱신 규칙
+
+- 이메일 회원가입 시작 시 생성 또는 갱신한다.
+- 인증 성공 전까지는 실제 `User`를 만들지 않는다.
+- 인증 성공 시 `EmailVerification`은 삭제한다.
+- 개발 단계에서는 서버 로그/DB에서 인증 코드를 확인한다.
+
+### 검증 규칙
+
+- 이메일별 pending 인증은 1건만 유지한다.
+- 인증 코드는 6자리, 10분 만료, 60초 재발송 제한을 적용한다.
+
+## 11) 예정 도메인: AnonymousRoom / AnonymousParticipant / GuestSession
 
 ### 목적
 
