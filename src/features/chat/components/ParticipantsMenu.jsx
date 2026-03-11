@@ -48,12 +48,17 @@ function ParticipantsMenu({
             <ul className="flex flex-col gap-2">
               {participants.map((participant) => {
                 const isMe = participant.userId === currentUserId
+                const statusLabel = participant.isDeleted ? 'deleted' : (participant.online ? 'online' : 'offline')
                 return (
                   <li key={participant.userId} className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]">
-                    <span className="min-w-0 truncate">{participant.nickname}{isMe ? ' (나)' : ''}</span>
-                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${participant.online ? 'border-brand-primary/15 bg-brand-primary/8 text-[var(--text-primary)]' : 'border-[var(--border-soft)]/60 bg-[color-mix(in_srgb,var(--surface-elevated)_72%,transparent)] text-[color:color-mix(in_srgb,var(--text-secondary)_72%,transparent)]'}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${participant.online ? 'bg-brand-primary/70' : 'bg-[color:color-mix(in_srgb,var(--text-tertiary)_55%,transparent)]'}`} />
-                      {participant.online ? 'online' : 'offline'}
+                    <span className="min-w-0 truncate">
+                      {participant.nickname}
+                      {participant.isDeleted ? ' (탈퇴한 회원)' : ''}
+                      {isMe ? ' (나)' : ''}
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${participant.isDeleted ? 'border-[var(--border-soft)]/50 bg-[color-mix(in_srgb,var(--surface-elevated)_62%,transparent)] text-[color:color-mix(in_srgb,var(--text-tertiary)_74%,transparent)]' : participant.online ? 'border-brand-primary/15 bg-brand-primary/8 text-[var(--text-primary)]' : 'border-[var(--border-soft)]/60 bg-[color-mix(in_srgb,var(--surface-elevated)_72%,transparent)] text-[color:color-mix(in_srgb,var(--text-secondary)_72%,transparent)]'}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${participant.isDeleted ? 'bg-[color:color-mix(in_srgb,var(--text-tertiary)_45%,transparent)]' : participant.online ? 'bg-brand-primary/70' : 'bg-[color:color-mix(in_srgb,var(--text-tertiary)_55%,transparent)]'}`} />
+                      {statusLabel}
                     </span>
                   </li>
                 )

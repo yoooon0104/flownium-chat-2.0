@@ -17,8 +17,8 @@ const getFriendSectionLabel = (friend) => {
   return first
 }
 
-// 좌측 패널은 프로필, 액션 버튼, 검색창, 친구/방 목록을 함께 렌더링한다.
-// 모바일에서는 하단 탭이 Friends/Rooms 전환을 담당하므로 상단 토글은 숨긴다.
+// 좌측 패널은 친구/방 목록과 상단 유저 액션, 알림 허브를 함께 보여준다.
+// 탈퇴한 친구는 tombstone 행으로 남기되 직접 채팅과 프로필 진입은 막는다.
 function RoomPanel({
   isMobileChatView,
   isMobileNotificationView,
@@ -50,6 +50,7 @@ function RoomPanel({
   pendingSent,
   notificationErrorMessage,
   onRespondFriendRequest,
+  onOpenRoomInvite,
   isUserMenuOpen,
   onToggleUserMenu,
   onOpenProfile,
@@ -112,6 +113,7 @@ function RoomPanel({
             pendingSent={pendingSent}
             notificationErrorMessage={notificationErrorMessage}
             onRespondFriendRequest={onRespondFriendRequest}
+            onOpenRoomInvite={onOpenRoomInvite}
           />
           <UserMenu
             isOpen={isUserMenuOpen}
@@ -121,7 +123,7 @@ function RoomPanel({
             onLogout={onLogout}
             isFloating={false}
             buttonLabel="설정 메뉴"
-            buttonSymbol="⚙"
+            buttonSymbol="⋯"
           />
         </div>
       </div>
@@ -183,17 +185,23 @@ function RoomPanel({
                   <li key={friend.id}>
                     <button
                       type="button"
-                      className="grid w-full grid-cols-[auto_1fr] items-center gap-3 rounded-2xl border border-transparent bg-[var(--panel-soft)] px-3 py-3 text-left transition hover:border-[var(--border-soft)] hover:bg-[var(--surface-muted)] focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                      className={`grid w-full grid-cols-[auto_1fr] items-center gap-3 rounded-2xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-brand-primary/30 ${friend.isDeleted ? 'cursor-not-allowed border-transparent bg-[var(--panel-soft)] opacity-70' : 'border-transparent bg-[var(--panel-soft)] hover:border-[var(--border-soft)] hover:bg-[var(--surface-muted)]'}`}
                       onDoubleClick={() => onFriendDoubleClick(friend)}
                       onClick={() => onFriendTap(friend)}
-                      title="친구와 1:1 채팅 시작"
+                      title={friend.isDeleted ? '탈퇴한 회원입니다.' : '친구와 1:1 채팅 시작'}
+                      disabled={friend.isDeleted}
                     >
                       <span className="inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-xs font-semibold text-[var(--text-primary)]">
                         {friend.profileImage ? <img src={friend.profileImage} alt="" className="h-full w-full object-cover" /> : getFriendInitial(friend)}
                       </span>
                       <span className="min-w-0">
-                        <strong className="block truncate text-sm font-semibold text-[var(--text-primary)]">{friend.nickname || '이름 없음'}</strong>
-                        <small className="mt-1 block truncate text-xs text-[var(--text-secondary)]">{friend.email || '이메일 미등록'}</small>
+                        <strong className="block truncate text-sm font-semibold text-[var(--text-primary)]">
+                          {friend.nickname || '이름 없음'}
+                          {friend.isDeleted ? ' (탈퇴한 회원)' : ''}
+                        </strong>
+                        <small className="mt-1 block truncate text-xs text-[var(--text-secondary)]">
+                          {friend.isDeleted ? '프로필을 볼 수 없습니다.' : (friend.email || '이메일 미등록')}
+                        </small>
                       </span>
                     </button>
                   </li>

@@ -14,11 +14,14 @@ const createFriendRouter = ({
 }) => {
   const router = express.Router();
 
+  const isDeletedUser = (userDoc) => String(userDoc?.accountStatus || "active") === "deleted";
+
   const toUserSummary = (userDoc) => ({
     id: String(userDoc._id),
-    email: userDoc.email || "",
+    email: isDeletedUser(userDoc) ? "" : userDoc.email || "",
     nickname: userDoc.nickname || "",
-    profileImage: userDoc.profileImage || "",
+    profileImage: isDeletedUser(userDoc) ? "" : userDoc.profileImage || "",
+    isDeleted: isDeletedUser(userDoc),
   });
 
   const toFriendRequestResponse = (friendshipDoc, me, userById) => {
@@ -75,6 +78,7 @@ const createFriendRouter = ({
       const regex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
       const users = await User.find({
         _id: { $ne: me },
+        accountStatus: { $ne: "deleted" },
         $or: [{ nickname: regex }, { email: regex }],
       })
         .limit(20)
@@ -184,7 +188,7 @@ const createFriendRouter = ({
         Friendship.findOne({ pairKey: [me, targetUserId].sort().join(":") }),
       ]);
 
-      if (!targetUser) {
+      if (!targetUser || isDeletedUser(targetUser)) {
         sendError(res, 404, "USER_NOT_FOUND", "user not found");
         return;
       }

@@ -127,6 +127,11 @@ export const useChatSocket = ({
     client.on('error', (payload) => {
       const code = String(payload?.code || '').trim()
       const message = String(payload?.message || 'Unknown socket error')
+      if (code === 'DELETED_MEMBER') {
+        onError?.(message)
+        return
+      }
+
       onError?.(code ? `${message} (${code})` : message)
     })
 

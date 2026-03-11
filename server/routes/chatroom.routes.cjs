@@ -47,16 +47,43 @@ const createChatroomRouter = ({
   const normalizeUserIds = (values) =>
     [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean))];
 
+  const findDeletedMemberIds = async (memberIds) => {
+    const normalizedMemberIds = Array.isArray(memberIds)
+      ? memberIds.map((value) => String(value))
+      : [];
+
+    if (normalizedMemberIds.length === 0) {
+      return [];
+    }
+
+    const deletedUsers = await User.find({
+      _id: { $in: normalizedMemberIds },
+      accountStatus: 'deleted',
+    })
+      .select({ _id: 1 })
+      .lean();
+
+    return deletedUsers.map((user) => String(user._id));
+  };
+
   // 응답 형태를 한곳에서 고정해 두면 REST/소켓의 room 메타가 어긋나지 않는다.
-  const toRoomResponse = (roomDoc, unreadCount = 0) => ({
-    id: String(roomDoc._id),
-    name: roomDoc.name,
-    isGroup: Boolean(roomDoc.isGroup),
-    memberIds: Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [],
-    lastMessage: roomDoc.lastMessage || '',
-    lastMessageAt: roomDoc.lastMessageAt ? new Date(roomDoc.lastMessageAt).toISOString() : null,
-    unreadCount: Number(unreadCount) || 0,
-  });
+  const toRoomResponse = async (roomDoc, unreadCount = 0) => {
+    const memberIds = Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
+    const deletedMemberIds = await findDeletedMemberIds(memberIds);
+
+    return {
+      id: String(roomDoc._id),
+      name: roomDoc.name,
+      isGroup: Boolean(roomDoc.isGroup),
+      memberIds,
+      lastMessage: roomDoc.lastMessage || '',
+      lastMessageAt: roomDoc.lastMessageAt ? new Date(roomDoc.lastMessageAt).toISOString() : null,
+      unreadCount: Number(unreadCount) || 0,
+      deletedMemberIds,
+      hasDeletedMember: deletedMemberIds.length > 0,
+      directChatDisabled: !roomDoc.isGroup && deletedMemberIds.length > 0,
+    };
+  };
 
   const createNotification = async (userId, type, payload) => {
     if (!Notification) return null;
@@ -151,8 +178,9 @@ const createChatroomRouter = ({
     });
 
   const broadcastRoomUpdated = async (memberIds, roomDoc) => {
+    const roomPayload = await toRoomResponse(roomDoc);
     await Promise.all(
-      memberIds.map((memberId) => emitRoomUpdated?.(String(memberId), toRoomResponse(roomDoc)))
+      memberIds.map((memberId) => emitRoomUpdated?.(String(memberId), roomPayload))
     );
   };
 
@@ -242,7 +270,7 @@ const createChatroomRouter = ({
         });
 
         await broadcastRoomUpdated([currentUserId], room);
-        res.status(201).json({ room: toRoomResponse(room) });
+        res.status(201).json({ room: await toRoomResponse(room) });
         return;
       }
 
@@ -256,7 +284,10 @@ const createChatroomRouter = ({
         return;
       }
 
-      const targetUsers = await User.find({ _id: { $in: normalizedTargetIds } }).lean();
+      const targetUsers = await User.find({
+        _id: { $in: normalizedTargetIds },
+        accountStatus: { $ne: 'deleted' },
+      }).lean();
       if (targetUsers.length !== normalizedTargetIds.length) {
         sendError(res, 404, 'USER_NOT_FOUND', 'one or more users were not found');
         return;
@@ -274,7 +305,7 @@ const createChatroomRouter = ({
         const friendUserId = normalizedTargetIds[0];
         const existingRoom = await findExistingDirectRoom(currentUserId, friendUserId);
         if (existingRoom) {
-          res.status(200).json({ room: toRoomResponse(existingRoom), reused: true });
+          res.status(200).json({ room: await toRoomResponse(existingRoom), reused: true });
           return;
         }
 
@@ -295,7 +326,7 @@ const createChatroomRouter = ({
         });
 
         await broadcastRoomUpdated(room.memberIds, room);
-        res.status(201).json({ room: toRoomResponse(room), reused: false });
+        res.status(201).json({ room: await toRoomResponse(room), reused: false });
         return;
       }
 
@@ -324,7 +355,7 @@ const createChatroomRouter = ({
       );
 
       await broadcastRoomUpdated(memberIds, room);
-      res.status(201).json({ room: toRoomResponse(room) });
+      res.status(201).json({ room: await toRoomResponse(room) });
     } catch (error) {
       sendError(res, 500, 'CHATROOM_CREATE_FAILED', error.message || 'failed to create chatroom');
     }
@@ -361,7 +392,16 @@ const createChatroomRouter = ({
         return;
       }
 
-      const targetUsers = await User.find({ _id: { $in: targetUserIds } }).lean();
+      const deletedMemberIds = await findDeletedMemberIds(room.memberIds);
+      if (!room.isGroup && deletedMemberIds.length > 0) {
+        sendError(res, 409, 'DELETED_MEMBER', 'deleted member direct rooms cannot be extended');
+        return;
+      }
+
+      const targetUsers = await User.find({
+        _id: { $in: targetUserIds },
+        accountStatus: { $ne: 'deleted' },
+      }).lean();
       if (targetUsers.length !== targetUserIds.length) {
         sendError(res, 404, 'USER_NOT_FOUND', 'one or more users were not found');
         return;
@@ -427,7 +467,7 @@ const createChatroomRouter = ({
         await emitRoomParticipants?.(String(room._id));
 
         res.status(200).json({
-          room: toRoomResponse(room),
+          room: await toRoomResponse(room),
           createdNewRoom: false,
         });
         return;
@@ -466,7 +506,7 @@ const createChatroomRouter = ({
 
       await broadcastRoomUpdated(nextMemberIds, nextRoom);
       res.status(201).json({
-        room: toRoomResponse(nextRoom),
+        room: await toRoomResponse(nextRoom),
         createdNewRoom: true,
       });
     } catch (error) {
@@ -547,7 +587,7 @@ const createChatroomRouter = ({
       await emitRoomParticipants?.(roomId);
 
       res.status(200).json({
-        room: toRoomResponse(room),
+        room: await toRoomResponse(room),
         deleted: false,
       });
     } catch (error) {
@@ -577,7 +617,7 @@ const createChatroomRouter = ({
           const currentRoomId = String(room._id);
           const readState = readStateByRoomId.get(currentRoomId);
           const unreadCount = await getUnreadCountForRoom(currentRoomId, req.user.userId, readState?.lastReadAt || null);
-          return toRoomResponse(room, unreadCount);
+          return await toRoomResponse(room, unreadCount);
         })
       );
 
