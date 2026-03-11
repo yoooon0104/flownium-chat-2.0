@@ -514,6 +514,7 @@ MVP2-A 1차 표준:
 - 현재 사용자가 참여 중인 방 목록 조회
 - 정렬: `lastMessageAt desc` -> `createdAt desc`
 - 응답에 방별 `unreadCount`, 전체 `totalUnreadCount` 포함
+- direct 방의 `name`은 저장값이 아니라 현재 사용자 기준 상대 닉네임으로 내려온다
 - direct 방에 탈퇴 회원이 남아 있으면 `deletedMemberIds`, `hasDeletedMember`, `directChatDisabled`가 함께 내려온다
 
 응답 예시:
