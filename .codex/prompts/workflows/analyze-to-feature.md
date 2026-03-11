@@ -48,6 +48,9 @@ Tasks:
 2. Propose the smallest implementation path.
 3. Call out required documentation updates if any.
 4. Call out whether realtime verification is likely needed.
+5. Once the analysis is sufficient, do not keep expanding the design in repeated turns.
+6. If the user has already indicated they want to proceed, move directly to implementation.
+7. If implementation should start but explicit intent is still unclear, ask only a short proceed-or-not confirmation.
 
 Output:
 

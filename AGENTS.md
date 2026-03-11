@@ -41,6 +41,7 @@ Agents must review `docs/development-rules.md` before changing code, documentati
 3. Permission justifications must be written in Korean.
 4. Do not run destructive actions unless explicitly requested.
 5. Do not push or merge unless explicitly instructed.
+6. If `gh` is not available on PATH but GitHub CLI is installed, use the explicit executable path `C:\Program Files\GitHub CLI\gh.exe`.
 
 ## 4. Reporting Rules
 

@@ -38,3 +38,5 @@
 
 - This phase still excludes real email delivery, password reset, email change, and Kakao account linking.
 - In development, the verification code is now available in both the server log and the signup response/UI as `debugCode`.
+- GitHub CLI was installed locally but not exposed on PATH, so PR creation used `C:\Program Files\GitHub CLI\gh.exe` directly.
+- Follow-up backlog note added: friend search should later move from nickname-based lookup to email-based lookup.
