@@ -224,6 +224,19 @@ const validatePassword = (rawPassword) => {
   return password;
 };
 
+// 신규 가입과 비밀번호 변경에는 길이 외에 영문/숫자 조합을 요구한다.
+const validateStrongPassword = (rawPassword) => {
+  const password = validatePassword(rawPassword);
+  const hasLetter = /[A-Za-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+
+  if (!hasLetter || !hasNumber) {
+    throw new Error('password must include both letters and numbers');
+  }
+
+  return password;
+};
+
 // 닉네임 입력값을 공통 규칙으로 검증/정규화한다.
 const validateNickname = (rawNickname) => {
   const nickname = String(rawNickname || '').trim();
@@ -249,4 +262,5 @@ module.exports = {
   verifySignupToken,
   validateNickname,
   validatePassword,
+  validateStrongPassword,
 };

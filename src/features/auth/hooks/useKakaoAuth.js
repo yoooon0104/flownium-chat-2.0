@@ -16,9 +16,13 @@ const resolveErrorMessage = (body, fallback) => {
   if (code === 'INVALID_EMAIL_PASSWORD') return '비밀번호가 올바르지 않습니다.'
   if (code === 'ACCOUNT_NOT_AVAILABLE') return '사용할 수 없는 계정입니다.'
   if (code === 'EMAIL_ALREADY_REGISTERED') return '이미 가입된 이메일입니다.'
+  if (code === 'TERMS_NOT_AGREED') return '약관 동의가 필요합니다.'
   if (code === 'INVALID_VERIFICATION_CODE') return '인증 코드가 올바르지 않습니다.'
   if (code === 'VERIFICATION_CODE_EXPIRED') return '인증 코드가 만료되었습니다. 다시 요청해주세요.'
   if (code === 'VERIFICATION_RESEND_COOLDOWN') return '인증 코드를 너무 자주 요청하고 있습니다. 잠시 후 다시 시도해주세요.'
+  if (code === 'WEAK_PASSWORD') return '비밀번호는 영문과 숫자를 모두 포함해야 합니다.'
+  if (code === 'INVALID_CURRENT_PASSWORD') return '현재 비밀번호가 올바르지 않습니다.'
+  if (code === 'EMAIL_PASSWORD_NOT_AVAILABLE') return '이 계정은 이메일 비밀번호 변경을 사용할 수 없습니다.'
   if (body?.error?.message) return String(body.error.message)
   if (typeof body?.error === 'string') return body.error
   return fallback
@@ -41,6 +45,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
   const [user, setUser] = useState(null)
   const [pendingSignup, setPendingSignup] = useState(null)
   const [pendingEmailVerification, setPendingEmailVerification] = useState(null)
+  const [shouldPromptKakaoLink, setShouldPromptKakaoLink] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const [error, setError] = useState('')
 
@@ -63,6 +68,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     setUser(UserProfile.normalize(payload.user || null))
     setPendingSignup(null)
     setPendingEmailVerification(null)
+    setShouldPromptKakaoLink(false)
     setError('')
   }, [])
 
@@ -73,6 +79,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     setUser(null)
     setPendingSignup(null)
     setPendingEmailVerification(null)
+    setShouldPromptKakaoLink(false)
     setError(nextError)
   }, [])
 
@@ -133,6 +140,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     }
 
     saveSession(body)
+    setShouldPromptKakaoLink(true)
   }, [authApi, saveSession])
 
   const loginWithEmail = useCallback(async (payload) => {
@@ -149,6 +157,10 @@ export const useKakaoAuth = (apiBaseUrl) => {
   const clearPendingEmailVerification = useCallback(() => {
     setPendingEmailVerification(null)
     setError('')
+  }, [])
+
+  const dismissKakaoLinkPrompt = useCallback(() => {
+    setShouldPromptKakaoLink(false)
   }, [])
 
   const updateProfileNickname = useCallback(async (nickname) => {
@@ -210,6 +222,37 @@ export const useKakaoAuth = (apiBaseUrl) => {
 
     throw new Error(resolveErrorMessage(first.body, '회원탈퇴 처리에 실패했습니다.'))
   }, [accessToken, authApi, clearSession, refreshAccessToken])
+
+  const changePassword = useCallback(async ({ currentPassword, newPassword }) => {
+    const currentToken = AuthSession.load().accessToken || accessToken
+    if (!currentToken) {
+      throw new Error('로그인이 필요합니다.')
+    }
+
+    const first = await authApi.changePassword({ currentPassword, newPassword }, currentToken)
+    if (first.ok) {
+      setError('')
+      return true
+    }
+
+    if (first.status === 401) {
+      const refreshed = await refreshAccessToken()
+      if (!refreshed) {
+        throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.')
+      }
+
+      const retriedToken = AuthSession.load().accessToken
+      const retried = await authApi.changePassword({ currentPassword, newPassword }, retriedToken)
+      if (retried.ok) {
+        setError('')
+        return true
+      }
+
+      throw new Error(resolveErrorMessage(retried.body, '비밀번호 변경에 실패했습니다.'))
+    }
+
+    throw new Error(resolveErrorMessage(first.body, '비밀번호 변경에 실패했습니다.'))
+  }, [accessToken, authApi, refreshAccessToken])
 
   const redirectToKakao = useCallback((authorizeUrl) => {
     if (!authorizeUrl) {
@@ -364,6 +407,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
       user,
       pendingSignup,
       pendingEmailVerification,
+      shouldPromptKakaoLink,
       isInitializing,
       error,
     },
@@ -376,7 +420,9 @@ export const useKakaoAuth = (apiBaseUrl) => {
     verifyEmailSignup,
     loginWithEmail,
     clearPendingEmailVerification,
+    dismissKakaoLinkPrompt,
     updateProfileNickname,
+    changePassword,
     deleteAccount,
     clearSession,
   }

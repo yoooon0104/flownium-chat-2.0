@@ -105,6 +105,19 @@ export const createAuthApi = (apiBaseUrl) => {
     return { ok: response.ok, status: response.status, body }
   }
 
+  const changePassword = async (payload, accessToken) => {
+    const response = await fetch(`${apiBaseUrl}/auth/password`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
   const deleteAccount = async (accessToken) => {
     const response = await fetch(`${apiBaseUrl}/auth/account`, {
       method: 'DELETE',
@@ -126,6 +139,7 @@ export const createAuthApi = (apiBaseUrl) => {
     loginWithEmail,
     getMe,
     updateProfile,
+    changePassword,
     deleteAccount,
   }
 }

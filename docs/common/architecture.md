@@ -42,11 +42,11 @@
 ## 백엔드 구조
 
 - `server/index.cjs`: 서버 엔트리 + 소켓 이벤트
-- `routes/auth.routes.cjs`: 카카오/온보딩/email signup/email login/kakao link/refresh/me/profile/account delete
+- `routes/auth.routes.cjs`: 카카오/온보딩/email signup/email login/kakao link/refresh/me/profile/password/account delete
 - `routes/chatroom.routes.cjs`: 채팅방 생성/초대/나가기/메시지/read 상태 REST + 커서 기반 메시지 페이지네이션
 - `routes/friend.routes.cjs`: 친구 검색/요청/수락/거절/차단
 - `routes/notification.routes.cjs`: 알림 목록/읽음 처리
-- `services/auth.service.cjs`: JWT/해시/signup 토큰 검증
+- `services/auth.service.cjs`: JWT/해시/signup 토큰 검증 + 신규/변경용 비밀번호 규칙
 - `models/AuthIdentity`: 로그인 수단 매핑
 - `models/EmailVerification`: 이메일 가입 전 임시 인증 레코드
 - `services/kakao.service.cjs`: 카카오 외부 API 연동(이메일 포함)
@@ -86,14 +86,16 @@
 14. 채팅 상세에서 친구 초대/나가기 처리
 15. 메시지 목록은 `before` 커서 기반으로 이전 메시지 추가 로드
 16. 알림 허브/모바일 알림 화면에서 친구 요청과 초대 처리
-17. 설정 화면/모달에서 닉네임과 테마(light/dark/system) 변경, 카카오 계정 연결
-18. 회원탈퇴 시 사용자 문서를 tombstone 상태로 바꾸고 친구/방/알림/읽음 상태를 함께 정리한 뒤 로그인 게이트로 복귀
+17. 메뉴에서 `내 정보`와 `설정`을 분리해 진입
+18. `내 정보` 화면에서 닉네임 변경, 비밀번호 변경, 카카오 계정 연결, 회원탈퇴 처리
+19. `설정` 화면에서는 테마(light/dark/system) 같은 앱 환경 설정만 관리
+20. 회원탈퇴 시 사용자 문서를 tombstone 상태로 바꾸고 친구/방/알림/읽음 상태를 함께 정리한 뒤 로그인 게이트로 복귀
 
 ## 데이터 핵심 필드
 
 - `User`: `email`, `nickname`, `profileImage`, `accountStatus`, `deletedAt`, `refreshTokenHash`
 - `AuthIdentity`: `userId`, `provider`, `providerUserId`, `providerEmail`, `lastLoginAt`
-- `EmailVerification`: `email`, `codeHash`, `passwordHash`, `nickname`, `expiresAt`, `resendAvailableAt`
+- `EmailVerification`: `email`, `codeHash`, `passwordHash`, `nickname`, `agreedToTermsAt`, `expiresAt`, `resendAvailableAt`
 - `ChatRoom`: `name`, `memberIds`, `lastMessage`, `lastMessageAt`, `deletedMemberIds`(응답 가공 필드), `directChatDisabled`(응답 가공 필드)
 - `Message`: `chatRoomId`, `senderId`, `type`, `text`, `timestamp`
 - `Friendship`: `requesterId`, `addresseeId`, `pairKey`, `status`
@@ -134,7 +136,10 @@
 - 초대 승인 절차/강퇴 정책은 아직 없음(친구 검증 후 즉시 반영)
 - presence는 메모리 기반(서버 재시작 시 초기화)
 - unread 감소/증가 흐름은 실제 친구 계정 2개 이상 기준 추가 검증 필요
-- 설정은 모바일 별도 화면 + 데스크톱 모달 구조이며 닉네임/테마 변경과 회원탈퇴를 지원
+- 인증 화면은 카카오 로그인과 이메일 로그인/회원가입 패널을 분리해 제공
+- 이메일 회원가입은 서비스 이용 약관 동의가 선행되어야 한다
+- 이메일 회원가입은 비밀번호 확인과 강화된 검증(닉네임 2~20자, 영문/숫자 포함 비밀번호)을 적용
+- 설정은 앱 환경 설정만 담당하고, 계정 관리는 `내 정보` 화면으로 분리
 - 카카오 계정 연결은 1차 구현되었지만 연결 해제/병합 정책은 아직 미구현
 - 개발 단계 이메일 인증 코드는 서버 로그/DB로 확인한다
 

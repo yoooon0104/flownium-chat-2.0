@@ -1,32 +1,41 @@
-import { useEffect, useState } from 'react'
-import './LoginGate.css'
+import { useEffect, useMemo, useState } from 'react'
+import brandWordmarkDark from '../../../../assets/branding/logo/flownium-wordmark-dark.png'
 import brandWordmarkLight from '../../../../assets/branding/logo/flownium-wordmark-light.png'
+import EmailLoginForm from './EmailLoginForm'
+import EmailSignupForm from './EmailSignupForm'
+import './LoginGate.css'
 
-const TEXT = {
-  checking: '\uB85C\uADF8\uC778 \uC0C1\uD0DC\uB97C \uD655\uC778\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4...',
-  intro: '\uCE74\uCE74\uC624 \uB610\uB294 \uC774\uBA54\uC77C\uB85C Flownium\uC744 \uC2DC\uC791\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
-  startKakao: '\uCE74\uCE74\uC624\uB85C \uC2DC\uC791\uD558\uAE30',
-  continueWithEmail: '\uB610\uB294 \uC774\uBA54\uC77C\uB85C \uACC4\uC18D\uD558\uAE30',
-  emailLoginTab: '\uC774\uBA54\uC77C \uB85C\uADF8\uC778',
-  emailSignupTab: '\uC774\uBA54\uC77C \uD68C\uC6D0\uAC00\uC785',
-  email: '\uC774\uBA54\uC77C',
-  nickname: '\uB2C9\uB124\uC784',
-  password: '\uBE44\uBC00\uBC88\uD638',
-  emailPlaceholder: 'name@example.com',
-  nicknamePlaceholder: '\uC0AC\uC6A9\uD560 \uB2C9\uB124\uC784',
-  passwordPlaceholder: '8\uC790 \uC774\uC0C1 \uBE44\uBC00\uBC88\uD638',
-  verificationCode: '\uC778\uC99D \uCF54\uB4DC',
-  verificationCodePlaceholder: '6\uC790\uB9AC \uC778\uC99D \uCF54\uB4DC',
-  loginButton: '\uC774\uBA54\uC77C \uB85C\uADF8\uC778',
-  verifyButton: '\uC774\uBA54\uC77C \uC778\uC99D \uC644\uB8CC',
-  resetButton: '\uB2E4\uC2DC \uC785\uB825',
-  requestCodeButton: '\uC778\uC99D \uCF54\uB4DC \uBC1B\uAE30',
-  debugCodeLabel: '\uAC1C\uBC1C\uC6A9 \uC778\uC99D \uCF54\uB4DC',
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PASSWORD_LETTER_PATTERN = /[A-Za-z]/
+const PASSWORD_NUMBER_PATTERN = /\d/
+
+const getSignupValidationMessage = ({
+  email,
+  nickname,
+  password,
+  confirmPassword,
+  agreedToTerms,
+}) => {
+  const trimmedEmail = String(email || '').trim().toLowerCase()
+  const trimmedNickname = String(nickname || '').trim()
+
+  if (!agreedToTerms) return '회원가입을 진행하려면 약관 동의가 필요합니다.'
+  if (!trimmedEmail) return '이메일을 입력해주세요.'
+  if (!EMAIL_PATTERN.test(trimmedEmail)) return '올바른 이메일 형식을 입력해주세요.'
+  if (trimmedNickname.length < 2 || trimmedNickname.length > 20) return '닉네임은 2~20자로 입력해주세요.'
+  if (password.length < 8 || password.length > 72) return '비밀번호는 8~72자로 입력해주세요.'
+  if (!PASSWORD_LETTER_PATTERN.test(password) || !PASSWORD_NUMBER_PATTERN.test(password)) {
+    return '비밀번호는 영문과 숫자를 모두 포함해야 합니다.'
+  }
+  if (!confirmPassword) return '비밀번호 확인을 입력해주세요.'
+  if (password !== confirmPassword) return '비밀번호와 비밀번호 확인이 일치하지 않습니다.'
+  return ''
 }
 
 function LoginGate({
   isLoading,
   authError,
+  resolvedTheme = 'light',
   pendingEmailVerification,
   onStartKakaoLogin,
   onStartEmailSignup,
@@ -34,23 +43,49 @@ function LoginGate({
   onLoginWithEmail,
   onClearPendingEmailVerification,
 }) {
-  const [authMode, setAuthMode] = useState('login')
+  const [authView, setAuthView] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [nickname, setNickname] = useState('')
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [verificationCode, setVerificationCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (!pendingEmailVerification?.email) return
+
     setEmail(String(pendingEmailVerification.email || ''))
     setNickname(String(pendingEmailVerification.nickname || ''))
     setPassword(String(pendingEmailVerification.password || ''))
-    setAuthMode('signup')
+    setConfirmPassword(String(pendingEmailVerification.password || ''))
+    setAgreedToTerms(true)
+    setAuthView('signup')
   }, [pendingEmailVerification])
 
+  const signupValidationMessage = useMemo(() => {
+    if (pendingEmailVerification?.email) return ''
+    return getSignupValidationMessage({
+      email,
+      nickname,
+      password,
+      confirmPassword,
+      agreedToTerms,
+    })
+  }, [agreedToTerms, confirmPassword, email, nickname, password, pendingEmailVerification?.email])
+
+  const isPendingVerification = Boolean(pendingEmailVerification?.email)
+  const canSubmitEmailLogin = !isSubmitting && EMAIL_PATTERN.test(email.trim()) && password.length >= 8
+  const canStartEmailSignup = !isSubmitting && !signupValidationMessage
+  const canVerifyEmailSignup =
+    !isSubmitting &&
+    Boolean(pendingEmailVerification?.email) &&
+    verificationCode.trim().length === 6
+
+  const brandWordmark = resolvedTheme === 'dark' ? brandWordmarkLight : brandWordmarkDark
+
   const handleEmailLogin = async () => {
-    if (isSubmitting || !email.trim() || !password) return
+    if (!canSubmitEmailLogin) return
 
     try {
       setIsSubmitting(true)
@@ -61,18 +96,18 @@ function LoginGate({
   }
 
   const handleEmailSignupStart = async () => {
-    if (isSubmitting || !email.trim() || !password || nickname.trim().length < 2) return
+    if (!canStartEmailSignup) return
 
     try {
       setIsSubmitting(true)
-      await onStartEmailSignup({ email, password, nickname })
+      await onStartEmailSignup({ email, password, nickname, agreedToTerms })
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleEmailSignupVerify = async () => {
-    if (isSubmitting || !pendingEmailVerification?.email || !verificationCode.trim()) return
+    if (!canVerifyEmailSignup) return
 
     try {
       setIsSubmitting(true)
@@ -85,141 +120,98 @@ function LoginGate({
     }
   }
 
-  const isPendingVerification = Boolean(pendingEmailVerification?.email)
-  const canSubmitEmailLogin = !isSubmitting && Boolean(email.trim()) && Boolean(password)
-  const canStartEmailSignup =
-    !isSubmitting &&
-    Boolean(email.trim()) &&
-    Boolean(password) &&
-    nickname.trim().length >= 2
-  const canVerifyEmailSignup =
-    !isSubmitting &&
-    Boolean(pendingEmailVerification?.email) &&
-    verificationCode.trim().length === 6
+  const openLoginView = () => {
+    setAuthView('login')
+    if (isPendingVerification) {
+      setVerificationCode('')
+      onClearPendingEmailVerification()
+    }
+  }
+
+  const openSignupView = () => {
+    setAuthView('signup')
+  }
 
   return (
     <main className="auth-gate">
-      <section className="auth-card">
+      <section className={`auth-card auth-card-${authView}`}>
         <div className="auth-brand-wrap">
-          <img className="auth-brand-logo" src={brandWordmarkLight} alt="Flownium" />
+          <img className="auth-brand-logo" src={brandWordmark} alt="Flownium" />
         </div>
-        <p>{isLoading ? TEXT.checking : TEXT.intro}</p>
 
-        {authError && <p className="auth-error">{authError}</p>}
+        <div className="auth-hero">
+          <span className="auth-hero-eyebrow">Flownium Chat</span>
+          <h1>{authView === 'signup' ? '회원가입을 진행할게요' : '대화를 더 가볍게 시작하세요'}</h1>
+          <p>
+            {authView === 'signup'
+              ? '약관 동의와 이메일 인증을 먼저 마치고, 가입이 끝나면 간편로그인 연결도 이어서 진행할 수 있어요.'
+              : '카카오 간편로그인으로 바로 들어오거나, 이메일 로그인으로 기존 계정을 이어서 사용할 수 있어요.'}
+          </p>
+        </div>
 
-        {!isLoading && (
+        {authError && <p className="auth-error-banner">{authError}</p>}
+
+        {isLoading ? (
+          <p className="auth-status-copy">로그인 상태를 확인하고 있습니다...</p>
+        ) : authView === 'login' ? (
           <>
             <button type="button" className="kakao-login-button" onClick={onStartKakaoLogin}>
-              {TEXT.startKakao}
+              카카오로 시작하기
             </button>
 
             <div className="auth-divider">
-              <span>{TEXT.continueWithEmail}</span>
+              <span>또는 이메일로 로그인</span>
             </div>
 
-            <div className="auth-mode-toggle">
-              <button
-                type="button"
-                className={authMode === 'login' ? 'active' : ''}
-                onClick={() => {
-                  setAuthMode('login')
-                  if (isPendingVerification) onClearPendingEmailVerification()
-                }}
-              >
-                {TEXT.emailLoginTab}
-              </button>
-              <button
-                type="button"
-                className={authMode === 'signup' ? 'active' : ''}
-                onClick={() => setAuthMode('signup')}
-              >
-                {TEXT.emailSignupTab}
+            <EmailLoginForm
+              email={email}
+              password={password}
+              isSubmitting={isSubmitting}
+              canSubmit={canSubmitEmailLogin}
+              onEmailChange={setEmail}
+              onPasswordChange={setPassword}
+              onSubmit={handleEmailLogin}
+            />
+
+            <div className="auth-footer-card">
+              <strong>아직 계정이 없나요?</strong>
+              <p>회원가입 화면으로 이동해 이메일 인증과 약관 동의를 먼저 완료해주세요.</p>
+              <button type="button" className="secondary-action-button" onClick={openSignupView}>
+                이메일 회원가입
               </button>
             </div>
+          </>
+        ) : (
+          <>
+            <button type="button" className="auth-back-link" onClick={openLoginView}>
+              로그인 화면으로 돌아가기
+            </button>
 
-            <div className="auth-form">
-              <label className="auth-field">
-                <span>{TEXT.email}</span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder={TEXT.emailPlaceholder}
-                  disabled={isSubmitting || isPendingVerification}
-                />
-              </label>
-
-              {authMode === 'signup' && (
-                <label className="auth-field">
-                  <span>{TEXT.nickname}</span>
-                  <input
-                    value={nickname}
-                    onChange={(event) => setNickname(event.target.value)}
-                    placeholder={TEXT.nicknamePlaceholder}
-                    disabled={isSubmitting || isPendingVerification}
-                  />
-                </label>
-              )}
-
-              <label className="auth-field">
-                <span>{TEXT.password}</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder={TEXT.passwordPlaceholder}
-                  disabled={isSubmitting || isPendingVerification}
-                />
-              </label>
-
-              {authMode === 'signup' && isPendingVerification && (
-                <>
-                  <label className="auth-field">
-                    <span>{TEXT.verificationCode}</span>
-                    <input
-                      value={verificationCode}
-                      onChange={(event) => setVerificationCode(event.target.value)}
-                      placeholder={TEXT.verificationCodePlaceholder}
-                      inputMode="numeric"
-                      maxLength={6}
-                      disabled={isSubmitting}
-                    />
-                  </label>
-                  {pendingEmailVerification?.debugCode && (
-                    <p className="auth-debug-code">
-                      {TEXT.debugCodeLabel}: <strong>{pendingEmailVerification.debugCode}</strong>
-                    </p>
-                  )}
-                </>
-              )}
-
-              {authMode === 'login' ? (
-                <button type="button" className="email-action-button" onClick={() => void handleEmailLogin()} disabled={!canSubmitEmailLogin}>
-                  {TEXT.loginButton}
-                </button>
-              ) : isPendingVerification ? (
-                <div className="auth-action-group">
-                  <button type="button" className="email-action-button" onClick={() => void handleEmailSignupVerify()} disabled={!canVerifyEmailSignup}>
-                    {TEXT.verifyButton}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-action-button"
-                    onClick={() => {
-                      setVerificationCode('')
-                      onClearPendingEmailVerification()
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    {TEXT.resetButton}
-                  </button>
-                </div>
-              ) : (
-                <button type="button" className="email-action-button" onClick={() => void handleEmailSignupStart()} disabled={!canStartEmailSignup}>
-                  {TEXT.requestCodeButton}
-                </button>
-              )}
-            </div>
+            <EmailSignupForm
+              email={email}
+              nickname={nickname}
+              password={password}
+              confirmPassword={confirmPassword}
+              agreedToTerms={agreedToTerms}
+              verificationCode={verificationCode}
+              pendingEmailVerification={pendingEmailVerification}
+              isSubmitting={isSubmitting}
+              canStartSignup={canStartEmailSignup}
+              canVerifySignup={canVerifyEmailSignup}
+              validationMessage={signupValidationMessage}
+              onEmailChange={setEmail}
+              onNicknameChange={setNickname}
+              onPasswordChange={setPassword}
+              onConfirmPasswordChange={setConfirmPassword}
+              onAgreedToTermsChange={setAgreedToTerms}
+              onVerificationCodeChange={setVerificationCode}
+              onStartSignup={handleEmailSignupStart}
+              onVerifySignup={handleEmailSignupVerify}
+              onResetVerification={() => {
+                setVerificationCode('')
+                onClearPendingEmailVerification()
+              }}
+            />
           </>
         )}
       </section>
