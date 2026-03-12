@@ -48,7 +48,7 @@ const toTimeLabel = (value) => {
 }
 
 function AppShell() {
-  const messagesEndRef = useRef(null)
+  const chatHistoryViewportRef = useRef(null)
   const shouldScrollToBottomRef = useRef(false)
   const [themePreference, setThemePreference] = useState(() => {
     if (typeof window === 'undefined') return 'system'
@@ -373,13 +373,17 @@ function AppShell() {
   const previousRoomIdRef = useRef('')
 
   useLayoutEffect(() => {
-    if (!messagesEndRef.current || isLoadingHistory || isLoadingOlderHistory) return
+    if (!chatHistoryViewportRef.current || isLoadingHistory || isLoadingOlderHistory) return
 
     const roomChanged = shouldScrollToBottomRef.current || previousRoomIdRef.current !== joinedRoomId
     const appendedNewMessage = lastMessageMutation === 'append'
 
     if (joinedRoomId && (roomChanged || appendedNewMessage)) {
-      messagesEndRef.current.scrollIntoView({ behavior: roomChanged ? 'auto' : 'smooth', block: 'end' })
+      const viewport = chatHistoryViewportRef.current
+      viewport.scrollTo({
+        top: viewport.scrollHeight,
+        behavior: roomChanged ? 'auto' : 'smooth',
+      })
       shouldScrollToBottomRef.current = false
     }
 
@@ -859,7 +863,7 @@ function AppShell() {
           historyError={historyError}
           messages={messages}
           currentUserId={currentUser?.id || ''}
-          messagesEndRef={messagesEndRef}
+          historyViewportRef={chatHistoryViewportRef}
           onLoadOlderMessages={() => void loadOlderMessageHistory(joinedRoomId)}
           text={text}
           onTextChange={setText}
