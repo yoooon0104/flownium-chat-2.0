@@ -52,6 +52,7 @@ const toTimeLabel = (value) => {
 function AppShell() {
   const chatHistoryViewportRef = useRef(null)
   const shouldScrollToBottomRef = useRef(false)
+  const shouldOpenMobileChatOnJoinRef = useRef(false)
   const [themePreference, setThemePreference] = useState(() => {
     if (typeof window === 'undefined') return 'system'
     return localStorage.getItem(THEME_PREFERENCE_KEY) || 'system'
@@ -338,11 +339,14 @@ function AppShell() {
     shouldScrollToBottomRef.current = true
     prepareMessageHistory()
     setJoinedRoomId(nextRoomId)
-    setIsMobileChatView(true)
+    if (!isMobileViewport || shouldOpenMobileChatOnJoinRef.current) {
+      setIsMobileChatView(true)
+    }
     setIsMobileNotificationView(false)
     setIsMobileSettingsView(false)
     setIsMobileAccountView(false)
     setIsParticipantsMenuOpen(false)
+    shouldOpenMobileChatOnJoinRef.current = false
 
     // room_participants 이벤트가 뒤늦게 오더라도, 방 입장 직후 헤더와 참여자 목록이
     // 비어 보이지 않게 room_joined payload의 participants를 먼저 반영한다.
@@ -352,7 +356,7 @@ function AppShell() {
       await loadMessageHistory(nextRoomId)
       await markRoomRead(nextRoomId)
     })()
-  }, [loadMessageHistory, markRoomRead, prepareMessageHistory])
+  }, [isMobileViewport, loadMessageHistory, markRoomRead, prepareMessageHistory])
 
   // 실시간 메시지 수신 분기:
   // - 현재 방이 실제로 보이는 상태일 때만 본문 append + 읽음 처리
@@ -546,6 +550,7 @@ function AppShell() {
     if (!roomId) return
 
     shouldScrollToBottomRef.current = true
+    shouldOpenMobileChatOnJoinRef.current = true
     prepareMessageHistory()
     setJoinedRoomId(roomId)
     setIsMobileChatView(true)
@@ -939,7 +944,10 @@ function AppShell() {
           isMobileChatView={isMobileChatView}
           activeRoom={activeRoom}
           joinedRoomId={joinedRoomId}
-          onBack={() => setIsMobileChatView(false)}
+          onBack={() => {
+            shouldOpenMobileChatOnJoinRef.current = false
+            setIsMobileChatView(false)
+          }}
           participantsProps={{
             joinedRoomId,
             participants,

@@ -79,32 +79,41 @@ const findDeletedMemberIds = async (memberIds) => {
   return deletedUsers.map((user) => String(user._id));
 };
 
-const resolveDirectRoomName = async (roomDoc, currentUserId) => {
+const resolveDirectRoomCounterpart = async (roomDoc, currentUserId) => {
   const memberIds = Array.isArray(roomDoc?.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
   if (Boolean(roomDoc?.isGroup) || !currentUserId || memberIds.length !== 2) {
-    return String(roomDoc?.name || '').trim();
+    return null;
   }
 
   const counterpartUserId = memberIds.find((memberId) => memberId !== String(currentUserId));
   if (!counterpartUserId) {
-    return String(roomDoc?.name || '').trim();
+    return null;
   }
 
   const counterpartUser = await User.findById(counterpartUserId)
-    .select({ nickname: 1 })
+    .select({ nickname: 1, profileImage: 1 })
     .lean();
 
-  return String(counterpartUser?.nickname || roomDoc?.name || '').trim();
+  if (!counterpartUser) {
+    return null;
+  }
+
+  return {
+    nickname: String(counterpartUser.nickname || roomDoc?.name || '').trim(),
+    profileImage: String(counterpartUser.profileImage || '').trim(),
+  };
 };
 
 const toRoomResponse = async (roomDoc, currentUserId = '') => {
   const memberIds = Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
   const deletedMemberIds = await findDeletedMemberIds(memberIds);
-  const resolvedName = await resolveDirectRoomName(roomDoc, currentUserId);
+  const counterpart = await resolveDirectRoomCounterpart(roomDoc, currentUserId);
+  const resolvedName = counterpart?.nickname || String(roomDoc?.name || '').trim();
 
   return {
     id: String(roomDoc._id),
     name: resolvedName,
+    profileImage: counterpart?.profileImage || '',
     isGroup: Boolean(roomDoc.isGroup),
     memberIds,
     lastMessage: roomDoc.lastMessage || '',

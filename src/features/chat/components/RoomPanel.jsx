@@ -149,7 +149,8 @@ function RoomPanel({
           >
             채팅방
             {totalUnreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--badge-bg)] px-1.5 text-[10px] font-bold text-white shadow-[var(--shadow-glow)]">
+              <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-[var(--shadow-glow)]"
+                style={{ backgroundColor: 'var(--brand-primary)' }}>
                 {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
               </span>
             )}
@@ -172,7 +173,6 @@ function RoomPanel({
         <div className="min-h-0 flex-1 overflow-hidden">
           <div className="h-full min-h-0 overflow-hidden">
             <ul className="flex h-full min-h-0 flex-col gap-2 overflow-auto px-3 pb-24 md:px-4">
-              {friendsLoading && <li className="px-3 py-3 text-xs text-[var(--text-secondary)]">친구 목록을 불러오는 중입니다.</li>}
               {!friendsLoading && groupedFriends.map((entry, index) => {
                 if (entry.type === 'label') {
                   return (
@@ -217,7 +217,6 @@ function RoomPanel({
         </div>
       ) : (
         <ul className="min-h-0 flex-1 overflow-auto px-3 pb-24 md:px-4">
-          {roomsLoading && <li className="px-3 py-3 text-xs text-[var(--text-secondary)]">채팅방 목록을 불러오는 중입니다.</li>}
           {!roomsLoading && filteredRooms.length === 0 && <li className="px-3 py-3 text-xs text-[var(--text-secondary)]">표시할 채팅방이 없습니다.</li>}
           {filteredRooms.map((room) => {
             const isActive = room.id === joinedRoomId
@@ -228,8 +227,12 @@ function RoomPanel({
                   className={`grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border px-3 py-3 text-left transition ${isActive ? 'border-brand-primary/35 bg-[var(--surface-elevated)] shadow-[var(--shadow-glow)] ring-1 ring-brand-primary/15' : 'border-transparent bg-[var(--panel-soft)] hover:border-[var(--border-soft)] hover:bg-[var(--surface-muted)]'}`}
                   onClick={() => onJoinRoom(room.id)}
                 >
-                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-xs font-semibold text-[var(--text-primary)]">
-                    {room.name.slice(0, 2).toUpperCase()}
+                  <span className="inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-xs font-semibold text-[var(--text-primary)]">
+                    {room.profileImage ? (
+                      <img src={room.profileImage} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      room.name.slice(0, 2).toUpperCase()
+                    )}
                   </span>
                   <span className="min-w-0">
                     <strong className="block truncate text-sm font-semibold text-[var(--text-primary)]">{room.name}</strong>
@@ -238,7 +241,10 @@ function RoomPanel({
                   <span className="flex min-w-[58px] flex-col items-end gap-2">
                     <span className="text-[11px] text-[var(--text-secondary)]">{toTimeLabel(room.lastMessageAt)}</span>
                     {room.unreadCount > 0 && (
-                      <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--badge-bg)] px-2 py-0.5 text-[10px] font-bold text-white shadow-[var(--shadow-glow)]">
+                      <span
+                        className="inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[10px] font-bold text-white shadow-[var(--shadow-glow)]"
+                        style={{ backgroundColor: 'var(--brand-primary)' }}
+                      >
                         {room.unreadCount > 99 ? '99+' : room.unreadCount}
                       </span>
                     )}
