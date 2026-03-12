@@ -27,10 +27,31 @@ MVP2-A 1차 표준:
 
 ## 인증
 
+### POST /auth/kakao/link/start
+- 현재 로그인한 계정에 카카오 계정 연결을 시작합니다.
+- 헤더: `Authorization: Bearer <accessToken>`
+- 응답으로 카카오 인가 URL을 내려주고, 프론트는 해당 URL로 이동합니다.
+- 이미 카카오가 연결된 계정이면 연결을 시작하지 않습니다.
+
+응답:
+```json
+{
+  "authorizeUrl": "https://kauth.kakao.com/oauth/authorize?..."
+}
+```
+
+대표 오류:
+- `401 UNAUTHORIZED`
+- `409 KAKAO_ALREADY_CONNECTED`
+- `500 SERVER_MISCONFIGURED`
+- `500 KAKAO_LINK_START_FAILED`
+- `503 DB_NOT_CONNECTED`
+
 ### GET /auth/kakao/callback?code=
 - 카카오 인가 코드를 교환합니다.
 - 서버는 `AuthIdentity(provider='kakao')` 기준으로 기존 사용자를 식별합니다.
 - legacy `User.kakaoId` 사용자는 첫 로그인 시 identity로 점진 마이그레이션합니다.
+- `state`가 있으면 로그인 대신 현재 로그인한 계정에 카카오 연결을 완료합니다.
 - 응답 분기:
 
 1) 가입 완료 사용자
@@ -64,8 +85,27 @@ MVP2-A 1차 표준:
 }
 ```
 
+3) 카카오 계정 연결 성공
+```json
+{
+  "resultType": "LINK_SUCCESS",
+  "user": {
+    "id": "userId",
+    "kakaoId": "",
+    "email": "user@example.com",
+    "nickname": "닉네임",
+    "profileImage": "",
+    "isDeleted": false,
+    "linkedProviders": ["email", "kakao"]
+  },
+  "provider": "kakao",
+  "alreadyLinked": false
+}
+```
+
 대표 오류:
 - `400 INVALID_REQUEST` (code 누락)
+- `409 KAKAO_ALREADY_LINKED`
 - `500 SERVER_MISCONFIGURED`
 - `502 KAKAO_LOGIN_FAILED`
 
@@ -200,7 +240,8 @@ MVP2-A 1차 표준:
     "email": "user@example.com",
     "nickname": "닉네임",
     "profileImage": "",
-    "isDeleted": false
+    "isDeleted": false,
+    "linkedProviders": ["email"]
   }
 }
 ```
@@ -230,7 +271,8 @@ MVP2-A 1차 표준:
     "email": "user@example.com",
     "nickname": "새닉네임",
     "profileImage": "",
-    "isDeleted": false
+    "isDeleted": false,
+    "linkedProviders": ["email", "kakao"]
   }
 }
 ```

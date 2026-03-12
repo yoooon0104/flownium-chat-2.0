@@ -1,6 +1,6 @@
 ﻿# 아키텍처
 
-업데이트: 2026-03-11
+업데이트: 2026-03-12
 
 ## 시스템 구조
 
@@ -26,7 +26,7 @@
 
 3. `domain/`
 - `AuthSession`: 토큰 로드/저장/삭제
-- `UserProfile`: 사용자 정규화/표기 규칙 (`email`, `nickname`, `profileImage`, `isDeleted`)
+- `UserProfile`: 사용자 정규화/표기 규칙 (`email`, `nickname`, `profileImage`, `isDeleted`, `linkedProviders`)
 
 4. `services/`
 - `api/authApi`, `api/chatApi`
@@ -42,8 +42,7 @@
 ## 백엔드 구조
 
 - `server/index.cjs`: 서버 엔트리 + 소켓 이벤트
-- `routes/auth.routes.cjs`: 카카오/온보딩/refresh/me/profile/account delete
-- `routes/auth.routes.cjs`: 카카오/온보딩/email signup/email login/refresh/me/profile/account delete
+- `routes/auth.routes.cjs`: 카카오/온보딩/email signup/email login/kakao link/refresh/me/profile/account delete
 - `routes/chatroom.routes.cjs`: 채팅방 생성/초대/나가기/메시지/read 상태 REST + 커서 기반 메시지 페이지네이션
 - `routes/friend.routes.cjs`: 친구 검색/요청/수락/거절/차단
 - `routes/notification.routes.cjs`: 알림 목록/읽음 처리
@@ -59,6 +58,7 @@
 - `AuthIdentity`가 카카오 등 외부 로그인 수단을 담당한다.
 - 카카오는 회원 본체가 아니라 간편로그인 수단으로만 관리한다.
 - 기존 legacy `User.kakaoId` 사용자는 첫 카카오 로그인에서 `AuthIdentity(kakao)`로 점진 마이그레이션한다.
+- 이메일 회원은 설정 화면에서 명시적으로 `AuthIdentity(kakao)`를 연결할 수 있다.
 - 탈퇴한 tombstone `User`는 유지하되, 연결된 로그인 수단은 제거한다.
 - 같은 카카오 계정 재가입은 기존 tombstone 계정 복구가 아니라 새 `User` 생성 흐름으로 간다.
 
@@ -76,16 +76,18 @@
 4. 이메일 회원가입 시작 시 `/auth/email/signup/start`
 5. 이메일 인증 완료 시 `/auth/email/signup/verify`
 6. 이메일 로그인 시 `/auth/email/login`
-7. 토큰 저장 후 초기 세션 복원 시 `/auth/me` 호출
-8. REST/Socket 인증 시작
-6. Friends/Rooms 목록 조회
-7. 채팅방 조회/입장/메시지 송수신
-8. `room_participants`로 전체 멤버 + 온라인 상태 표시
-9. 채팅 상세에서 친구 초대/나가기 처리
-10. 메시지 목록은 `before` 커서 기반으로 이전 메시지 추가 로드
-11. 알림 허브/모바일 알림 화면에서 친구 요청과 초대 처리
-12. 설정 화면/모달에서 닉네임과 테마(light/dark/system) 변경
-13. 회원탈퇴 시 사용자 문서를 tombstone 상태로 바꾸고 친구/방/알림/읽음 상태를 함께 정리한 뒤 로그인 게이트로 복귀
+7. 이메일 회원은 설정 화면에서 `/auth/kakao/link/start`로 카카오 계정 연결 시작
+8. 연결 콜백은 `/auth/kakao/callback?state=...`에서 `LINK_SUCCESS`로 종료
+9. 토큰 저장 후 초기 세션 복원 시 `/auth/me` 호출
+10. REST/Socket 인증 시작
+11. Friends/Rooms 목록 조회
+12. 채팅방 조회/입장/메시지 송수신
+13. `room_participants`로 전체 멤버 + 온라인 상태 표시
+14. 채팅 상세에서 친구 초대/나가기 처리
+15. 메시지 목록은 `before` 커서 기반으로 이전 메시지 추가 로드
+16. 알림 허브/모바일 알림 화면에서 친구 요청과 초대 처리
+17. 설정 화면/모달에서 닉네임과 테마(light/dark/system) 변경, 카카오 계정 연결
+18. 회원탈퇴 시 사용자 문서를 tombstone 상태로 바꾸고 친구/방/알림/읽음 상태를 함께 정리한 뒤 로그인 게이트로 복귀
 
 ## 데이터 핵심 필드
 
@@ -133,7 +135,7 @@
 - presence는 메모리 기반(서버 재시작 시 초기화)
 - unread 감소/증가 흐름은 실제 친구 계정 2개 이상 기준 추가 검증 필요
 - 설정은 모바일 별도 화면 + 데스크톱 모달 구조이며 닉네임/테마 변경과 회원탈퇴를 지원
-- 기본 회원가입 UI/연결/병합 정책은 아직 미구현
+- 카카오 계정 연결은 1차 구현되었지만 연결 해제/병합 정책은 아직 미구현
 - 개발 단계 이메일 인증 코드는 서버 로그/DB로 확인한다
 
 ## 익명방 확장 방향(계획)

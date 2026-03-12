@@ -60,6 +60,7 @@ function AppShell() {
   const {
     authState,
     startKakaoLogin,
+    startKakaoLink,
     refreshAccessToken,
     completeSignup,
     startEmailSignup,
@@ -106,6 +107,7 @@ function AppShell() {
       nickname: String(authPayload?.nickname || '게스트'),
       profileImage: '',
       email: '',
+      linkedProviders: [],
     }
   }, [authPayload, user])
 
@@ -846,6 +848,7 @@ function AppShell() {
             themePreference={themePreference}
             onChangeTheme={handleChangeTheme}
             onSubmit={updateProfileNickname}
+            onStartKakaoLink={startKakaoLink}
             onDeleteAccount={handleDeleteAccount}
             onBack={() => setIsMobileSettingsView(false)}
           />
@@ -910,6 +913,7 @@ function AppShell() {
         onChangeTheme={handleChangeTheme}
         onClose={() => setIsSettingsModalOpen(false)}
         onSubmit={updateProfileNickname}
+        onStartKakaoLink={startKakaoLink}
         onDeleteAccount={handleDeleteAccount}
       />
     </main>

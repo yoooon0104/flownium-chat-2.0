@@ -4,12 +4,14 @@ const {
   hashToken,
   hashSecret,
   issueJwtTokens,
+  issueLinkToken,
   issueSignupToken,
   validateNickname,
   validateEmail,
   validatePassword,
   verifySecret,
   verifyAccessToken,
+  verifyLinkToken,
   verifyRefreshToken,
   verifySignupToken,
 } = require('../services/auth.service.cjs');
@@ -66,14 +68,25 @@ const createAuthRouter = ({
     return deletedUsers.map((user) => String(user._id));
   };
 
+  const listUserProviders = async (userId) => {
+    if (!userId) return [];
+
+    const identities = await AuthIdentity.find({ userId: String(userId) })
+      .select({ provider: 1, _id: 0 })
+      .lean();
+
+    return [...new Set(identities.map((identity) => String(identity.provider || '').trim().toLowerCase()).filter(Boolean))];
+  };
+
   // DB 사용자 문서를 클라이언트 응답 포맷으로 변환한다.
-  const toClientUser = (userDoc) => ({
+  const toClientUser = async (userDoc) => ({
     id: String(userDoc._id),
     kakaoId: userDoc.kakaoId || '',
     email: userDoc.email || '',
     nickname: userDoc.nickname,
     profileImage: userDoc.profileImage || '',
     isDeleted: isDeletedUser(userDoc),
+    linkedProviders: await listUserProviders(userDoc._id),
   });
 
   const findIdentity = async (provider, providerUserId) => {
@@ -86,6 +99,19 @@ const createAuthRouter = ({
   const EMAIL_VERIFICATION_EXPIRES_IN_MS = 10 * 60 * 1000;
   const EMAIL_RESEND_COOLDOWN_MS = 60 * 1000;
   const isDevelopment = String(config.NODE_ENV || '').trim().toLowerCase() !== 'production';
+  const buildKakaoAuthorizeUrl = (state = '') => {
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: String(config.KAKAO_REST_API_KEY || '').trim(),
+      redirect_uri: String(config.KAKAO_REDIRECT_URI || '').trim(),
+    });
+
+    if (state) {
+      params.set('state', state);
+    }
+
+    return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
+  };
 
   // 레거시 kakaoId 기반 사용자도 첫 로그인 시 identity로 승격해 점진적으로 이전한다.
   const migrateLegacyKakaoIdentityIfNeeded = async (kakaoUser) => {
@@ -134,7 +160,7 @@ const createAuthRouter = ({
 
     res.status(200).json({
       resultType: 'LOGIN_SUCCESS',
-      user: toClientUser(user),
+      user: await toClientUser(user),
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     });
@@ -263,9 +289,59 @@ const createAuthRouter = ({
     });
   };
 
+  router.post('/kakao/link/start', async (req, res) => {
+    const accessToken = extractBearerToken(req);
+    if (!accessToken) {
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+      return;
+    }
+
+    if (!config.KAKAO_REST_API_KEY || !config.KAKAO_REDIRECT_URI) {
+      sendError(res, 500, 'SERVER_MISCONFIGURED', 'kakao oauth config is missing');
+      return;
+    }
+
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const auth = verifyAccessToken(accessToken, config.JWT_SECRET);
+      const user = await User.findById(auth.userId);
+      if (!user || isDeletedUser(user)) {
+        sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+        return;
+      }
+
+      const existingIdentity = await AuthIdentity.findOne({
+        userId: String(user._id),
+        provider: 'kakao',
+      }).lean();
+
+      if (existingIdentity) {
+        sendError(res, 409, 'KAKAO_ALREADY_CONNECTED', '이미 연결된 카카오 계정이 있습니다.');
+        return;
+      }
+
+      const linkToken = issueLinkToken({ userId: user._id }, config);
+      res.status(200).json({
+        authorizeUrl: buildKakaoAuthorizeUrl(linkToken),
+      });
+    } catch (error) {
+      if (error?.name === 'JsonWebTokenError' || error?.name === 'TokenExpiredError') {
+        sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+        return;
+      }
+
+      logger.error('[auth:kakao/link/start] failed', { message: error.message });
+      sendError(res, 500, 'KAKAO_LINK_START_FAILED', 'failed to start kakao link');
+    }
+  });
+
   // 카카오 OAuth callback code를 처리해 로그인 또는 온보딩 분기를 수행한다.
   router.get('/kakao/callback', async (req, res) => {
     const code = String(req.query.code || '').trim();
+    const state = String(req.query.state || '').trim();
 
     if (!code) {
       sendError(res, 400, 'INVALID_REQUEST', 'code is required');
@@ -294,6 +370,39 @@ const createAuthRouter = ({
         clientSecret: config.KAKAO_CLIENT_SECRET,
       });
       const kakaoUser = await fetchKakaoUserProfile(kakaoToken.access_token);
+
+      if (state) {
+        const { userId } = verifyLinkToken(state, config);
+        const user = await User.findById(userId);
+        if (!user || isDeletedUser(user)) {
+          sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
+          return;
+        }
+
+        const existingIdentity = await findIdentity('kakao', kakaoUser.kakaoId);
+        if (existingIdentity && String(existingIdentity.userId) !== String(user._id)) {
+          sendError(res, 409, 'KAKAO_ALREADY_LINKED', '이미 다른 계정에 연결된 카카오 계정입니다.');
+          return;
+        }
+
+        if (!existingIdentity) {
+          await AuthIdentity.create({
+            userId: user._id,
+            provider: 'kakao',
+            providerUserId: kakaoUser.kakaoId,
+            providerEmail: kakaoUser.email || '',
+            lastLoginAt: new Date(),
+          });
+        }
+
+        res.status(200).json({
+          resultType: 'LINK_SUCCESS',
+          user: await toClientUser(user),
+          provider: 'kakao',
+          alreadyLinked: Boolean(existingIdentity),
+        });
+        return;
+      }
 
       const identity = await migrateLegacyKakaoIdentityIfNeeded(kakaoUser);
       const existingUser = identity ? await User.findById(identity.userId) : null;
@@ -736,7 +845,7 @@ const createAuthRouter = ({
         return;
       }
 
-      res.status(200).json({ user: toClientUser(user) });
+      res.status(200).json({ user: await toClientUser(user) });
     } catch (_error) {
       sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
     }
@@ -768,7 +877,7 @@ const createAuthRouter = ({
       user.nicknameUpdatedAt = new Date();
       await user.save();
 
-      res.status(200).json({ user: toClientUser(user) });
+      res.status(200).json({ user: await toClientUser(user) });
     } catch (error) {
       const message = String(error.message || '').toLowerCase();
       if (message.includes('nickname must be between')) {

@@ -120,6 +120,23 @@ const issueSignupToken = (payload, config) => {
   );
 };
 
+const issueLinkToken = (payload, config) => {
+  const { JWT_LINK_SECRET, JWT_SECRET, SIGNUP_TOKEN_EXPIRES_IN = '10m' } = config;
+  const secret = JWT_LINK_SECRET || JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT link secret is not configured');
+  }
+
+  return jwt.sign(
+    {
+      tokenType: 'link',
+      userId: String(payload.userId || '').trim(),
+    },
+    secret,
+    { expiresIn: SIGNUP_TOKEN_EXPIRES_IN }
+  );
+};
+
 // access 토큰의 구조와 타입을 검증한다.
 const verifyAccessToken = (token, jwtSecret) => {
   const decoded = jwt.verify(token, jwtSecret);
@@ -167,6 +184,27 @@ const verifySignupToken = (token, signupSecret) => {
   };
 };
 
+const verifyLinkToken = (token, secretOrConfig) => {
+  const secret =
+    typeof secretOrConfig === 'string'
+      ? secretOrConfig
+      : secretOrConfig?.JWT_LINK_SECRET || secretOrConfig?.JWT_SECRET;
+
+  if (!secret) {
+    throw new Error('JWT link secret is not configured');
+  }
+
+  const decoded = jwt.verify(token, secret);
+  const userId = String(decoded.userId || '').trim();
+  const tokenType = String(decoded.tokenType || '').trim();
+
+  if (!userId || tokenType !== 'link') {
+    throw new Error('invalid link token');
+  }
+
+  return { userId };
+};
+
 const validateEmail = (rawEmail) => {
   const email = normalizeEmail(rawEmail);
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -202,10 +240,12 @@ module.exports = {
   hashSecret,
   verifySecret,
   issueJwtTokens,
+  issueLinkToken,
   issueSignupToken,
   validateEmail,
   verifyAccessToken,
   verifyRefreshToken,
+  verifyLinkToken,
   verifySignupToken,
   validateNickname,
   validatePassword,

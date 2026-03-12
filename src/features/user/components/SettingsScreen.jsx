@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react'
 
-// 모바일 설정 화면은 데스크톱 모달과 같은 동작을 화면 형태로 제공한다.
-function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onDeleteAccount, onBack }) {
+// 모바일 설정 화면은 모달과 같은 기능을 화면 레이아웃으로 제공한다.
+function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onStartKakaoLink, onDeleteAccount, onBack }) {
   const [nickname, setNickname] = useState('')
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isLinkingKakao, setIsLinkingKakao] = useState(false)
 
   useEffect(() => {
     setNickname(String(user?.nickname || ''))
     setError('')
     setIsSaving(false)
     setIsDeleting(false)
+    setIsLinkingKakao(false)
   }, [user])
 
   const normalized = nickname.trim()
+  const isKakaoLinked = Array.isArray(user?.linkedProviders) && user.linkedProviders.includes('kakao')
 
   const handleSave = async () => {
     if (normalized.length < 2 || normalized.length > 20) {
@@ -31,6 +34,19 @@ function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onDele
       setError(nextError.message || '설정 저장에 실패했습니다.')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleStartKakaoLink = async () => {
+    if (isKakaoLinked) return
+
+    try {
+      setIsLinkingKakao(true)
+      setError('')
+      await onStartKakaoLink()
+    } catch (nextError) {
+      setError(nextError.message || '카카오 계정 연결에 실패했습니다.')
+      setIsLinkingKakao(false)
     }
   }
 
@@ -56,7 +72,7 @@ function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onDele
         </button>
         <div className="settings-screen-main">
           <h3>설정</h3>
-          <p>닉네임과 테마를 바꾸거나 계정을 정리할 수 있습니다.</p>
+          <p>닉네임과 테마를 바꾸거나 계정 연결 및 회원탈퇴를 진행할 수 있습니다.</p>
         </div>
       </header>
 
@@ -76,15 +92,23 @@ function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onDele
           </label>
           <button
             type="button"
+            className="secondary"
+            onClick={() => void handleStartKakaoLink()}
+            disabled={isSaving || isDeleting || isLinkingKakao || isKakaoLinked}
+          >
+            {isKakaoLinked ? '카카오 계정 연결됨' : (isLinkingKakao ? '카카오 연결 중...' : '카카오 계정 연결')}
+          </button>
+          <button
+            type="button"
             className="secondary danger-zone-button"
             onClick={() => void handleDeleteAccount()}
-            disabled={isSaving || isDeleting}
+            disabled={isSaving || isDeleting || isLinkingKakao}
           >
             {isDeleting ? '회원탈퇴 처리 중...' : '회원탈퇴'}
           </button>
           {error && <p className="error-text modal-error">{error}</p>}
           <div className="modal-actions single-column-actions">
-            <button type="button" onClick={() => void handleSave()} disabled={isSaving || isDeleting}>
+            <button type="button" onClick={() => void handleSave()} disabled={isSaving || isDeleting || isLinkingKakao}>
               {isSaving ? '저장 중...' : '저장'}
             </button>
           </div>
