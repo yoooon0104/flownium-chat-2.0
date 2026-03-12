@@ -35,7 +35,7 @@ function FriendActionSheet({ friend, isOpen, onStartChat, onClose }) {
           </span>
           <div>
             <h3>{friend.nickname || '이름 없음'}{friend.isDeleted ? ' (탈퇴한 회원)' : ''}</h3>
-            <p>{friend.isDeleted ? '프로필을 볼 수 없습니다.' : (friend.email || '이메일 미등록')}</p>
+            <p>{friend.isDeleted ? '프로필을 볼 수 없습니다.' : (friend.email || '이메일 정보를 불러오지 못했습니다.')}</p>
           </div>
         </div>
         <div className="modal-actions single-column-actions">
