@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react'
+import notificationIcon from '../../../../assets/branding/icons/system/notifications.svg?raw'
+import InlineIcon from '../../../components/InlineIcon'
 
 const toCreatedLabel = (value) => {
   if (!value) return ''
@@ -71,7 +73,7 @@ function NotificationMenu({
           onToggle(!isOpen)
         }}
       >
-        <span className="notification-button-icon">종</span>
+        <InlineIcon svg={notificationIcon} className="notification-button-icon" size={18} />
         {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
       </button>
 

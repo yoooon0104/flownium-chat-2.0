@@ -1,4 +1,10 @@
-﻿// 모바일 하단 탭바는 친구/채팅방/알림/설정의 1차 이동만 담당한다.
+import InlineIcon from '../../../components/InlineIcon'
+import friendsIcon from '../../../../assets/branding/icons/system/friends.svg?raw'
+import roomsIcon from '../../../../assets/branding/icons/system/rooms.svg?raw'
+import notificationsIcon from '../../../../assets/branding/icons/system/notifications.svg?raw'
+import settingsIcon from '../../../../assets/branding/icons/system/settings.svg?raw'
+
+// 모바일 하단 탭바는 친구/채팅방/알림/설정의 1차 이동만 담당한다.
 // 실제 화면 전환은 상위 AppShell 상태를 바꾸는 방식으로 처리하고,
 // 여기서는 현재 활성 탭과 배지만 렌더링한다.
 function MobileBottomTabBar({
@@ -17,7 +23,7 @@ function MobileBottomTabBar({
         className={activeItem === 'friends' ? 'active' : ''}
         onClick={onSelectFriends}
       >
-        <span className="mobile-bottom-tabbar-icon" aria-hidden="true">👤</span>
+        <InlineIcon svg={friendsIcon} className="mobile-bottom-tabbar-icon" size={18} />
         <span>친구</span>
       </button>
 
@@ -26,7 +32,7 @@ function MobileBottomTabBar({
         className={activeItem === 'rooms' ? 'active' : ''}
         onClick={onSelectRooms}
       >
-        <span className="mobile-bottom-tabbar-icon" aria-hidden="true">💬</span>
+        <InlineIcon svg={roomsIcon} className="mobile-bottom-tabbar-icon" size={18} />
         <span>채팅방</span>
         {totalUnreadCount > 0 && (
           <span className="mobile-bottom-tabbar-badge">
@@ -40,7 +46,7 @@ function MobileBottomTabBar({
         className={activeItem === 'notifications' ? 'active' : ''}
         onClick={onSelectNotifications}
       >
-        <span className="mobile-bottom-tabbar-icon" aria-hidden="true">🔔</span>
+        <InlineIcon svg={notificationsIcon} className="mobile-bottom-tabbar-icon" size={18} />
         <span>알림</span>
         {notificationUnreadCount > 0 && (
           <span className="mobile-bottom-tabbar-badge">
@@ -54,7 +60,7 @@ function MobileBottomTabBar({
         className={activeItem === 'settings' ? 'active' : ''}
         onClick={onSelectSettings}
       >
-        <span className="mobile-bottom-tabbar-icon" aria-hidden="true">⚙</span>
+        <InlineIcon svg={settingsIcon} className="mobile-bottom-tabbar-icon" size={18} />
         <span>설정</span>
       </button>
     </nav>

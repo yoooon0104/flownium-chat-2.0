@@ -1,4 +1,6 @@
-﻿import { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
+import menuIcon from '../../../../assets/branding/icons/system/menu.svg?raw'
+import InlineIcon from '../../../components/InlineIcon'
 
 // 사용자 메뉴는 상단 우측 액션 영역에서 내 정보/설정/로그아웃 진입점을 담당한다.
 // 버튼 기호를 외부에서 주입할 수 있게 열어둬서 헤더 레이아웃에 맞게 재사용한다.
@@ -10,7 +12,7 @@ function UserMenu({
   onLogout,
   isFloating = false,
   buttonLabel = '메뉴',
-  buttonSymbol = '☰',
+  buttonSymbol = null,
 }) {
   const menuRef = useRef(null)
 
@@ -40,7 +42,7 @@ function UserMenu({
   return (
     <div className={`user-menu ${isFloating ? 'floating' : ''}`} ref={menuRef}>
       <button type="button" className="kebab-button" onClick={() => onToggle(!isOpen)} aria-label={buttonLabel}>
-        {buttonSymbol}
+        {buttonSymbol || <InlineIcon svg={menuIcon} size={18} />}
       </button>
 
       {isOpen && (
