@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import brandWordmarkDark from '../../../../assets/branding/logo/flownium-wordmark-dark.png'
-import brandWordmarkLight from '../../../../assets/branding/logo/flownium-wordmark-light.png'
+import brandWordmarkOnDark from '../../../../assets/branding/logo/flownium-logo_wordmark-on-dark.png'
+import brandWordmarkOnLight from '../../../../assets/branding/logo/flownium-logo_wordmark-on-light.png'
 import EmailLoginForm from './EmailLoginForm'
 import EmailSignupForm from './EmailSignupForm'
 import './LoginGate.css'
@@ -122,7 +122,7 @@ function LoginGate({
     Boolean(pendingPasswordReset?.email) &&
     verificationCode.trim().length === 6
 
-  const brandWordmark = resolvedTheme === 'dark' ? brandWordmarkLight : brandWordmarkDark
+  const brandWordmark = resolvedTheme === 'dark' ? brandWordmarkOnDark : brandWordmarkOnLight
 
   const openLoginView = () => {
     setAuthView('login')
