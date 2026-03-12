@@ -47,6 +47,35 @@ MVP2-A 1차 표준:
 - `500 KAKAO_LINK_START_FAILED`
 - `503 DB_NOT_CONNECTED`
 
+### DELETE /auth/kakao/link
+- 현재 로그인한 계정에서 카카오 계정 연결을 해제합니다.
+- 헤더: `Authorization: Bearer <accessToken>`
+- 마지막 로그인 수단 하나만 남은 경우에는 해제할 수 없습니다.
+
+응답:
+```json
+{
+  "unlinked": true,
+  "provider": "kakao",
+  "user": {
+    "id": "userId",
+    "email": "user@example.com",
+    "nickname": "닉네임",
+    "profileImage": "",
+    "isDeleted": false,
+    "linkedProviders": ["email"]
+  }
+}
+```
+
+대표 오류:
+- `401 UNAUTHORIZED`
+- `404 USER_NOT_FOUND`
+- `404 KAKAO_NOT_LINKED`
+- `409 CANNOT_UNLINK_LAST_PROVIDER`
+- `500 KAKAO_UNLINK_FAILED`
+- `503 DB_NOT_CONNECTED`
+
 ### GET /auth/kakao/callback?code=
 - 카카오 인가 코드를 교환합니다.
 - 서버는 `AuthIdentity(provider='kakao')` 기준으로 기존 사용자를 식별합니다.

@@ -31,6 +31,17 @@ export const createAuthApi = (apiBaseUrl) => {
     return { ok: response.ok, status: response.status, body }
   }
 
+  const unlinkKakao = async (accessToken) => {
+    const response = await fetch(`${apiBaseUrl}/auth/kakao/link`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
   const refresh = async (refreshToken) => {
     const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
       method: 'POST',
@@ -152,6 +163,7 @@ export const createAuthApi = (apiBaseUrl) => {
   return {
     getKakaoCallback,
     startKakaoLink,
+    unlinkKakao,
     refresh,
     completeSignup,
     startEmailSignup,

@@ -12,6 +12,7 @@ function AccountPanel({
   onSubmitNickname,
   onChangePassword,
   onStartKakaoLink,
+  onUnlinkKakao,
   onDeleteAccount,
   emphasizeKakaoLink = false,
 }) {
@@ -25,6 +26,7 @@ function AccountPanel({
   const [isSavingNickname, setIsSavingNickname] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [isLinkingKakao, setIsLinkingKakao] = useState(false)
+  const [isUnlinkingKakao, setIsUnlinkingKakao] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
@@ -38,6 +40,7 @@ function AccountPanel({
     setIsSavingNickname(false)
     setIsChangingPassword(false)
     setIsLinkingKakao(false)
+    setIsUnlinkingKakao(false)
     setIsDeleting(false)
   }, [user])
 
@@ -128,6 +131,26 @@ function AccountPanel({
     }
   }
 
+  const handleUnlinkKakao = async () => {
+    if (!isKakaoLinked) return
+
+    const shouldUnlink = window.confirm('카카오 간편로그인 연결을 해제하시겠습니까?')
+    if (!shouldUnlink) return
+
+    try {
+      setIsUnlinkingKakao(true)
+      setError('')
+      setSuccess('')
+      await onUnlinkKakao()
+      setSuccess('카카오 계정 연결이 해제되었습니다.')
+    } catch (nextError) {
+      setError(nextError.message || '카카오 계정 연결 해제에 실패했습니다.')
+      setSuccess('')
+    } finally {
+      setIsUnlinkingKakao(false)
+    }
+  }
+
   const handleDeleteAccount = async () => {
     const shouldDelete = window.confirm('정말 회원탈퇴하시겠어요? 이 작업은 되돌릴 수 없습니다.')
     if (!shouldDelete) return
@@ -147,7 +170,7 @@ function AccountPanel({
   return (
     <div className="account-panel subtle-scroll">
       <div className="account-panel-hero">
-        <div className="profile-modal-avatar">
+        <div className="profile-modal-avatar account-panel-avatar">
           {user?.profileImage ? (
             <img src={user.profileImage} alt="profile" />
           ) : (
@@ -156,13 +179,15 @@ function AccountPanel({
         </div>
         <div className="account-panel-summary">
           <h3>{UserProfile.getDisplayName(user)}</h3>
-          <p>{emailLabel}</p>
-          <div className="account-provider-list">
-            {linkedProviders.map((provider) => (
-              <span key={provider} className="account-provider-chip">
-                {getLinkedProviderLabel(provider)}
-              </span>
-            ))}
+          <div className="account-panel-meta">
+            <p className={`account-panel-email ${user?.email ? '' : 'account-panel-email-fallback'}`}>{emailLabel}</p>
+            <div className="account-provider-list">
+              {linkedProviders.map((provider) => (
+                <span key={provider} className="account-provider-chip">
+                  {getLinkedProviderLabel(provider)}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -202,7 +227,7 @@ function AccountPanel({
               type="button"
               className="inline-action-button"
               onClick={() => void handleSaveNickname()}
-              disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isDeleting}
+              disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting}
             >
               {isSavingNickname ? '저장 중...' : '확인'}
             </button>
@@ -210,7 +235,7 @@ function AccountPanel({
               type="button"
               className="secondary inline-action-button"
               onClick={handleCancelEdit}
-              disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isDeleting}
+              disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting}
             >
               취소
             </button>
@@ -224,7 +249,7 @@ function AccountPanel({
               setSuccess('')
               setIsEditingProfile(true)
             }}
-            disabled={isChangingPassword || isLinkingKakao || isDeleting}
+            disabled={isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting}
           >
             내 정보 변경
           </button>
@@ -241,10 +266,23 @@ function AccountPanel({
           type="button"
           className="secondary inline-action-button"
           onClick={() => void handleStartKakaoLink()}
-          disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isDeleting || isKakaoLinked}
+          disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting || isKakaoLinked}
         >
           {isKakaoLinked ? '카카오 계정 연결됨' : isLinkingKakao ? '카카오 연결 중...' : '카카오 계정 연결'}
         </button>
+
+        <button
+          type="button"
+          className="secondary inline-action-button"
+          onClick={() => void handleUnlinkKakao()}
+          disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting || !isKakaoLinked || !hasEmailPassword}
+        >
+          {isUnlinkingKakao ? '연결 해제 중...' : '카카오 연결 해제'}
+        </button>
+
+        {!hasEmailPassword && isKakaoLinked && (
+          <p className="muted-text">이메일 로그인 수단이 없으면 마지막 간편로그인은 해제할 수 없습니다.</p>
+        )}
       </section>
 
       <section className="account-section">
@@ -291,7 +329,7 @@ function AccountPanel({
               type="button"
               className="inline-action-button"
               onClick={() => void handleChangePassword()}
-              disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isDeleting}
+              disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting}
             >
               {isChangingPassword ? '변경 중...' : '비밀번호 변경'}
             </button>
@@ -311,7 +349,7 @@ function AccountPanel({
           type="button"
           className="secondary inline-action-button danger-zone-button"
           onClick={() => void handleDeleteAccount()}
-          disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isDeleting}
+          disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting}
         >
           {isDeleting ? '회원탈퇴 처리 중...' : '회원탈퇴'}
         </button>

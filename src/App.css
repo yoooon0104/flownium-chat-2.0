@@ -380,10 +380,10 @@
 
 .friend-avatar.large,
 .profile-modal-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 22px;
-  font-size: 18px;
+  width: 52px;
+  height: 52px;
+  border-radius: 20px;
+  font-size: 17px;
 }
 
 .friend-main,
@@ -502,16 +502,26 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px;
+  padding: 12px 16px;
   border: 1px solid var(--border-soft);
   border-radius: 22px;
   background: var(--surface-muted);
 }
 
+.account-panel-avatar {
+  margin: 0;
+  flex-shrink: 0;
+  align-self: center;
+  width: 78px;
+  height: 78px;
+  border-radius: 28px;
+}
+
 .account-panel-summary {
   min-width: 0;
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  align-content: center;
 }
 
 .account-panel-summary h3 {
@@ -524,11 +534,28 @@
   margin: 0;
 }
 
+.account-panel-meta {
+  display: grid;
+  gap: 6px;
+}
+
+.account-panel-email {
+  color: var(--brand-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.account-panel-email-fallback {
+  color: var(--brand-subtext);
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .account-provider-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 4px;
 }
 
 .account-provider-chip {
@@ -538,7 +565,8 @@
   min-height: 28px;
   border-radius: 999px;
   padding: 0 12px;
-  background: var(--panel-soft);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-elevated);
   color: var(--brand-text);
   font-size: 12px;
   font-weight: 700;
@@ -592,6 +620,10 @@
 .profile-modal-avatar {
   margin: 8px auto;
   border-radius: 999px;
+}
+
+.account-panel-hero .account-panel-avatar {
+  margin: 0;
 }
 
 .profile-modal-name {
@@ -785,7 +817,9 @@
 
   .notification-screen.mobile-active,
   .settings-screen.mobile-active {
-    display: block;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
   }
 
   .room-panel,

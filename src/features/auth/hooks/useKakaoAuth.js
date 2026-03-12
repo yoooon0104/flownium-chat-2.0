@@ -27,6 +27,9 @@ const resolveErrorMessage = (body, fallback) => {
   if (code === 'WEAK_PASSWORD') return '비밀번호는 영문과 숫자를 모두 포함해야 합니다.'
   if (code === 'INVALID_CURRENT_PASSWORD') return '현재 비밀번호가 올바르지 않습니다.'
   if (code === 'EMAIL_PASSWORD_NOT_AVAILABLE') return '이 계정은 이메일 비밀번호 변경을 사용할 수 없습니다.'
+  if (code === 'KAKAO_NOT_LINKED') return '연결된 카카오 계정이 없습니다.'
+  if (code === 'CANNOT_UNLINK_LAST_PROVIDER') return '마지막 로그인 수단은 해제할 수 없습니다.'
+  if (code === 'KAKAO_UNLINK_FAILED') return '카카오 계정 연결 해제에 실패했습니다.'
   if (body?.error?.message) return String(body.error.message)
   if (typeof body?.error === 'string') return body.error
 
@@ -356,6 +359,39 @@ export const useKakaoAuth = (apiBaseUrl) => {
     redirectToKakao(body.authorizeUrl)
   }, [accessToken, authApi, redirectToKakao, refreshAccessToken])
 
+  const unlinkKakao = useCallback(async () => {
+    const currentToken = AuthSession.load().accessToken || accessToken
+    if (!currentToken) {
+      throw new Error('로그인이 필요합니다.')
+    }
+
+    const first = await authApi.unlinkKakao(currentToken)
+    if (first.ok && first.body?.user) {
+      setUser(UserProfile.normalize(first.body.user))
+      setError('')
+      return first.body.user
+    }
+
+    if (first.status === 401) {
+      const refreshed = await refreshAccessToken()
+      if (!refreshed) {
+        throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.')
+      }
+
+      const retriedToken = AuthSession.load().accessToken
+      const retried = await authApi.unlinkKakao(retriedToken)
+      if (retried.ok && retried.body?.user) {
+        setUser(UserProfile.normalize(retried.body.user))
+        setError('')
+        return retried.body.user
+      }
+
+      throw new Error(resolveErrorMessage(retried.body, '카카오 계정 연결 해제에 실패했습니다.'))
+    }
+
+    throw new Error(resolveErrorMessage(first.body, '카카오 계정 연결 해제에 실패했습니다.'))
+  }, [accessToken, authApi, refreshAccessToken])
+
   useEffect(() => {
     if (callbackHandledRef.current) return
     callbackHandledRef.current = true
@@ -468,6 +504,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     setUser,
     startKakaoLogin,
     startKakaoLink,
+    unlinkKakao,
     refreshAccessToken,
     completeSignup,
     startEmailSignup,
