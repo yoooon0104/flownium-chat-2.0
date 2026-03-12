@@ -41,6 +41,9 @@
   --bubble-other-text: #111827;
   --system-pill-bg: rgba(91, 92, 255, 0.08);
   --system-pill-text: #5f6b7a;
+  --scrollbar-thumb: rgba(106, 116, 140, 0.26);
+  --scrollbar-thumb-hover: rgba(91, 92, 255, 0.34);
+  --scrollbar-track: transparent;
 }
 
 :root[data-resolved-theme='dark'] {
@@ -75,6 +78,9 @@
   --bubble-other-text: #f5f7ff;
   --system-pill-bg: rgba(255, 255, 255, 0.06);
   --system-pill-text: #9aa3b2;
+  --scrollbar-thumb: rgba(154, 163, 178, 0.18);
+  --scrollbar-thumb-hover: rgba(154, 163, 178, 0.3);
+  --scrollbar-track: transparent;
 }
 
 /* 전체 레이아웃 계산을 단순화하기 위한 기본 박스모델 */
@@ -100,6 +106,32 @@ body {
 button,
 input {
   font: inherit;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
 }
 
 body {
