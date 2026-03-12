@@ -27,6 +27,7 @@ const createAuthRouter = ({
   User,
   AuthIdentity,
   EmailVerification,
+  EmailChangeVerification,
   PasswordResetVerification,
   Friendship,
   ChatRoom,
@@ -102,6 +103,8 @@ const createAuthRouter = ({
   const EMAIL_RESEND_COOLDOWN_MS = 60 * 1000;
   const PASSWORD_RESET_EXPIRES_IN_MS = 10 * 60 * 1000;
   const PASSWORD_RESET_RESEND_COOLDOWN_MS = 60 * 1000;
+  const EMAIL_CHANGE_EXPIRES_IN_MS = 10 * 60 * 1000;
+  const EMAIL_CHANGE_RESEND_COOLDOWN_MS = 60 * 1000;
   const isDevelopment = String(config.NODE_ENV || '').trim().toLowerCase() !== 'production';
   const buildKakaoAuthorizeUrl = (state = '') => {
     const params = new URLSearchParams({
@@ -1182,6 +1185,218 @@ const createAuthRouter = ({
       }
 
       sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+    }
+  });
+
+  // 이메일 변경은 verified email 로그인 수단이 있는 계정만 현재 비밀번호 확인 후 진행한다.
+  router.post('/email/change/start', async (req, res) => {
+    const accessToken = extractBearerToken(req);
+    if (!accessToken) {
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+      return;
+    }
+
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const auth = verifyAccessToken(accessToken, config.JWT_SECRET);
+      const currentPassword = validatePassword(req.body?.currentPassword);
+      const nextEmail = validateEmail(req.body?.nextEmail);
+      const now = new Date();
+
+      const user = await User.findById(auth.userId);
+      if (!user || isDeletedUser(user)) {
+        sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
+        return;
+      }
+
+      const currentEmail = validateEmail(user.email);
+      if (currentEmail === nextEmail) {
+        sendError(res, 409, 'EMAIL_UNCHANGED', 'email is unchanged');
+        return;
+      }
+
+      const emailIdentity = await findIdentity('email', currentEmail);
+      if (!emailIdentity?.verifiedAt || !emailIdentity?.secretHash) {
+        sendError(res, 409, 'EMAIL_CHANGE_NOT_AVAILABLE', 'email change is not available');
+        return;
+      }
+
+      const matched = await verifySecret(currentPassword, emailIdentity.secretHash);
+      if (!matched) {
+        sendError(res, 400, 'INVALID_CURRENT_PASSWORD', 'current password is invalid');
+        return;
+      }
+
+      const [existingIdentity, existingUser] = await Promise.all([
+        findIdentity('email', nextEmail),
+        User.findOne({ email: nextEmail, accountStatus: { $ne: 'deleted' } }),
+      ]);
+
+      if (existingIdentity || existingUser) {
+        sendError(res, 409, 'EMAIL_ALREADY_REGISTERED', 'email is already registered');
+        return;
+      }
+
+      const pendingChange = await EmailChangeVerification.findOne({ userId: user._id });
+      if (pendingChange?.resendAvailableAt && new Date(pendingChange.resendAvailableAt) > now) {
+        sendError(res, 429, 'EMAIL_CHANGE_RESEND_COOLDOWN', 'email change resend is cooling down', {
+          resendAvailableAt: new Date(pendingChange.resendAvailableAt).toISOString(),
+        });
+        return;
+      }
+
+      const code = generateVerificationCode();
+      const codeHash = await hashSecret(code);
+      const expiresAt = new Date(now.getTime() + EMAIL_CHANGE_EXPIRES_IN_MS);
+      const resendAvailableAt = new Date(now.getTime() + EMAIL_CHANGE_RESEND_COOLDOWN_MS);
+
+      await EmailChangeVerification.findOneAndUpdate(
+        { userId: user._id },
+        {
+          $set: {
+            userId: user._id,
+            currentEmail,
+            nextEmail,
+            codeHash,
+            expiresAt,
+            resendAvailableAt,
+            verifiedAt: null,
+            attemptCount: 0,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        }
+      );
+
+      logger.info('[auth:email/change/start] verification issued', {
+        userId: String(user._id),
+        currentEmail,
+        nextEmail,
+        code,
+        expiresAt: expiresAt.toISOString(),
+      });
+
+      res.status(200).json({
+        currentEmail,
+        nextEmail,
+        expiresAt: expiresAt.toISOString(),
+        resendAvailableAt: resendAvailableAt.toISOString(),
+        ...(isDevelopment ? { debugCode: code } : {}),
+      });
+    } catch (error) {
+      const message = String(error.message || '').toLowerCase();
+      if (message.includes('invalid email')) {
+        sendError(res, 400, 'INVALID_EMAIL', 'invalid email');
+        return;
+      }
+      if (message.includes('password must be between')) {
+        sendError(res, 400, 'INVALID_PASSWORD', 'password must be between 8 and 72 characters');
+        return;
+      }
+
+      logger.error('[auth:email/change/start] failed', { message: error.message });
+      sendError(res, 500, 'EMAIL_CHANGE_START_FAILED', 'failed to start email change');
+    }
+  });
+
+  // 인증 코드가 일치하면 User.email과 email identity의 providerUserId/providerEmail을 함께 바꾼다.
+  router.post('/email/change/verify', async (req, res) => {
+    const accessToken = extractBearerToken(req);
+    if (!accessToken) {
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+      return;
+    }
+
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const auth = verifyAccessToken(accessToken, config.JWT_SECRET);
+      const code = String(req.body?.code || '').trim();
+
+      if (!code) {
+        sendError(res, 400, 'INVALID_REQUEST', 'code is required');
+        return;
+      }
+
+      const user = await User.findById(auth.userId);
+      if (!user || isDeletedUser(user)) {
+        sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
+        return;
+      }
+
+      const verification = await EmailChangeVerification.findOne({ userId: user._id });
+      if (!verification) {
+        sendError(res, 404, 'EMAIL_CHANGE_NOT_FOUND', 'email change verification not found');
+        return;
+      }
+
+      const now = new Date();
+      if (new Date(verification.expiresAt) <= now) {
+        await EmailChangeVerification.deleteOne({ _id: verification._id });
+        sendError(res, 410, 'EMAIL_CHANGE_CODE_EXPIRED', 'email change code expired');
+        return;
+      }
+
+      const matched = await verifySecret(code, verification.codeHash);
+      if (!matched) {
+        verification.attemptCount = Number(verification.attemptCount || 0) + 1;
+        await verification.save();
+        sendError(res, 400, 'INVALID_EMAIL_CHANGE_CODE', 'invalid email change code');
+        return;
+      }
+
+      const nextEmail = validateEmail(verification.nextEmail);
+      const currentEmail = validateEmail(verification.currentEmail);
+
+      const [existingIdentity, existingUser, emailIdentity] = await Promise.all([
+        findIdentity('email', nextEmail),
+        User.findOne({ email: nextEmail, accountStatus: { $ne: 'deleted' } }),
+        findIdentity('email', currentEmail),
+      ]);
+
+      if ((existingIdentity && String(existingIdentity.userId) !== String(user._id)) || existingUser) {
+        await EmailChangeVerification.deleteOne({ _id: verification._id });
+        sendError(res, 409, 'EMAIL_ALREADY_REGISTERED', 'email is already registered');
+        return;
+      }
+
+      if (!emailIdentity || String(emailIdentity.userId) !== String(user._id)) {
+        await EmailChangeVerification.deleteOne({ _id: verification._id });
+        sendError(res, 409, 'EMAIL_CHANGE_NOT_AVAILABLE', 'email change is not available');
+        return;
+      }
+
+      user.email = nextEmail;
+      await user.save();
+
+      emailIdentity.providerUserId = nextEmail;
+      emailIdentity.providerEmail = nextEmail;
+      emailIdentity.verifiedAt = emailIdentity.verifiedAt || now;
+      await emailIdentity.save();
+
+      await EmailChangeVerification.deleteOne({ _id: verification._id });
+
+      res.status(200).json({
+        changed: true,
+        user: await toClientUser(user),
+      });
+    } catch (error) {
+      const message = String(error.message || '').toLowerCase();
+      if (message.includes('invalid email')) {
+        sendError(res, 400, 'INVALID_EMAIL', 'invalid email');
+        return;
+      }
+
+      logger.error('[auth:email/change/verify] failed', { message: error.message });
+      sendError(res, 500, 'EMAIL_CHANGE_VERIFY_FAILED', 'failed to verify email change');
     }
   });
 

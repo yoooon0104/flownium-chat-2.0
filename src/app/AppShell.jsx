@@ -21,6 +21,8 @@ import SettingsScreen from '../features/user/components/SettingsScreen'
 import { useNotifications } from '../features/notifications/hooks/useNotifications'
 import NotificationsScreen from '../features/notifications/components/NotificationsScreen'
 import MobileBottomTabBar from '../features/navigation/components/MobileBottomTabBar'
+import { UserProfile } from '../domain/user/UserProfile'
+import { createAuthApi } from '../services/api/authApi'
 import { createChatApi } from '../services/api/chatApi'
 import { createChatSocketClient } from '../services/socket/chatSocketClient'
 
@@ -61,6 +63,7 @@ function AppShell() {
 
   const {
     authState,
+    setUser,
     startKakaoLogin,
     startKakaoLink,
     refreshAccessToken,
@@ -116,6 +119,7 @@ function AppShell() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
+  const [pendingEmailChange, setPendingEmailChange] = useState(null)
 
   const authPayload = useMemo(() => parseJwtPayload(accessToken), [accessToken])
 
@@ -144,6 +148,8 @@ function AppShell() {
       onUnauthorizedRetry: refreshAccessToken,
     })
   }, [accessToken, refreshAccessToken])
+
+  const authApi = useMemo(() => createAuthApi(API_BASE_URL), [])
 
   const {
     messages,
@@ -206,6 +212,7 @@ function AppShell() {
 
   const handleLogout = useCallback(() => {
     clearSession('')
+    setPendingEmailChange(null)
     setJoinedRoomId('')
     setParticipants([])
     setText('')
@@ -228,6 +235,83 @@ function AppShell() {
     clearFriends()
     clearNotifications()
   }, [clearFriends, clearMessages, clearNotifications, clearRooms, clearSession, setErrorMessage])
+
+  const handleStartEmailChange = useCallback(async (payload) => {
+    const execute = async (token) => authApi.startEmailChange(payload, token)
+
+    let currentToken = accessToken || localStorage.getItem('accessToken') || ''
+    if (!currentToken) {
+      throw new Error('로그인이 필요합니다.')
+    }
+
+    let result = await execute(currentToken)
+    if (result.status === 401) {
+      const refreshed = await refreshAccessToken()
+      if (!refreshed) {
+        throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.')
+      }
+
+      currentToken = localStorage.getItem('accessToken') || ''
+      result = await execute(currentToken)
+    }
+
+    if (!result.ok || !result.body?.nextEmail) {
+      const code = String(result.body?.error?.code || '').trim()
+      if (code === 'EMAIL_CHANGE_NOT_AVAILABLE') throw new Error('이메일 변경을 사용할 수 없습니다.')
+      if (code === 'EMAIL_UNCHANGED') throw new Error('기존 이메일과 다른 주소를 입력해주세요.')
+      if (code === 'INVALID_CURRENT_PASSWORD') throw new Error('현재 비밀번호가 올바르지 않습니다.')
+      if (code === 'EMAIL_ALREADY_REGISTERED') throw new Error('이미 가입된 이메일입니다.')
+      if (code === 'EMAIL_CHANGE_RESEND_COOLDOWN') throw new Error('이메일 변경 코드를 너무 자주 요청하고 있습니다. 잠시 후 다시 시도해주세요.')
+      if (code === 'INVALID_EMAIL') throw new Error('올바른 이메일 형식으로 입력해주세요.')
+      if (code === 'INVALID_PASSWORD') throw new Error('현재 비밀번호를 확인해주세요.')
+      throw new Error(String(result.body?.error?.message || '이메일 변경을 시작하지 못했습니다.'))
+    }
+
+    setPendingEmailChange({
+      currentEmail: String(result.body.currentEmail || ''),
+      nextEmail: String(result.body.nextEmail || ''),
+      expiresAt: String(result.body.expiresAt || ''),
+      resendAvailableAt: String(result.body.resendAvailableAt || ''),
+      debugCode: String(result.body.debugCode || ''),
+    })
+
+    return result.body
+  }, [accessToken, authApi, refreshAccessToken])
+
+  const handleVerifyEmailChange = useCallback(async (payload) => {
+    const execute = async (token) => authApi.verifyEmailChange(payload, token)
+
+    let currentToken = accessToken || localStorage.getItem('accessToken') || ''
+    if (!currentToken) {
+      throw new Error('로그인이 필요합니다.')
+    }
+
+    let result = await execute(currentToken)
+    if (result.status === 401) {
+      const refreshed = await refreshAccessToken()
+      if (!refreshed) {
+        throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.')
+      }
+
+      currentToken = localStorage.getItem('accessToken') || ''
+      result = await execute(currentToken)
+    }
+
+    if (!result.ok || result.body?.changed !== true || !result.body?.user) {
+      const code = String(result.body?.error?.code || '').trim()
+      if (code === 'EMAIL_CHANGE_NOT_FOUND') throw new Error('이메일 변경 인증 요청을 찾지 못했습니다.')
+      if (code === 'INVALID_EMAIL_CHANGE_CODE') throw new Error('이메일 변경 코드가 올바르지 않습니다.')
+      if (code === 'EMAIL_CHANGE_CODE_EXPIRED') throw new Error('이메일 변경 코드가 만료되었습니다. 다시 요청해주세요.')
+      if (code === 'EMAIL_ALREADY_REGISTERED') throw new Error('이미 가입된 이메일입니다.')
+      if (code === 'EMAIL_CHANGE_NOT_AVAILABLE') throw new Error('이메일 변경을 사용할 수 없습니다.')
+      if (code === 'INVALID_EMAIL') throw new Error('올바른 이메일 형식으로 입력해주세요.')
+      throw new Error(String(result.body?.error?.message || '이메일 변경을 완료하지 못했습니다.'))
+    }
+
+    setUser(UserProfile.normalize(result.body.user))
+    setPendingEmailChange(null)
+    return result.body.user
+  }, [accessToken, authApi, refreshAccessToken, setUser])
 
   // 소켓 재연결 시점에는 서버 메모리 상태가 바뀌었을 수 있으므로, 방/친구/알림 목록을 모두 다시 불러와 화면 기준 상태를 맞춘다.
   const handleSocketConnect = useCallback(() => {
@@ -888,7 +972,10 @@ function AppShell() {
         {isMobileAccountView && (
           <AccountScreen
             user={currentUser}
+            pendingEmailChange={pendingEmailChange}
             onSubmitNickname={updateProfileNickname}
+            onStartEmailChange={handleStartEmailChange}
+            onVerifyEmailChange={handleVerifyEmailChange}
             onChangePassword={changePassword}
             onStartKakaoLink={startKakaoLink}
             onUnlinkKakao={unlinkKakao}
@@ -956,7 +1043,10 @@ function AppShell() {
         isOpen={isProfileModalOpen}
         user={currentUser}
         onClose={() => setIsProfileModalOpen(false)}
+        pendingEmailChange={pendingEmailChange}
         onSubmitNickname={updateProfileNickname}
+        onStartEmailChange={handleStartEmailChange}
+        onVerifyEmailChange={handleVerifyEmailChange}
         onChangePassword={changePassword}
         onStartKakaoLink={startKakaoLink}
         onUnlinkKakao={unlinkKakao}

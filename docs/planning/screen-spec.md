@@ -268,6 +268,7 @@
 - 카카오 계정 연결은 내 정보 화면에서 시작하고, 카카오 OAuth 완료 후 현재 로그인한 계정에 귀속된다
 - 카카오 계정 연결 해제는 마지막 로그인 수단이 아닐 때만 가능하다
 - 비밀번호 변경은 이메일 identity가 연결된 계정만 가능하다
+- 이메일 변경은 이메일 identity가 연결된 계정만 가능하며, 현재 비밀번호 확인과 인증 코드 검증을 거친다
 - 회원탈퇴 성공 시 세션을 비우고 로그인 게이트로 복귀
 - direct 방은 tombstone 상태로 유지되고, group 방은 남은 멤버 기준으로 유지/삭제 규칙을 따른다
 - 데스크톱 모달과 모바일 내 정보 화면은 눈에 띄지 않는 subtle scrollbar를 사용한다
@@ -276,6 +277,8 @@
 
 - `PATCH /auth/profile`
 - `PATCH /auth/password`
+- `POST /auth/email/change/start`
+- `POST /auth/email/change/verify`
 - `POST /auth/kakao/link/start`
 - `GET /auth/kakao/callback`
 - `DELETE /auth/account`

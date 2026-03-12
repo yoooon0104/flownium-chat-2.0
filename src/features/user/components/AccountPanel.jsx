@@ -10,7 +10,10 @@ const getLinkedProviderLabel = (provider) => {
 
 function AccountPanel({
   user,
+  pendingEmailChange,
   onSubmitNickname,
+  onStartEmailChange,
+  onVerifyEmailChange,
   onChangePassword,
   onStartKakaoLink,
   onUnlinkKakao,
@@ -18,6 +21,9 @@ function AccountPanel({
   emphasizeKakaoLink = false,
 }) {
   const [nicknameDraft, setNicknameDraft] = useState('')
+  const [currentEmailPassword, setCurrentEmailPassword] = useState('')
+  const [nextEmail, setNextEmail] = useState('')
+  const [emailChangeCode, setEmailChangeCode] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -25,6 +31,8 @@ function AccountPanel({
   const [success, setSuccess] = useState('')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [isSavingNickname, setIsSavingNickname] = useState(false)
+  const [isStartingEmailChange, setIsStartingEmailChange] = useState(false)
+  const [isVerifyingEmailChange, setIsVerifyingEmailChange] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [isLinkingKakao, setIsLinkingKakao] = useState(false)
   const [isUnlinkingKakao, setIsUnlinkingKakao] = useState(false)
@@ -32,6 +40,9 @@ function AccountPanel({
 
   useEffect(() => {
     setNicknameDraft(String(user?.nickname || ''))
+    setCurrentEmailPassword('')
+    setNextEmail('')
+    setEmailChangeCode('')
     setCurrentPassword('')
     setNewPassword('')
     setConfirmPassword('')
@@ -39,6 +50,8 @@ function AccountPanel({
     setSuccess('')
     setIsEditingProfile(false)
     setIsSavingNickname(false)
+    setIsStartingEmailChange(false)
+    setIsVerifyingEmailChange(false)
     setIsChangingPassword(false)
     setIsLinkingKakao(false)
     setIsUnlinkingKakao(false)
@@ -46,11 +59,19 @@ function AccountPanel({
   }, [user])
 
   const normalizedNickname = nicknameDraft.trim()
-  const emailLabel = String(user?.email || '').trim() || '이메일 정보를 불러오지 못했습니다.'
   const linkedProviders = Array.isArray(user?.linkedProviders) ? user.linkedProviders : []
   const isKakaoLinked = linkedProviders.includes('kakao')
   const hasEmailPassword = linkedProviders.includes('email')
-  const isBusy = isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting
+  const emailLabel = String(user?.email || '').trim() || '이메일 정보를 불러오지 못했습니다.'
+  const normalizedNextEmail = nextEmail.trim().toLowerCase()
+  const isBusy =
+    isSavingNickname ||
+    isStartingEmailChange ||
+    isVerifyingEmailChange ||
+    isChangingPassword ||
+    isLinkingKakao ||
+    isUnlinkingKakao ||
+    isDeleting
 
   const passwordValidationMessage = useMemo(() => {
     if (!hasEmailPassword) return ''
@@ -64,6 +85,23 @@ function AccountPanel({
     if (newPassword !== confirmPassword) return '새 비밀번호와 확인 값이 일치하지 않습니다.'
     return ''
   }, [confirmPassword, currentPassword, hasEmailPassword, newPassword])
+
+  const emailChangeValidationMessage = useMemo(() => {
+    if (!hasEmailPassword) return ''
+    if (!pendingEmailChange && !currentEmailPassword && !normalizedNextEmail) return ''
+
+    if (!pendingEmailChange) {
+      if (currentEmailPassword.length < 8) return '현재 비밀번호를 입력해주세요.'
+      if (!normalizedNextEmail) return '새 이메일을 입력해주세요.'
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedNextEmail)) return '올바른 이메일 형식으로 입력해주세요.'
+      if (normalizedNextEmail === String(user?.email || '').trim().toLowerCase()) return '기존 이메일과 다른 주소를 입력해주세요.'
+      return ''
+    }
+
+    if (!emailChangeCode) return '인증 코드를 입력해주세요.'
+    if (String(emailChangeCode).trim().length !== 6) return '인증 코드는 6자리로 입력해주세요.'
+    return ''
+  }, [currentEmailPassword, emailChangeCode, hasEmailPassword, normalizedNextEmail, pendingEmailChange, user?.email])
 
   const handleSaveNickname = async () => {
     if (normalizedNickname.length < 2 || normalizedNickname.length > 20) {
@@ -92,6 +130,52 @@ function AccountPanel({
     setError('')
     setSuccess('')
     setIsEditingProfile(false)
+  }
+
+  const handleStartEmailChange = async () => {
+    if (emailChangeValidationMessage) {
+      setError(emailChangeValidationMessage)
+      setSuccess('')
+      return
+    }
+
+    try {
+      setIsStartingEmailChange(true)
+      setError('')
+      setSuccess('')
+      await onStartEmailChange({ currentPassword: currentEmailPassword, nextEmail: normalizedNextEmail })
+      setEmailChangeCode('')
+      setSuccess('인증 코드를 발급했습니다. 코드를 입력하면 이메일 변경이 완료됩니다.')
+    } catch (nextError) {
+      setError(nextError.message || '이메일 변경을 시작하지 못했습니다.')
+      setSuccess('')
+    } finally {
+      setIsStartingEmailChange(false)
+    }
+  }
+
+  const handleVerifyEmailChange = async () => {
+    if (emailChangeValidationMessage) {
+      setError(emailChangeValidationMessage)
+      setSuccess('')
+      return
+    }
+
+    try {
+      setIsVerifyingEmailChange(true)
+      setError('')
+      setSuccess('')
+      await onVerifyEmailChange({ code: String(emailChangeCode || '').trim() })
+      setCurrentEmailPassword('')
+      setNextEmail('')
+      setEmailChangeCode('')
+      setSuccess('이메일이 변경되었습니다.')
+    } catch (nextError) {
+      setError(nextError.message || '이메일 변경을 완료하지 못했습니다.')
+      setSuccess('')
+    } finally {
+      setIsVerifyingEmailChange(false)
+    }
   }
 
   const handleChangePassword = async () => {
@@ -144,7 +228,7 @@ function AccountPanel({
       setError('')
       setSuccess('')
       await onUnlinkKakao()
-      setSuccess('카카오 계정 연결을 해제했습니다.')
+      setSuccess('카카오 계정 연결이 해제되었습니다.')
     } catch (nextError) {
       setError(nextError.message || '카카오 계정 연결 해제에 실패했습니다.')
       setSuccess('')
@@ -203,7 +287,7 @@ function AccountPanel({
       <section className="account-section">
         <div className="account-section-header">
           <h4>로그인 방식</h4>
-          <p>지금 사용할 수 있는 로그인 수단과 연결 상태를 한눈에 확인할 수 있어요.</p>
+          <p>지금 사용 중인 로그인 수단과 연결 상태를 한눈에 확인할 수 있어요.</p>
         </div>
 
         <div className="account-status-grid">
@@ -216,7 +300,7 @@ function AccountPanel({
           <div className={`account-status-card ${isKakaoLinked ? 'is-active' : 'is-inactive'}`}>
             <span className="account-status-label">카카오 간편로그인</span>
             <strong>{isKakaoLinked ? '연결됨' : '미연결'}</strong>
-            <p>{isKakaoLinked ? '다음부터 카카오로 더 빠르게 로그인할 수 있어요.' : '보조 로그인 수단으로 카카오를 연결할 수 있어요.'}</p>
+            <p>{isKakaoLinked ? '다음부터는 카카오로 더 빠르게 로그인할 수 있어요.' : '보조 로그인 수단으로 카카오를 연결할 수 있어요.'}</p>
           </div>
         </div>
       </section>
@@ -252,20 +336,10 @@ function AccountPanel({
 
         {isEditingProfile ? (
           <div className="account-inline-actions">
-            <button
-              type="button"
-              className="inline-action-button"
-              onClick={() => void handleSaveNickname()}
-              disabled={isBusy}
-            >
+            <button type="button" className="inline-action-button" onClick={() => void handleSaveNickname()} disabled={isBusy}>
               {isSavingNickname ? '저장 중...' : '확인'}
             </button>
-            <button
-              type="button"
-              className="secondary inline-action-button"
-              onClick={handleCancelEdit}
-              disabled={isBusy}
-            >
+            <button type="button" className="secondary inline-action-button" onClick={handleCancelEdit} disabled={isBusy}>
               취소
             </button>
           </div>
@@ -287,17 +361,78 @@ function AccountPanel({
 
       <section className="account-section">
         <div className="account-section-header">
+          <h4>이메일 변경</h4>
+          <p>현재 비밀번호를 확인한 뒤 새 이메일을 인증하면 로그인 이메일도 함께 바뀝니다.</p>
+        </div>
+
+        {hasEmailPassword ? (
+          <>
+            <label className="settings-field">
+              <span>현재 비밀번호</span>
+              <input
+                type="password"
+                value={currentEmailPassword}
+                onChange={(event) => setCurrentEmailPassword(event.target.value)}
+                placeholder="현재 비밀번호"
+                disabled={Boolean(pendingEmailChange)}
+              />
+            </label>
+
+            <label className="settings-field">
+              <span>새 이메일</span>
+              <input
+                type="email"
+                value={pendingEmailChange?.nextEmail || nextEmail}
+                onChange={(event) => setNextEmail(event.target.value)}
+                placeholder="new@email.com"
+                disabled={Boolean(pendingEmailChange)}
+              />
+            </label>
+
+            {pendingEmailChange ? (
+              <>
+                <label className="settings-field">
+                  <span>인증 코드</span>
+                  <input
+                    value={emailChangeCode}
+                    onChange={(event) => setEmailChangeCode(event.target.value)}
+                    placeholder="6자리 코드"
+                    inputMode="numeric"
+                  />
+                </label>
+                {pendingEmailChange.debugCode ? (
+                  <p className="muted-text">개발용 인증 코드: {pendingEmailChange.debugCode}</p>
+                ) : null}
+                <div className="account-inline-actions">
+                  <button type="button" className="inline-action-button" onClick={() => void handleVerifyEmailChange()} disabled={isBusy}>
+                    {isVerifyingEmailChange ? '인증 중...' : '이메일 변경 완료'}
+                  </button>
+                  <button type="button" className="secondary inline-action-button" onClick={() => void handleStartEmailChange()} disabled={isBusy}>
+                    {isStartingEmailChange ? '재발송 중...' : '코드 다시 받기'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button type="button" className="inline-action-button" onClick={() => void handleStartEmailChange()} disabled={isBusy}>
+                {isStartingEmailChange ? '요청 중...' : '이메일 변경 인증 코드 받기'}
+              </button>
+            )}
+
+            {emailChangeValidationMessage && <p className="muted-text">{emailChangeValidationMessage}</p>}
+          </>
+        ) : (
+          <p className="muted-text">이메일 로그인 수단이 있어야 안전하게 이메일을 변경할 수 있어요.</p>
+        )}
+      </section>
+
+      <section className="account-section">
+        <div className="account-section-header">
           <h4>간편로그인</h4>
           <p>이메일 계정에 카카오 계정을 연결하면 다음부터 더 빠르게 로그인할 수 있어요.</p>
         </div>
 
         <div className="account-inline-actions account-inline-actions-stack">
-          <button
-            type="button"
-            className="secondary inline-action-button"
-            onClick={() => void handleStartKakaoLink()}
-            disabled={isBusy || isKakaoLinked}
-          >
+          <button type="button" className="secondary inline-action-button" onClick={() => void handleStartKakaoLink()} disabled={isBusy || isKakaoLinked}>
             {isKakaoLinked ? '카카오 계정 연결됨' : isLinkingKakao ? '카카오 연결 중...' : '카카오 계정 연결'}
           </button>
 
@@ -319,7 +454,7 @@ function AccountPanel({
       <section className="account-section">
         <div className="account-section-header">
           <h4>비밀번호 변경</h4>
-          <p>이메일 로그인 계정인 경우에만 현재 비밀번호를 확인한 뒤 변경할 수 있어요.</p>
+          <p>이메일 로그인 계정은 현재 비밀번호를 확인한 뒤 새 비밀번호로 변경할 수 있어요.</p>
         </div>
 
         {hasEmailPassword ? (
@@ -356,12 +491,7 @@ function AccountPanel({
 
             {passwordValidationMessage && <p className="muted-text">{passwordValidationMessage}</p>}
 
-            <button
-              type="button"
-              className="inline-action-button"
-              onClick={() => void handleChangePassword()}
-              disabled={isBusy}
-            >
+            <button type="button" className="inline-action-button" onClick={() => void handleChangePassword()} disabled={isBusy}>
               {isChangingPassword ? '변경 중...' : '비밀번호 변경'}
             </button>
           </>
@@ -376,12 +506,7 @@ function AccountPanel({
           <p>탈퇴하면 복구할 수 없고, 기존 대화 기록에서는 탈퇴한 회원으로만 남게 됩니다.</p>
         </div>
 
-        <button
-          type="button"
-          className="secondary inline-action-button danger-zone-button"
-          onClick={() => void handleDeleteAccount()}
-          disabled={isBusy}
-        >
+        <button type="button" className="secondary inline-action-button danger-zone-button" onClick={() => void handleDeleteAccount()} disabled={isBusy}>
           {isDeleting ? '회원탈퇴 처리 중...' : '회원탈퇴'}
         </button>
       </section>
