@@ -671,12 +671,29 @@
 .kebab-button {
   width: 36px;
   height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border-soft);
   border-radius: 14px;
   background: var(--surface-elevated);
   color: var(--brand-text);
   font-size: 16px;
   font-weight: 700;
+}
+
+.ui-inline-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  line-height: 1;
+}
+
+.ui-inline-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .notification-button:hover,
@@ -723,6 +740,10 @@
 
 .notification-button {
   position: relative;
+}
+
+.notification-button-icon {
+  transform: translateY(0.5px);
 }
 
 .notification-badge {
@@ -897,8 +918,11 @@
   }
 
   .mobile-bottom-tabbar-icon {
-    font-size: 18px;
-    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
   }
 
   .mobile-bottom-tabbar-badge {
