@@ -5,11 +5,11 @@
 ## 문서 구조
 
 - `docs/common`
-  - 현재 구현 기준의 운영 문서
+  - 현재 구현 기준 운영 문서
 - `docs/planning`
   - 화면/오브젝트/요구사항 정의
 - `docs/operations`
-  - 배포, 운영, 검증, 작업 로그 정책
+  - 배포, 운영, 검증, 환경 세팅 문서
 - `docs/decisions`
   - ADR 및 의사결정 기록
 - `docs/flows`

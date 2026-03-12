@@ -27,6 +27,9 @@
 - VS Code
 - Codex / AI 도구 사용 시 GitHub 인증 및 로컬 워크스페이스 접근 환경
 
+추가 권장:
+- 기존 작업 맥락을 이어가려면 사용자 홈의 `.codex` 폴더 백업
+
 ## 3) 기본 설치
 
 ### OS별 패키지 매니저
@@ -108,6 +111,33 @@ mongodb://127.0.0.1:27017/flownium-chat
 git clone https://github.com/yoooon0104/flownium-chat-2.0.git
 cd flownium-chat-2.0
 ```
+
+## 4-1) 다른 컴퓨터에서 Codex 작업 이어가기
+
+`.codex` 폴더를 복사하면 아래 항목을 함께 옮길 수 있습니다.
+- task-specific worklog
+- prompt/workflow 로컬 규칙
+- Codex 관련 임시 메모와 작업 맥락
+
+하지만 `.codex`만으로 개발 환경이 완성되지는 않습니다.
+추가로 필요:
+- 저장소 전체 clone 또는 동일 workspace 파일
+- 루트 `.env`
+- `server/.env`
+- GitHub CLI 로그인(`gh auth login`)
+- OpenAI API 키 같은 로컬 환경변수(사용 중인 경우)
+- Node/npm/MongoDB 설치 상태
+
+권장 복원 순서:
+1. 저장소 clone
+2. 사용자 홈의 `.codex` 복사
+3. `.env`, `server/.env` 복원
+4. `gh auth status` 확인
+5. `npm install`
+6. `server` 의존성 설치 후 실행
+
+주의:
+- `.codex` 안에 있는 메모/자동화/로그는 개인 환경 정보가 섞일 수 있으니 본인 환경끼리만 복사하는 것을 권장합니다.
 
 macOS:
 
