@@ -342,6 +342,58 @@ const createAuthRouter = ({
     }
   });
 
+  router.delete('/kakao/link', async (req, res) => {
+    const accessToken = extractBearerToken(req);
+    if (!accessToken) {
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+      return;
+    }
+
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const auth = verifyAccessToken(accessToken, config.JWT_SECRET);
+      const user = await User.findById(auth.userId);
+      if (!user || isDeletedUser(user)) {
+        sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
+        return;
+      }
+
+      const identities = await AuthIdentity.find({ userId: String(user._id) }).lean();
+      const hasKakaoIdentity = identities.some((identity) => String(identity.provider || '').trim().toLowerCase() === 'kakao');
+      if (!hasKakaoIdentity) {
+        sendError(res, 404, 'KAKAO_NOT_LINKED', 'kakao identity is not linked');
+        return;
+      }
+
+      if (identities.length <= 1) {
+        sendError(res, 409, 'CANNOT_UNLINK_LAST_PROVIDER', 'cannot unlink the last login provider');
+        return;
+      }
+
+      await AuthIdentity.deleteOne({
+        userId: String(user._id),
+        provider: 'kakao',
+      });
+
+      res.status(200).json({
+        unlinked: true,
+        provider: 'kakao',
+        user: await toClientUser(user),
+      });
+    } catch (error) {
+      if (error?.name === 'JsonWebTokenError' || error?.name === 'TokenExpiredError') {
+        sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+        return;
+      }
+
+      logger.error('[auth:kakao/link/delete] failed', { message: error.message });
+      sendError(res, 500, 'KAKAO_UNLINK_FAILED', 'failed to unlink kakao account');
+    }
+  });
+
   // 카카오 OAuth callback code를 처리해 로그인 또는 온보딩 분기를 수행한다.
   router.get('/kakao/callback', async (req, res) => {
     const code = String(req.query.code || '').trim();

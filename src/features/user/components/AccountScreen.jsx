@@ -5,6 +5,7 @@ function AccountScreen({
   onSubmitNickname,
   onChangePassword,
   onStartKakaoLink,
+  onUnlinkKakao,
   onDeleteAccount,
   onBack,
   emphasizeKakaoLink = false,
@@ -27,6 +28,7 @@ function AccountScreen({
           onSubmitNickname={onSubmitNickname}
           onChangePassword={onChangePassword}
           onStartKakaoLink={onStartKakaoLink}
+          onUnlinkKakao={onUnlinkKakao}
           onDeleteAccount={onDeleteAccount}
           emphasizeKakaoLink={emphasizeKakaoLink}
         />

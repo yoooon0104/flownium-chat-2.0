@@ -75,6 +75,7 @@ function AppShell() {
     clearPendingPasswordReset,
     updateProfileNickname,
     changePassword,
+    unlinkKakao,
     deleteAccount,
     clearSession,
   } = useKakaoAuth(API_BASE_URL)
@@ -900,6 +901,7 @@ function AppShell() {
             onSubmitNickname={updateProfileNickname}
             onChangePassword={changePassword}
             onStartKakaoLink={startKakaoLink}
+            onUnlinkKakao={unlinkKakao}
             onDeleteAccount={handleDeleteAccount}
             onBack={() => setIsMobileAccountView(false)}
             emphasizeKakaoLink={shouldPromptKakaoLink && !currentUser?.linkedProviders?.includes('kakao')}
@@ -967,6 +969,7 @@ function AppShell() {
         onSubmitNickname={updateProfileNickname}
         onChangePassword={changePassword}
         onStartKakaoLink={startKakaoLink}
+        onUnlinkKakao={unlinkKakao}
         onDeleteAccount={handleDeleteAccount}
         emphasizeKakaoLink={shouldPromptKakaoLink && !currentUser?.linkedProviders?.includes('kakao')}
       />

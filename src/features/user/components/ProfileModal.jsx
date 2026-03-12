@@ -8,6 +8,7 @@ function ProfileModal({
   onSubmitNickname,
   onChangePassword,
   onStartKakaoLink,
+  onUnlinkKakao,
   onDeleteAccount,
   emphasizeKakaoLink = false,
 }) {
@@ -32,6 +33,7 @@ function ProfileModal({
             onSubmitNickname={onSubmitNickname}
             onChangePassword={onChangePassword}
             onStartKakaoLink={onStartKakaoLink}
+            onUnlinkKakao={onUnlinkKakao}
             onDeleteAccount={onDeleteAccount}
             emphasizeKakaoLink={emphasizeKakaoLink}
           />
