@@ -214,6 +214,71 @@ MVP2-A 1차 표준:
 - `500 EMAIL_LOGIN_FAILED`
 - `503 DB_NOT_CONNECTED`
 
+### POST /auth/email/password-reset/start
+- 이메일 비밀번호 재설정을 시작
+- verified email identity만 대상
+- 새 비밀번호를 함께 받아 재설정 코드 검증 전까지 임시 저장
+- 개발 환경에서는 위 응답에 `debugCode`가 추가될 수 있음
+
+요청:
+```json
+{
+  "email": "user@example.com",
+  "password": "new-password123"
+}
+```
+
+응답:
+```json
+{
+  "email": "user@example.com",
+  "expiresAt": "2026-03-12T10:10:00.000Z",
+  "resendAvailableAt": "2026-03-12T10:01:00.000Z"
+}
+```
+
+대표 오류:
+- `400 INVALID_EMAIL`
+- `400 INVALID_PASSWORD`
+- `403 ACCOUNT_NOT_AVAILABLE`
+- `403 EMAIL_NOT_VERIFIED`
+- `404 EMAIL_NOT_REGISTERED`
+- `429 PASSWORD_RESET_RESEND_COOLDOWN`
+- `500 PASSWORD_RESET_START_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+### POST /auth/email/password-reset/verify
+- 이메일 + 재설정 코드를 검증하고 성공 시 비밀번호를 교체
+- 성공 시 기존 refresh token은 무효화
+
+요청:
+```json
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+
+응답:
+```json
+{
+  "reset": true,
+  "email": "user@example.com"
+}
+```
+
+대표 오류:
+- `400 INVALID_EMAIL`
+- `400 INVALID_REQUEST`
+- `400 INVALID_PASSWORD_RESET_CODE`
+- `403 ACCOUNT_NOT_AVAILABLE`
+- `403 EMAIL_NOT_VERIFIED`
+- `404 EMAIL_NOT_REGISTERED`
+- `404 PASSWORD_RESET_NOT_FOUND`
+- `410 PASSWORD_RESET_CODE_EXPIRED`
+- `500 PASSWORD_RESET_VERIFY_FAILED`
+- `503 DB_NOT_CONNECTED`
+
 ### POST /auth/refresh
 - Refresh 토큰 검증 후 Access/Refresh 토큰 재발급
 

@@ -42,13 +42,14 @@
 ## 백엔드 구조
 
 - `server/index.cjs`: 서버 엔트리 + 소켓 이벤트
-- `routes/auth.routes.cjs`: 카카오/온보딩/email signup/email login/kakao link/refresh/me/profile/password/account delete
+- `routes/auth.routes.cjs`: 카카오/온보딩/email signup/email login/password reset/kakao link/refresh/me/profile/password/account delete
 - `routes/chatroom.routes.cjs`: 채팅방 생성/초대/나가기/메시지/read 상태 REST + 커서 기반 메시지 페이지네이션
 - `routes/friend.routes.cjs`: 친구 검색/요청/수락/거절/차단
 - `routes/notification.routes.cjs`: 알림 목록/읽음 처리
 - `services/auth.service.cjs`: JWT/해시/signup 토큰 검증 + 신규/변경용 비밀번호 규칙
 - `models/AuthIdentity`: 로그인 수단 매핑
 - `models/EmailVerification`: 이메일 가입 전 임시 인증 레코드
+- `models/PasswordResetVerification`: 이메일 비밀번호 재설정 전 임시 인증 레코드
 - `services/kakao.service.cjs`: 카카오 외부 API 연동(이메일 포함)
 - `utils/error-response.cjs`: 공통 HTTP 에러 응답 포맷
 
@@ -76,10 +77,12 @@
 4. 이메일 회원가입 시작 시 `/auth/email/signup/start`
 5. 이메일 인증 완료 시 `/auth/email/signup/verify`
 6. 이메일 로그인 시 `/auth/email/login`
-7. 이메일 회원은 설정 화면에서 `/auth/kakao/link/start`로 카카오 계정 연결 시작
-8. 연결 콜백은 `/auth/kakao/callback?state=...`에서 `LINK_SUCCESS`로 종료
-9. 토큰 저장 후 초기 세션 복원 시 `/auth/me` 호출
-10. REST/Socket 인증 시작
+7. 비밀번호 재설정 시작 시 `/auth/email/password-reset/start`
+8. 재설정 코드 검증 시 `/auth/email/password-reset/verify`
+9. 이메일 회원은 설정 화면에서 `/auth/kakao/link/start`로 카카오 계정 연결 시작
+10. 연결 콜백은 `/auth/kakao/callback?state=...`에서 `LINK_SUCCESS`로 종료
+11. 토큰 저장 후 초기 세션 복원 시 `/auth/me` 호출
+12. REST/Socket 인증 시작
 11. Friends/Rooms 목록 조회
 12. 채팅방 조회/입장/메시지 송수신
 13. `room_participants`로 전체 멤버 + 온라인 상태 표시
@@ -96,6 +99,9 @@
 - `User`: `email`, `nickname`, `profileImage`, `accountStatus`, `deletedAt`, `refreshTokenHash`
 - `AuthIdentity`: `userId`, `provider`, `providerUserId`, `providerEmail`, `lastLoginAt`
 - `EmailVerification`: `email`, `codeHash`, `passwordHash`, `nickname`, `agreedToTermsAt`, `expiresAt`, `resendAvailableAt`
+- `PasswordResetVerification`: `email`, `codeHash`, `passwordHash`, `expiresAt`, `resendAvailableAt`
+- `EmailVerification`: `email`, `codeHash`, `passwordHash`, `nickname`, `agreedToTermsAt`, `expiresAt`, `resendAvailableAt`
+- `PasswordResetVerification`: `email`, `codeHash`, `passwordHash`, `expiresAt`, `resendAvailableAt`
 - `ChatRoom`: `name`, `memberIds`, `lastMessage`, `lastMessageAt`, `deletedMemberIds`(응답 가공 필드), `directChatDisabled`(응답 가공 필드)
 - `Message`: `chatRoomId`, `senderId`, `type`, `text`, `timestamp`
 - `Friendship`: `requesterId`, `addresseeId`, `pairKey`, `status`
@@ -141,6 +147,7 @@
 - 이메일 회원가입은 비밀번호 확인과 강화된 검증(닉네임 2~20자, 영문/숫자 포함 비밀번호)을 적용
 - 설정은 앱 환경 설정만 담당하고, 계정 관리는 `내 정보` 화면으로 분리
 - 카카오 계정 연결은 1차 구현되었지만 연결 해제/병합 정책은 아직 미구현
+- 개발 단계 이메일 인증/비밀번호 재설정 코드는 서버 로그와 debugCode 응답으로 확인한다
 - 개발 단계 이메일 인증 코드는 서버 로그/DB로 확인한다
 
 ## 익명방 확장 방향(계획)

@@ -68,8 +68,11 @@ function AppShell() {
     startEmailSignup,
     verifyEmailSignup,
     loginWithEmail,
+    startPasswordReset,
+    verifyPasswordReset,
     clearPendingEmailVerification,
     dismissKakaoLinkPrompt,
+    clearPendingPasswordReset,
     updateProfileNickname,
     changePassword,
     deleteAccount,
@@ -81,9 +84,11 @@ function AppShell() {
     user,
     pendingSignup,
     pendingEmailVerification,
+    pendingPasswordReset,
     shouldPromptKakaoLink,
     isInitializing,
     error,
+    notice,
   } = authState
 
   const [joinedRoomId, setJoinedRoomId] = useState('')
@@ -719,7 +724,15 @@ function AppShell() {
   )
 
   if (isInitializing) {
-    return <LoginGate isLoading authError={error} resolvedTheme={resolvedTheme} onStartKakaoLogin={startKakaoLogin} />
+    return (
+      <LoginGate
+        isLoading
+        authError={error}
+        authNotice={notice}
+        resolvedTheme={resolvedTheme}
+        onStartKakaoLogin={startKakaoLogin}
+      />
+    )
   }
 
   if (!accessToken && pendingSignup?.signupToken) {
@@ -739,12 +752,19 @@ function AppShell() {
         isLoading={false}
         authError={error}
         resolvedTheme={resolvedTheme}
+        authNotice={notice}
+        authNotice={notice}
+        resolvedTheme={resolvedTheme}
         pendingEmailVerification={pendingEmailVerification}
+        pendingPasswordReset={pendingPasswordReset}
         onStartKakaoLogin={startKakaoLogin}
         onStartEmailSignup={startEmailSignup}
         onVerifyEmailSignup={verifyEmailSignup}
         onLoginWithEmail={loginWithEmail}
+        onStartPasswordReset={startPasswordReset}
+        onVerifyPasswordReset={verifyPasswordReset}
         onClearPendingEmailVerification={clearPendingEmailVerification}
+        onClearPendingPasswordReset={clearPendingPasswordReset}
       />
     )
   }

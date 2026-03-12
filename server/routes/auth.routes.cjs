@@ -27,6 +27,7 @@ const createAuthRouter = ({
   User,
   AuthIdentity,
   EmailVerification,
+  PasswordResetVerification,
   Friendship,
   ChatRoom,
   Message,
@@ -99,6 +100,8 @@ const createAuthRouter = ({
 
   const EMAIL_VERIFICATION_EXPIRES_IN_MS = 10 * 60 * 1000;
   const EMAIL_RESEND_COOLDOWN_MS = 60 * 1000;
+  const PASSWORD_RESET_EXPIRES_IN_MS = 10 * 60 * 1000;
+  const PASSWORD_RESET_RESEND_COOLDOWN_MS = 60 * 1000;
   const isDevelopment = String(config.NODE_ENV || '').trim().toLowerCase() !== 'production';
   const buildKakaoAuthorizeUrl = (state = '') => {
     const params = new URLSearchParams({
@@ -808,6 +811,177 @@ const createAuthRouter = ({
 
       logger.error('[auth:email/login] failed', { message: error.message });
       sendError(res, 500, 'EMAIL_LOGIN_FAILED', 'failed to login with email');
+    }
+  });
+
+  // 비밀번호 재설정은 이메일 회원만 대상으로 하며, 개발 단계에서는 인증 코드를 로그/응답으로 확인한다.
+  router.post('/email/password-reset/start', async (req, res) => {
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const email = validateEmail(req.body?.email);
+      const nextPassword = validatePassword(req.body?.password);
+      const now = new Date();
+      const identity = await findIdentity('email', email);
+
+      if (!identity) {
+        sendError(res, 404, 'EMAIL_NOT_REGISTERED', '가입되지 않은 이메일입니다.');
+        return;
+      }
+
+      if (!identity?.verifiedAt) {
+        sendError(res, 403, 'EMAIL_NOT_VERIFIED', '이메일 인증을 먼저 완료해주세요.');
+        return;
+      }
+
+      const user = await User.findById(identity.userId);
+      if (!user || isDeletedUser(user)) {
+        sendError(res, 403, 'ACCOUNT_NOT_AVAILABLE', '사용할 수 없는 계정입니다.');
+        return;
+      }
+
+      const pendingReset = await PasswordResetVerification.findOne({ email });
+      if (pendingReset?.resendAvailableAt && new Date(pendingReset.resendAvailableAt) > now) {
+        sendError(res, 429, 'PASSWORD_RESET_RESEND_COOLDOWN', 'password reset resend is cooling down', {
+          resendAvailableAt: new Date(pendingReset.resendAvailableAt).toISOString(),
+        });
+        return;
+      }
+
+      const code = generateVerificationCode();
+      const [codeHash, passwordHash] = await Promise.all([hashSecret(code), hashSecret(nextPassword)]);
+      const expiresAt = new Date(now.getTime() + PASSWORD_RESET_EXPIRES_IN_MS);
+      const resendAvailableAt = new Date(now.getTime() + PASSWORD_RESET_RESEND_COOLDOWN_MS);
+
+      await PasswordResetVerification.findOneAndUpdate(
+        { email },
+        {
+          $set: {
+            email,
+            codeHash,
+            passwordHash,
+            expiresAt,
+            resendAvailableAt,
+            verifiedAt: null,
+            attemptCount: 0,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        }
+      );
+
+      logger.info('[auth:email/password-reset/start] verification issued', {
+        email,
+        code,
+        expiresAt: expiresAt.toISOString(),
+      });
+
+      res.status(200).json({
+        email,
+        expiresAt: expiresAt.toISOString(),
+        resendAvailableAt: resendAvailableAt.toISOString(),
+        ...(isDevelopment ? { debugCode: code } : {}),
+      });
+    } catch (error) {
+      const message = String(error.message || '').toLowerCase();
+      if (message.includes('invalid email')) {
+        sendError(res, 400, 'INVALID_EMAIL', 'invalid email');
+        return;
+      }
+      if (message.includes('password must be between')) {
+        sendError(res, 400, 'INVALID_PASSWORD', 'password must be between 8 and 72 characters');
+        return;
+      }
+
+      logger.error('[auth:email/password-reset/start] failed', { message: error.message });
+      sendError(res, 500, 'PASSWORD_RESET_START_FAILED', 'failed to start password reset');
+    }
+  });
+
+  // 인증 코드 검증이 끝나면 email identity의 비밀번호 해시를 교체하고 기존 refresh 토큰은 무효화한다.
+  router.post('/email/password-reset/verify', async (req, res) => {
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const email = validateEmail(req.body?.email);
+      const code = String(req.body?.code || '').trim();
+
+      if (!code) {
+        sendError(res, 400, 'INVALID_REQUEST', 'code is required');
+        return;
+      }
+
+      const verification = await PasswordResetVerification.findOne({ email });
+      if (!verification) {
+        sendError(res, 404, 'PASSWORD_RESET_NOT_FOUND', 'password reset verification not found');
+        return;
+      }
+
+      const now = new Date();
+      if (new Date(verification.expiresAt) <= now) {
+        await PasswordResetVerification.deleteOne({ _id: verification._id });
+        sendError(res, 410, 'PASSWORD_RESET_CODE_EXPIRED', 'password reset code expired');
+        return;
+      }
+
+      const matched = await verifySecret(code, verification.codeHash);
+      if (!matched) {
+        verification.attemptCount = Number(verification.attemptCount || 0) + 1;
+        await verification.save();
+        sendError(res, 400, 'INVALID_PASSWORD_RESET_CODE', 'invalid password reset code');
+        return;
+      }
+
+      const identity = await findIdentity('email', email);
+      if (!identity) {
+        await PasswordResetVerification.deleteOne({ _id: verification._id });
+        sendError(res, 404, 'EMAIL_NOT_REGISTERED', '가입되지 않은 이메일입니다.');
+        return;
+      }
+
+      if (!identity?.verifiedAt) {
+        await PasswordResetVerification.deleteOne({ _id: verification._id });
+        sendError(res, 403, 'EMAIL_NOT_VERIFIED', '이메일 인증을 먼저 완료해주세요.');
+        return;
+      }
+
+      const user = await User.findById(identity.userId);
+      if (!user || isDeletedUser(user)) {
+        await PasswordResetVerification.deleteOne({ _id: verification._id });
+        sendError(res, 403, 'ACCOUNT_NOT_AVAILABLE', '사용할 수 없는 계정입니다.');
+        return;
+      }
+
+      identity.secretHash = verification.passwordHash;
+      identity.providerEmail = email;
+      identity.verifiedAt = identity.verifiedAt || now;
+      await identity.save();
+
+      user.refreshTokenHash = null;
+      await user.save();
+
+      await PasswordResetVerification.deleteOne({ _id: verification._id });
+
+      res.status(200).json({
+        reset: true,
+        email,
+      });
+    } catch (error) {
+      const message = String(error.message || '').toLowerCase();
+      if (message.includes('invalid email')) {
+        sendError(res, 400, 'INVALID_EMAIL', 'invalid email');
+        return;
+      }
+
+      logger.error('[auth:email/password-reset/verify] failed', { message: error.message });
+      sendError(res, 500, 'PASSWORD_RESET_VERIFY_FAILED', 'failed to verify password reset');
     }
   });
 
