@@ -17,7 +17,7 @@ function ChatPanel({
   historyError,
   messages,
   currentUserId,
-  messagesEndRef,
+  historyViewportRef,
   onLoadOlderMessages,
   text,
   onTextChange,
@@ -26,17 +26,19 @@ function ChatPanel({
   canSend,
   composerDisabledReason,
 }) {
-  const historyViewportRef = useRef(null)
+  const internalHistoryViewportRef = useRef(null)
   const restoreScrollRef = useRef(null)
 
+  const resolvedHistoryViewportRef = historyViewportRef || internalHistoryViewportRef
+
   useEffect(() => {
-    const viewport = historyViewportRef.current
+    const viewport = resolvedHistoryViewportRef.current
     if (!viewport || restoreScrollRef.current == null || isLoadingOlderHistory) return
 
     const previousScrollHeight = restoreScrollRef.current
     viewport.scrollTop = viewport.scrollHeight - previousScrollHeight
     restoreScrollRef.current = null
-  }, [isLoadingOlderHistory, messages.length])
+  }, [isLoadingOlderHistory, messages.length, resolvedHistoryViewportRef])
 
   const handleHistoryScroll = (event) => {
     const viewport = event.currentTarget
@@ -71,7 +73,7 @@ function ChatPanel({
       </div>
 
       <div
-        ref={historyViewportRef}
+        ref={resolvedHistoryViewportRef}
         className="min-h-0 overflow-auto bg-[linear-gradient(180deg,var(--panel-soft)_0%,transparent_100%)] px-4 py-4 md:px-5"
         onScroll={handleHistoryScroll}
       >
@@ -131,7 +133,6 @@ function ChatPanel({
             })}
           </ul>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4 md:px-5">
