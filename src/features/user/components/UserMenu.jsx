@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import menuIcon from '../../../../assets/branding/icons/system/menu.svg?raw'
 import InlineIcon from '../../../components/InlineIcon'
+import './UserMenu.css'
 
 // 사용자 메뉴는 상단 우측 액션 영역에서 내 정보/설정/로그아웃 진입점을 담당한다.
 // 버튼 기호를 외부에서 주입할 수 있게 열어둬서 헤더 레이아웃에 맞게 재사용한다.

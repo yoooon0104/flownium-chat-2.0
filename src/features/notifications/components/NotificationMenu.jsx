@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import notificationIcon from '../../../../assets/branding/icons/system/notifications.svg?raw'
 import InlineIcon from '../../../components/InlineIcon'
+import './NotificationMenu.css'
 
 const toCreatedLabel = (value) => {
   if (!value) return ''
