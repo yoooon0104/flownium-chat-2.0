@@ -50,6 +50,9 @@ Agents must review `docs/development-rules.md` before changing code, documentati
 3. If something failed or was not applied, state that first and clearly.
 4. When a task changes code, docs, validation status, or release readiness, update a task-specific worklog under `.codex/worklogs/` in the same task.
 5. When a PR is intended to resolve a tracked GitHub Issue, include a closing keyword such as `Closes #123` in the PR body.
+6. If the user explicitly says a PR was merged, treat that PR and branch as closed in all following responses unless the user reopens that topic.
+7. After a PR is treated as merged, do not describe it as pending, newly opened, or needing upload again.
+8. Before suggesting rollback or redeployment as the cause of a mismatch, first check whether the local worktree contains uncommitted changes.
 
 ## 5. Validation Baseline
 
