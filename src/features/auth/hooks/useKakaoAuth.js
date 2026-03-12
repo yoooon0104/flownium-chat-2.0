@@ -211,13 +211,54 @@ export const useKakaoAuth = (apiBaseUrl) => {
     throw new Error(resolveErrorMessage(first.body, '회원탈퇴 처리에 실패했습니다.'))
   }, [accessToken, authApi, clearSession, refreshAccessToken])
 
+  const redirectToKakao = useCallback((authorizeUrl) => {
+    if (!authorizeUrl) {
+      setError('카카오 로그인 설정이 비어 있습니다. VITE_KAKAO_* 값을 확인하세요.')
+      return
+    }
+
+    window.location.href = authorizeUrl
+  }, [])
+
   const startKakaoLogin = useCallback(() => {
     if (!kakaoAuthorizeUrl) {
       setError('카카오 로그인 설정이 비어 있습니다. VITE_KAKAO_* 값을 확인하세요.')
       return
     }
-    window.location.href = kakaoAuthorizeUrl
-  }, [kakaoAuthorizeUrl])
+
+    redirectToKakao(kakaoAuthorizeUrl)
+  }, [kakaoAuthorizeUrl, redirectToKakao])
+
+  const startKakaoLink = useCallback(async () => {
+    const currentToken = AuthSession.load().accessToken || accessToken
+    if (!currentToken) {
+      throw new Error('로그인이 필요합니다.')
+    }
+
+    const first = await authApi.startKakaoLink(currentToken)
+    if (first.status === 401) {
+      const refreshed = await refreshAccessToken()
+      if (!refreshed) {
+        throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.')
+      }
+
+      const retriedToken = AuthSession.load().accessToken
+      const retried = await authApi.startKakaoLink(retriedToken)
+      if (!retried.ok || !retried.body?.authorizeUrl) {
+        throw new Error(resolveErrorMessage(retried.body, '카카오 계정 연결을 시작하지 못했습니다.'))
+      }
+
+      redirectToKakao(retried.body.authorizeUrl)
+      return
+    }
+
+    const { ok, body } = first
+    if (!ok || !body?.authorizeUrl) {
+      throw new Error(resolveErrorMessage(body, '카카오 계정 연결을 시작하지 못했습니다.'))
+    }
+
+    redirectToKakao(body.authorizeUrl)
+  }, [accessToken, authApi, redirectToKakao, refreshAccessToken])
 
   useEffect(() => {
     if (callbackHandledRef.current) return
@@ -234,6 +275,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
         setError('')
 
         if (code) {
+          const state = String(params.get('state') || '').trim()
           // 같은 인가 코드를 새로고침/중복 렌더로 다시 보내지 않도록 먼저 URL query를 제거한다.
           clearKakaoCallbackQuery()
 
@@ -244,7 +286,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
           // 카카오 인가 코드는 1회용이므로 처리 중 상태를 먼저 기록해 중복 교환을 차단한다.
           window.sessionStorage.setItem(KAKAO_AUTH_IN_PROGRESS_STORAGE_KEY, code)
 
-          const { ok, body } = await authApi.getKakaoCallback(code)
+          const { ok, body } = await authApi.getKakaoCallback(code, state)
           if (!ok || !body) {
             throw new Error(resolveErrorMessage(body, '카카오 로그인 처리에 실패했습니다.'))
           }
@@ -252,6 +294,9 @@ export const useKakaoAuth = (apiBaseUrl) => {
           // 가입 완료 사용자는 즉시 세션을 저장하고 채팅 화면으로 이동한다.
           if (body.resultType === 'LOGIN_SUCCESS') {
             saveSession(body)
+          } else if (body.resultType === 'LINK_SUCCESS') {
+            setUser(UserProfile.normalize(body.user || null))
+            setError('')
           } else if (body.resultType === 'SIGNUP_REQUIRED') {
             AuthSession.clear()
             setAccessToken('')
@@ -324,6 +369,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     },
     setUser,
     startKakaoLogin,
+    startKakaoLink,
     refreshAccessToken,
     completeSignup,
     startEmailSignup,

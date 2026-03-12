@@ -7,8 +7,26 @@
 }
 
 export const createAuthApi = (apiBaseUrl) => {
-  const getKakaoCallback = async (code) => {
-    const response = await fetch(`${apiBaseUrl}/auth/kakao/callback?code=${encodeURIComponent(code)}`)
+  const getKakaoCallback = async (code, state = '') => {
+    const params = new URLSearchParams({
+      code: String(code || ''),
+    })
+    if (state) {
+      params.set('state', String(state || ''))
+    }
+
+    const response = await fetch(`${apiBaseUrl}/auth/kakao/callback?${params.toString()}`)
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
+  const startKakaoLink = async (accessToken) => {
+    const response = await fetch(`${apiBaseUrl}/auth/kakao/link/start`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
     const body = await parseJsonSafe(response)
     return { ok: response.ok, status: response.status, body }
   }
@@ -100,6 +118,7 @@ export const createAuthApi = (apiBaseUrl) => {
 
   return {
     getKakaoCallback,
+    startKakaoLink,
     refresh,
     completeSignup,
     startEmailSignup,

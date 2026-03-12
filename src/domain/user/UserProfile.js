@@ -9,6 +9,7 @@ export const UserProfile = {
       nickname: String(safe.nickname || '').trim(),
       profileImage: String(safe.profileImage || '').trim(),
       isDeleted: safe.isDeleted === true,
+      linkedProviders: Array.isArray(safe.linkedProviders) ? safe.linkedProviders.map((value) => String(value || '').trim().toLowerCase()).filter(Boolean) : [],
     }
   },
 
