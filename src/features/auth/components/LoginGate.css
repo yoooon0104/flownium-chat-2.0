@@ -31,10 +31,7 @@
   max-width: 100%;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border-soft);
-  border-radius: 16px;
-  background: var(--surface-elevated);
-  padding: 10px 14px;
+  padding: 0;
 }
 
 .auth-brand-logo {
