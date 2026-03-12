@@ -9,6 +9,7 @@ const Message = require('./models/message.model.cjs');
 const User = require('./models/user.model.cjs');
 const AuthIdentity = require('./models/authidentity.model.cjs');
 const EmailVerification = require('./models/emailverification.model.cjs');
+const PasswordResetVerification = require('./models/passwordresetverification.model.cjs');
 const ChatRoom = require('./models/chatroom.model.cjs');
 const ChatReadState = require('./models/chatreadstate.model.cjs');
 const { Friendship } = require('./models/friendship.model.cjs');
@@ -414,6 +415,7 @@ app.use(
     User,
     AuthIdentity,
     EmailVerification,
+    PasswordResetVerification,
     Friendship,
     ChatRoom,
     Message,

@@ -54,6 +54,10 @@
   color: #d63c4c;
 }
 
+.auth-notice {
+  color: #2f37d8;
+}
+
 .kakao-login-button {
   height: 44px;
   border: none;
@@ -96,6 +100,10 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
+}
+
+.auth-mode-toggle-triple {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .auth-mode-toggle button,

@@ -375,7 +375,37 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - 이메일별 pending 인증은 1건만 유지한다.
 - 인증 코드는 6자리, 10분 만료, 60초 재발송 제한을 적용한다.
 
-## 11) 예정 도메인: AnonymousRoom / AnonymousParticipant / GuestSession
+## 11) PasswordResetVerification
+
+### 목적
+
+- 이메일 비밀번호 재설정 중 인증 전 임시 입력값을 저장하는 도메인
+
+### 필드
+
+- `email: string`
+- `codeHash: string`
+- `passwordHash: string`
+- `expiresAt: date`
+- `resendAvailableAt: date`
+- `verifiedAt: date|null`
+- `attemptCount: number`
+- `createdAt: date`
+- `updatedAt: date`
+
+### 생성/갱신 규칙
+
+- 비밀번호 재설정 시작 시 생성 또는 갱신한다.
+- 인증 성공 전까지는 실제 `AuthIdentity(email).secretHash`를 바꾸지 않는다.
+- 인증 성공 시 `AuthIdentity(email).secretHash`를 교체하고 기존 refresh token을 무효화한다.
+- 개발 단계에서는 서버 로그/응답의 `debugCode`로 인증 코드를 확인한다.
+
+### 검증 규칙
+
+- 이메일별 pending 재설정은 1건만 유지한다.
+- 인증 코드는 6자리, 10분 만료, 60초 재발송 제한을 적용한다.
+
+## 12) 예정 도메인: AnonymousRoom / AnonymousParticipant / GuestSession
 
 ### 목적
 
