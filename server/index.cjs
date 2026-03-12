@@ -197,6 +197,16 @@ const emitRoomDeleted = (userId, roomId) => {
   });
 };
 
+const broadcastRoomUpdated = async (roomDoc) => {
+  const memberIds = Array.isArray(roomDoc?.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
+  await Promise.all(
+    memberIds.map(async (memberId) => {
+      const roomPayload = await toRoomResponse(roomDoc, memberId);
+      emitRoomUpdated(memberId, roomPayload);
+    })
+  );
+};
+
 const addPresence = (roomId, userId, socketId) => {
   if (!roomPresence.has(roomId)) {
     roomPresence.set(roomId, new Map());
@@ -618,6 +628,7 @@ io.on('connection', (socket) => {
       room.lastMessageAt = message.timestamp;
       await room.save();
 
+      await broadcastRoomUpdated(room);
       await emitRoomMessage(room, message, clientMessageId || null);
 
       reply({

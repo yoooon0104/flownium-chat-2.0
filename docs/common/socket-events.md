@@ -37,6 +37,7 @@
 - direct 방에 탈퇴 회원이 남아 있으면 전송을 막고 `DELETED_MEMBER` 에러를 반환
 - 방의 `lastMessage`, `lastMessageAt` 갱신
 - `receive_message` 브로드캐스트
+- `room_updated`를 사용자 전용 room으로 같이 전송해 방 목록 메타를 즉시 갱신
 - ack 응답으로 전송 성공/실패를 호출자에게 즉시 반환
 
 ack 성공:
@@ -111,7 +112,7 @@ ack 실패:
 
 규칙:
 - 사용자 전용 room(`user:<userId>`)으로 전달
-- 새 방 생성, 초대, 나가기 후 방 메타가 바뀌면 전송
+- 새 방 생성, 초대, 나가기, 새 메시지 저장 후 방 메타가 바뀌면 전송
 - 프론트는 이 이벤트를 받으면 방 목록을 다시 조회해 room 메타와 unread를 맞춘다
 
 ### room_deleted
