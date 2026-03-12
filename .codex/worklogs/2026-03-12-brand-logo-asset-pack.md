@@ -33,6 +33,7 @@
 
 - 실제 배포용 웹 아이콘 세트는 `public/branding/` 아래로 이동했다.
 - `index.html`과 `site.webmanifest`는 새 `/branding/...` 경로를 참조한다.
+- 사용자가 제공한 원본 초안 로고는 `assets/branding/logo/draft/flownium-logo.png`로 함께 보존한다.
 
 ## Notes
 
