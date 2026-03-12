@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+﻿import { useEffect, useRef } from 'react'
 import ParticipantsMenu from './ParticipantsMenu'
 
 // 채팅 본문 패널은 히스토리, 참여자 메뉴, 입력창을 한곳에서 조합한다.
@@ -62,10 +62,10 @@ function ChatPanel({
 
         <div className="min-w-0">
           <h3 className="truncate text-lg font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
-            {activeRoom?.name || '채팅방을 선택해 주세요'}
+            {activeRoom?.name || '채팅방을 선택해 주세요.'}
           </h3>
           <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
-            {joinedRoomId ? `방 ID: ${joinedRoomId}` : '좌측 패널에서 채팅방을 선택하면 대화를 시작할 수 있습니다.'}
+            {joinedRoomId ? `방 ID: ${joinedRoomId}` : '좌측 목록에서 채팅방을 선택하면 대화를 시작할 수 있습니다.'}
           </p>
         </div>
 
@@ -149,7 +149,8 @@ function ChatPanel({
         />
         <button
           type="button"
-          className="h-12 rounded-2xl border border-brand-primary/25 bg-[var(--cta-bg)] px-5 text-sm font-semibold text-[var(--cta-text)] shadow-[var(--shadow-glow)] transition hover:brightness-105 disabled:border-[var(--border-soft)] disabled:bg-[var(--surface-muted)] disabled:text-[var(--text-secondary)] disabled:shadow-none"
+          className="h-12 rounded-2xl border border-brand-primary/25 px-5 text-sm font-semibold text-white shadow-[var(--shadow-glow)] transition hover:brightness-105 disabled:border-[var(--border-soft)] disabled:bg-[var(--surface-muted)] disabled:text-[var(--text-secondary)] disabled:shadow-none"
+          style={!canSend ? undefined : { background: 'var(--brand-primary)' }}
           onClick={onSendMessage}
           disabled={!canSend}
         >
@@ -161,3 +162,4 @@ function ChatPanel({
 }
 
 export default ChatPanel
+

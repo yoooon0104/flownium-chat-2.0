@@ -19,7 +19,11 @@ export const useChatRooms = ({ chatApi }) => {
   const fetchRooms = useCallback(async () => {
     if (!chatApi) return
 
-    setRoomsLoading(true)
+    const shouldShowBlockingLoading = rooms.length === 0
+    if (shouldShowBlockingLoading) {
+      setRoomsLoading(true)
+    }
+
     const { ok, body } = await chatApi.getRooms()
     if (!ok) {
       setErrorMessage(resolveErrorMessage(body, '채팅방 목록을 불러오지 못했습니다.'))
@@ -30,7 +34,7 @@ export const useChatRooms = ({ chatApi }) => {
     setRooms(Array.isArray(body?.rooms) ? body.rooms : [])
     setTotalUnreadCount(Number(body?.totalUnreadCount) || 0)
     setRoomsLoading(false)
-  }, [chatApi])
+  }, [chatApi, rooms.length])
 
   const createRoom = useCallback(async (payload) => {
     if (!chatApi) return { ok: false, roomId: '' }
