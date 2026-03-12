@@ -50,6 +50,7 @@ function AccountPanel({
   const linkedProviders = Array.isArray(user?.linkedProviders) ? user.linkedProviders : []
   const isKakaoLinked = linkedProviders.includes('kakao')
   const hasEmailPassword = linkedProviders.includes('email')
+  const isBusy = isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting
 
   const passwordValidationMessage = useMemo(() => {
     if (!hasEmailPassword) return ''
@@ -57,7 +58,7 @@ function AccountPanel({
     if (currentPassword.length < 8) return '현재 비밀번호를 입력해주세요.'
     if (newPassword.length < 8 || newPassword.length > 72) return '새 비밀번호는 8~72자로 입력해주세요.'
     if (!/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
-      return '새 비밀번호는 영문과 숫자를 모두 포함해야 합니다.'
+      return '새 비밀번호에는 영문과 숫자가 모두 포함되어야 합니다.'
     }
     if (!confirmPassword) return '새 비밀번호 확인을 입력해주세요.'
     if (newPassword !== confirmPassword) return '새 비밀번호와 확인 값이 일치하지 않습니다.'
@@ -143,7 +144,7 @@ function AccountPanel({
       setError('')
       setSuccess('')
       await onUnlinkKakao()
-      setSuccess('카카오 계정 연결이 해제되었습니다.')
+      setSuccess('카카오 계정 연결을 해제했습니다.')
     } catch (nextError) {
       setError(nextError.message || '카카오 계정 연결 해제에 실패했습니다.')
       setSuccess('')
@@ -193,6 +194,33 @@ function AccountPanel({
         </div>
       </div>
 
+      {(error || success) && (
+        <div className={`account-feedback-banner ${error ? 'is-error' : 'is-success'}`}>
+          {error ? <p className="error-text">{error}</p> : <p className="success-text">{success}</p>}
+        </div>
+      )}
+
+      <section className="account-section">
+        <div className="account-section-header">
+          <h4>로그인 방식</h4>
+          <p>지금 사용할 수 있는 로그인 수단과 연결 상태를 한눈에 확인할 수 있어요.</p>
+        </div>
+
+        <div className="account-status-grid">
+          <div className={`account-status-card ${hasEmailPassword ? 'is-active' : 'is-inactive'}`}>
+            <span className="account-status-label">이메일 로그인</span>
+            <strong>{hasEmailPassword ? '사용 가능' : '사용 불가'}</strong>
+            <p>{hasEmailPassword ? '이메일로 바로 로그인할 수 있어요.' : '이메일 로그인 수단이 아직 연결되지 않았어요.'}</p>
+          </div>
+
+          <div className={`account-status-card ${isKakaoLinked ? 'is-active' : 'is-inactive'}`}>
+            <span className="account-status-label">카카오 간편로그인</span>
+            <strong>{isKakaoLinked ? '연결됨' : '미연결'}</strong>
+            <p>{isKakaoLinked ? '다음부터 카카오로 더 빠르게 로그인할 수 있어요.' : '보조 로그인 수단으로 카카오를 연결할 수 있어요.'}</p>
+          </div>
+        </div>
+      </section>
+
       {emphasizeKakaoLink && !isKakaoLinked && (
         <div className="account-highlight-card">
           <strong>카카오 간편로그인을 연결할까요?</strong>
@@ -203,7 +231,7 @@ function AccountPanel({
       <section className="account-section">
         <div className="account-section-header">
           <h4>내 정보</h4>
-          <p>계정의 기본 정보는 수정 버튼을 눌렀을 때만 변경할 수 있어요.</p>
+          <p>계정 기본 정보는 수정 버튼을 눌렀을 때만 변경할 수 있어요.</p>
         </div>
 
         <label className="settings-field">
@@ -228,7 +256,7 @@ function AccountPanel({
               type="button"
               className="inline-action-button"
               onClick={() => void handleSaveNickname()}
-              disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting}
+              disabled={isBusy}
             >
               {isSavingNickname ? '저장 중...' : '확인'}
             </button>
@@ -236,7 +264,7 @@ function AccountPanel({
               type="button"
               className="secondary inline-action-button"
               onClick={handleCancelEdit}
-              disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting}
+              disabled={isBusy}
             >
               취소
             </button>
@@ -250,7 +278,7 @@ function AccountPanel({
               setSuccess('')
               setIsEditingProfile(true)
             }}
-            disabled={isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting}
+            disabled={isBusy}
           >
             내 정보 변경
           </button>
@@ -260,36 +288,38 @@ function AccountPanel({
       <section className="account-section">
         <div className="account-section-header">
           <h4>간편로그인</h4>
-          <p>이메일 계정에 카카오 계정을 연결하면 다음부터 더 쉽게 로그인할 수 있어요.</p>
+          <p>이메일 계정에 카카오 계정을 연결하면 다음부터 더 빠르게 로그인할 수 있어요.</p>
         </div>
 
-        <button
-          type="button"
-          className="secondary inline-action-button"
-          onClick={() => void handleStartKakaoLink()}
-          disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting || isKakaoLinked}
-        >
-          {isKakaoLinked ? '카카오 계정 연결됨' : isLinkingKakao ? '카카오 연결 중...' : '카카오 계정 연결'}
-        </button>
+        <div className="account-inline-actions account-inline-actions-stack">
+          <button
+            type="button"
+            className="secondary inline-action-button"
+            onClick={() => void handleStartKakaoLink()}
+            disabled={isBusy || isKakaoLinked}
+          >
+            {isKakaoLinked ? '카카오 계정 연결됨' : isLinkingKakao ? '카카오 연결 중...' : '카카오 계정 연결'}
+          </button>
 
-        <button
-          type="button"
-          className="secondary inline-action-button"
-          onClick={() => void handleUnlinkKakao()}
-          disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting || !isKakaoLinked || !hasEmailPassword}
-        >
-          {isUnlinkingKakao ? '연결 해제 중...' : '카카오 연결 해제'}
-        </button>
+          <button
+            type="button"
+            className="secondary inline-action-button"
+            onClick={() => void handleUnlinkKakao()}
+            disabled={isBusy || !isKakaoLinked || !hasEmailPassword}
+          >
+            {isUnlinkingKakao ? '연결 해제 중...' : '카카오 연결 해제'}
+          </button>
+        </div>
 
         {!hasEmailPassword && isKakaoLinked && (
-          <p className="muted-text">이메일 로그인 수단이 없으면 마지막 간편로그인은 해제할 수 없습니다.</p>
+          <p className="muted-text">이메일 로그인 수단이 없으면 마지막 간편로그인 연결은 해제할 수 없습니다.</p>
         )}
       </section>
 
       <section className="account-section">
         <div className="account-section-header">
           <h4>비밀번호 변경</h4>
-          <p>이메일 로그인 계정인 경우에만 현재 비밀번호 확인 후 변경할 수 있어요.</p>
+          <p>이메일 로그인 계정인 경우에만 현재 비밀번호를 확인한 뒤 변경할 수 있어요.</p>
         </div>
 
         {hasEmailPassword ? (
@@ -330,7 +360,7 @@ function AccountPanel({
               type="button"
               className="inline-action-button"
               onClick={() => void handleChangePassword()}
-              disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting}
+              disabled={isBusy}
             >
               {isChangingPassword ? '변경 중...' : '비밀번호 변경'}
             </button>
@@ -350,14 +380,11 @@ function AccountPanel({
           type="button"
           className="secondary inline-action-button danger-zone-button"
           onClick={() => void handleDeleteAccount()}
-          disabled={isSavingNickname || isChangingPassword || isLinkingKakao || isUnlinkingKakao || isDeleting}
+          disabled={isBusy}
         >
           {isDeleting ? '회원탈퇴 처리 중...' : '회원탈퇴'}
         </button>
       </section>
-
-      {error && <p className="error-text account-feedback">{error}</p>}
-      {success && <p className="success-text account-feedback">{success}</p>}
     </div>
   )
 }
