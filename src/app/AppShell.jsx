@@ -355,12 +355,15 @@ function AppShell() {
   }, [loadMessageHistory, markRoomRead, prepareMessageHistory])
 
   // 실시간 메시지 수신 분기:
-  // - 현재 열려 있는 방이면 본문에 바로 append
-  // - 그중 상대 메시지면 읽음 처리까지 이어서 호출
-  // - 다른 방 메시지는 본문에는 넣지 않고 방 목록 unread만 갱신
+  // - 현재 방이 실제로 보이는 상태일 때만 본문 append + 읽음 처리
+  // - 모바일에서 다른 탭으로 나간 뒤 joinedRoomId만 남아 있는 경우에는
+  //   unread를 유지해야 하므로 방 목록만 다시 불러온다.
   const handleSocketReceiveMessage = useCallback((message) => {
     void (async () => {
-      if (message?.chatRoomId === joinedRoomId) {
+      const isActiveRoomMessage = message?.chatRoomId === joinedRoomId
+      const isChatVisible = !isMobileViewport || isMobileChatView
+
+      if (isActiveRoomMessage && isChatVisible) {
         appendMessage(message)
 
         if (message?.senderId && message.senderId !== currentUser?.id) {
@@ -371,7 +374,15 @@ function AppShell() {
 
       await fetchRooms()
     })()
-  }, [appendMessage, currentUser?.id, fetchRooms, joinedRoomId, markRoomRead])
+  }, [
+    appendMessage,
+    currentUser?.id,
+    fetchRooms,
+    isMobileChatView,
+    isMobileViewport,
+    joinedRoomId,
+    markRoomRead,
+  ])
 
   const handleSocketMessageUpdated = useCallback((message) => {
     if (message?.chatRoomId !== joinedRoomId) return
