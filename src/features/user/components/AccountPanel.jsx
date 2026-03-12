@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { UserProfile } from '../../../domain/user/UserProfile'
+import './AccountPanel.css'
 
 const getLinkedProviderLabel = (provider) => {
   if (provider === 'kakao') return '카카오'

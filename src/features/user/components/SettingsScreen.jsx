@@ -13,14 +13,14 @@ function SettingsScreen({ themePreference, onChangeTheme, onBack }) {
 
       <div className="settings-screen-body">
         <div className="settings-form-card">
-          <label className="settings-field">
+          <div className="settings-field">
             <span>테마</span>
             <select value={themePreference} onChange={(event) => onChangeTheme(event.target.value)}>
               <option value="system">시스템 설정 따르기</option>
               <option value="light">라이트 모드</option>
               <option value="dark">다크 모드</option>
             </select>
-          </label>
+          </div>
         </div>
       </div>
     </section>
