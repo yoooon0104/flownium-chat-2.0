@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-// 모바일 설정 화면은 모달과 같은 기능을 화면 레이아웃으로 제공한다.
+// 모바일 설정 화면은 닉네임 수정, 계정 정보 확인, 카카오 연결, 회원탈퇴를 화면 레이아웃으로 제공한다.
 function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onStartKakaoLink, onDeleteAccount, onBack }) {
   const [nickname, setNickname] = useState('')
   const [error, setError] = useState('')
@@ -18,6 +18,7 @@ function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onStar
 
   const normalized = nickname.trim()
   const isKakaoLinked = Array.isArray(user?.linkedProviders) && user.linkedProviders.includes('kakao')
+  const emailLabel = String(user?.email || '').trim() || '이메일 정보를 불러오지 못했습니다.'
 
   const handleSave = async () => {
     if (normalized.length < 2 || normalized.length > 20) {
@@ -72,16 +73,22 @@ function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onStar
         </button>
         <div className="settings-screen-main">
           <h3>설정</h3>
-          <p>닉네임과 테마를 바꾸거나 계정 연결 및 회원탈퇴를 진행할 수 있습니다.</p>
+          <p>닉네임, 이메일, 테마와 계정 연결 상태를 확인할 수 있습니다.</p>
         </div>
       </header>
 
       <div className="settings-screen-body">
         <div className="settings-form-card">
           <label className="settings-field">
+            <span>이메일</span>
+            <input value={emailLabel} readOnly disabled />
+          </label>
+
+          <label className="settings-field">
             <span>닉네임</span>
             <input value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="닉네임" />
           </label>
+
           <label className="settings-field">
             <span>테마</span>
             <select value={themePreference} onChange={(event) => onChangeTheme(event.target.value)}>
@@ -90,6 +97,7 @@ function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onStar
               <option value="dark">다크 모드</option>
             </select>
           </label>
+
           <button
             type="button"
             className="secondary"
@@ -98,6 +106,7 @@ function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onStar
           >
             {isKakaoLinked ? '카카오 계정 연결됨' : (isLinkingKakao ? '카카오 연결 중...' : '카카오 계정 연결')}
           </button>
+
           <button
             type="button"
             className="secondary danger-zone-button"
@@ -106,7 +115,9 @@ function SettingsScreen({ user, themePreference, onChangeTheme, onSubmit, onStar
           >
             {isDeleting ? '회원탈퇴 처리 중...' : '회원탈퇴'}
           </button>
+
           {error && <p className="error-text modal-error">{error}</p>}
+
           <div className="modal-actions single-column-actions">
             <button type="button" onClick={() => void handleSave()} disabled={isSaving || isDeleting || isLinkingKakao}>
               {isSaving ? '저장 중...' : '저장'}
