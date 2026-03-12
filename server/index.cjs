@@ -77,13 +77,32 @@ const findDeletedMemberIds = async (memberIds) => {
   return deletedUsers.map((user) => String(user._id));
 };
 
-const toRoomResponse = async (roomDoc) => {
+const resolveDirectRoomName = async (roomDoc, currentUserId) => {
+  const memberIds = Array.isArray(roomDoc?.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
+  if (Boolean(roomDoc?.isGroup) || !currentUserId || memberIds.length !== 2) {
+    return String(roomDoc?.name || '').trim();
+  }
+
+  const counterpartUserId = memberIds.find((memberId) => memberId !== String(currentUserId));
+  if (!counterpartUserId) {
+    return String(roomDoc?.name || '').trim();
+  }
+
+  const counterpartUser = await User.findById(counterpartUserId)
+    .select({ nickname: 1 })
+    .lean();
+
+  return String(counterpartUser?.nickname || roomDoc?.name || '').trim();
+};
+
+const toRoomResponse = async (roomDoc, currentUserId = '') => {
   const memberIds = Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
   const deletedMemberIds = await findDeletedMemberIds(memberIds);
+  const resolvedName = await resolveDirectRoomName(roomDoc, currentUserId);
 
   return {
     id: String(roomDoc._id),
-    name: roomDoc.name,
+    name: resolvedName,
     isGroup: Boolean(roomDoc.isGroup),
     memberIds,
     lastMessage: roomDoc.lastMessage || '',
@@ -508,7 +527,7 @@ io.on('connection', (socket) => {
 
         socket.emit('room_joined', {
           roomId,
-          room: await toRoomResponse(room),
+          room: await toRoomResponse(room, socket.user.userId),
           participants,
         });
 

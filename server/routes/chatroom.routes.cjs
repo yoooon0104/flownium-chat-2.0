@@ -67,13 +67,32 @@ const createChatroomRouter = ({
   };
 
   // 응답 형태를 한곳에서 고정해 두면 REST/소켓의 room 메타가 어긋나지 않는다.
-  const toRoomResponse = async (roomDoc, unreadCount = 0) => {
+  const resolveDirectRoomName = async (roomDoc, currentUserId) => {
+    const memberIds = Array.isArray(roomDoc?.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
+    if (Boolean(roomDoc?.isGroup) || !currentUserId || memberIds.length !== 2) {
+      return String(roomDoc?.name || '').trim();
+    }
+
+    const counterpartUserId = memberIds.find((memberId) => memberId !== String(currentUserId));
+    if (!counterpartUserId) {
+      return String(roomDoc?.name || '').trim();
+    }
+
+    const counterpartUser = await User.findById(counterpartUserId)
+      .select({ nickname: 1 })
+      .lean();
+
+    return String(counterpartUser?.nickname || roomDoc?.name || '').trim();
+  };
+
+  const toRoomResponse = async (roomDoc, currentUserId = '', unreadCount = 0) => {
     const memberIds = Array.isArray(roomDoc.memberIds) ? roomDoc.memberIds.map((value) => String(value)) : [];
     const deletedMemberIds = await findDeletedMemberIds(memberIds);
+    const resolvedName = await resolveDirectRoomName(roomDoc, currentUserId);
 
     return {
       id: String(roomDoc._id),
-      name: roomDoc.name,
+      name: resolvedName,
       isGroup: Boolean(roomDoc.isGroup),
       memberIds,
       lastMessage: roomDoc.lastMessage || '',
@@ -178,9 +197,11 @@ const createChatroomRouter = ({
     });
 
   const broadcastRoomUpdated = async (memberIds, roomDoc) => {
-    const roomPayload = await toRoomResponse(roomDoc);
     await Promise.all(
-      memberIds.map((memberId) => emitRoomUpdated?.(String(memberId), roomPayload))
+      memberIds.map(async (memberId) => {
+        const roomPayload = await toRoomResponse(roomDoc, String(memberId));
+        return emitRoomUpdated?.(String(memberId), roomPayload);
+      })
     );
   };
 
@@ -270,7 +291,7 @@ const createChatroomRouter = ({
         });
 
         await broadcastRoomUpdated([currentUserId], room);
-        res.status(201).json({ room: await toRoomResponse(room) });
+        res.status(201).json({ room: await toRoomResponse(room, currentUserId) });
         return;
       }
 
@@ -305,7 +326,7 @@ const createChatroomRouter = ({
         const friendUserId = normalizedTargetIds[0];
         const existingRoom = await findExistingDirectRoom(currentUserId, friendUserId);
         if (existingRoom) {
-          res.status(200).json({ room: await toRoomResponse(existingRoom), reused: true });
+          res.status(200).json({ room: await toRoomResponse(existingRoom, currentUserId), reused: true });
           return;
         }
 
@@ -326,7 +347,7 @@ const createChatroomRouter = ({
         });
 
         await broadcastRoomUpdated(room.memberIds, room);
-        res.status(201).json({ room: await toRoomResponse(room), reused: false });
+        res.status(201).json({ room: await toRoomResponse(room, currentUserId), reused: false });
         return;
       }
 
@@ -355,7 +376,7 @@ const createChatroomRouter = ({
       );
 
       await broadcastRoomUpdated(memberIds, room);
-      res.status(201).json({ room: await toRoomResponse(room) });
+      res.status(201).json({ room: await toRoomResponse(room, currentUserId) });
     } catch (error) {
       sendError(res, 500, 'CHATROOM_CREATE_FAILED', error.message || 'failed to create chatroom');
     }
@@ -467,7 +488,7 @@ const createChatroomRouter = ({
         await emitRoomParticipants?.(String(room._id));
 
         res.status(200).json({
-          room: await toRoomResponse(room),
+          room: await toRoomResponse(room, currentUserId),
           createdNewRoom: false,
         });
         return;
@@ -506,7 +527,7 @@ const createChatroomRouter = ({
 
       await broadcastRoomUpdated(nextMemberIds, nextRoom);
       res.status(201).json({
-        room: await toRoomResponse(nextRoom),
+        room: await toRoomResponse(nextRoom, currentUserId),
         createdNewRoom: true,
       });
     } catch (error) {
@@ -587,7 +608,7 @@ const createChatroomRouter = ({
       await emitRoomParticipants?.(roomId);
 
       res.status(200).json({
-        room: await toRoomResponse(room),
+        room: await toRoomResponse(room, currentUserId),
         deleted: false,
       });
     } catch (error) {
@@ -617,7 +638,7 @@ const createChatroomRouter = ({
           const currentRoomId = String(room._id);
           const readState = readStateByRoomId.get(currentRoomId);
           const unreadCount = await getUnreadCountForRoom(currentRoomId, req.user.userId, readState?.lastReadAt || null);
-          return await toRoomResponse(room, unreadCount);
+          return await toRoomResponse(room, req.user.userId, unreadCount);
         })
       );
 
