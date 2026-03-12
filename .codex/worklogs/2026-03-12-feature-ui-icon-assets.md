@@ -30,3 +30,6 @@
 - generated SVG icons are intended as a shippable first pass and can later be replaced with AI-generated variants if needed
 - adjusted the top notification button so the bell icon sits centered within the 36x36 action button
 - split the previous settings icon into a dedicated `theme.svg` and a clearer gear-style `settings.svg`
+- loaded `Sora` explicitly in `index.html` and aligned the auth gate typography with the product font stack
+- softened the auth gate typography by reducing heading, label, and button font weights for better readability on dark backgrounds
+- reduced auth CTA brightness and shadow intensity so login/signup/reset screens feel less harsh on dark theme
