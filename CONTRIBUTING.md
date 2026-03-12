@@ -69,3 +69,5 @@ Issue Closure
 1. Do not merge before the PR stage is complete.
 2. If an operational issue occurs, document root cause, mitigation, and prevention.
 3. If a documentation review reveals a code issue, track it separately instead of hiding it inside a docs-only change.
+4. If a collaborator says a PR was already merged, treat that PR as closed state from that point onward and move to the next task unless they explicitly ask to revisit it.
+5. When local and production differ, check `git status` and local uncommitted changes before assuming the merged PR or deployment is wrong.
