@@ -527,6 +527,7 @@ MVP2-A 1차 표준:
 ### GET /api/notifications
 - 현재 사용자 알림 목록 조회
 - 최신순 최대 100건 반환
+- 현재 정책상 알림 허브에는 `friend_request`만 노출하며, legacy `room_invite`는 응답에서 제외
 
 응답 예시:
 ```json

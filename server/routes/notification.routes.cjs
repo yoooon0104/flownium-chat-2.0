@@ -4,6 +4,7 @@ const { sendError } = require("../utils/error-response.cjs");
 // 알림 REST API를 생성한다. 목록 조회와 읽음 처리만 담당한다.
 const createNotificationRouter = ({ Notification, requireAuth, assertDbConnected, emitNotificationRead }) => {
   const router = express.Router();
+  const isVisibleNotification = (notificationDoc) => String(notificationDoc?.type || '').trim() !== 'room_invite';
 
   const toNotificationResponse = (notificationDoc) => ({
     id: String(notificationDoc._id),
@@ -26,10 +27,11 @@ const createNotificationRouter = ({ Notification, requireAuth, assertDbConnected
         .limit(100)
         .lean();
 
-      const unreadCount = notifications.filter((item) => !item.isRead).length;
+      const visibleNotifications = notifications.filter(isVisibleNotification);
+      const unreadCount = visibleNotifications.filter((item) => !item.isRead).length;
       res.status(200).json({
         unreadCount,
-        notifications: notifications.map(toNotificationResponse),
+        notifications: visibleNotifications.map(toNotificationResponse),
       });
     } catch (_error) {
       sendError(res, 500, "NOTIFICATION_FETCH_FAILED", "failed to fetch notifications");

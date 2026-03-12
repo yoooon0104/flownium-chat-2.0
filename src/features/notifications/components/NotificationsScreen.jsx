@@ -6,27 +6,18 @@ const toCreatedLabel = (value) => {
 }
 
 const getNotificationTitle = (item) => {
-  if (item?.type === 'room_invite') return '방 초대'
   if (item?.type === 'friend_request') return '친구 요청'
   return String(item?.type || '알림')
 }
 
 const getNotificationSummary = (item) => {
-  if (item?.type === 'room_invite') {
-    const inviterName = String(item?.payload?.inviter?.nickname || '').trim() || '알 수 없는 사용자'
-    const roomName = String(item?.payload?.roomName || '').trim() || '이름 없는 채팅방'
-    return `${inviterName}님이 ${roomName}에 초대했습니다.`
-  }
-
   if (item?.type === 'friend_request') {
     return String(item?.payload?.requester?.nickname || '').trim() || '새 친구 요청이 도착했습니다.'
   }
 
-  return '추가 정보 없음'
+  return '추가 정보가 없습니다.'
 }
 
-// 모바일 알림 화면은 처리할 요청과 최근 알림만 보여준다.
-// 보낸 요청은 별도 섹션으로 분리하지 않고 최근 알림 흐름에 흡수한다.
 function NotificationsScreen({
   unreadCount,
   notificationsLoading,
@@ -34,7 +25,6 @@ function NotificationsScreen({
   pendingReceived,
   notificationErrorMessage,
   onRespondFriendRequest,
-  onOpenRoomInvite,
   onBack,
 }) {
   return (
@@ -60,7 +50,7 @@ function NotificationsScreen({
               <li key={item.id} className="notification-row actionable">
                 <div className="notification-main">
                   <strong>{item.counterpart.nickname || '이름 없음'}</strong>
-                  <small>{item.counterpart.email || '이메일 미등록'}</small>
+                  <p className="notification-summary">{item.counterpart.email || '이메일 정보를 불러오지 못했습니다.'}</p>
                 </div>
                 <div className="notification-actions">
                   <button type="button" onClick={() => void onRespondFriendRequest(item.id, 'accept')}>수락</button>
@@ -80,20 +70,9 @@ function NotificationsScreen({
               <li key={item.id} className={`notification-row ${item.isRead ? 'read' : 'unread'}`}>
                 <div className="notification-main">
                   <strong>{getNotificationTitle(item)}</strong>
-                  <small>{getNotificationSummary(item)}</small>
-                  <small>{toCreatedLabel(item.createdAt)}</small>
+                  <p className="notification-summary">{getNotificationSummary(item)}</p>
+                  <span className="notification-time">{toCreatedLabel(item.createdAt)}</span>
                 </div>
-                {item.type === 'room_invite' && (
-                  <div className="notification-actions">
-                    <button
-                      type="button"
-                      onClick={() => void onOpenRoomInvite?.(item)}
-                      disabled={!item?.payload?.roomId}
-                    >
-                      방으로 이동
-                    </button>
-                  </div>
-                )}
               </li>
             ))}
           </ul>

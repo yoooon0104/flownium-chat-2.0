@@ -337,15 +337,6 @@ const createChatroomRouter = ({
           memberIds: [currentUserId, friendUserId],
         });
 
-        await createNotification(friendUserId, 'room_invite', {
-          roomId: String(room._id),
-          roomName: room.name,
-          inviter: {
-            userId: currentUserId,
-            nickname: req.user.nickname,
-          },
-        });
-
         await broadcastRoomUpdated(room.memberIds, room);
         res.status(201).json({ room: await toRoomResponse(room, currentUserId), reused: false });
         return;
@@ -361,19 +352,6 @@ const createChatroomRouter = ({
         isGroup: true,
         memberIds,
       });
-
-      await Promise.all(
-        normalizedTargetIds.map((targetUserId) =>
-          createNotification(targetUserId, 'room_invite', {
-            roomId: String(room._id),
-            roomName: room.name,
-            inviter: {
-              userId: currentUserId,
-              nickname: req.user.nickname,
-            },
-          })
-        )
-      );
 
       await broadcastRoomUpdated(memberIds, room);
       res.status(201).json({ room: await toRoomResponse(room, currentUserId) });
@@ -471,19 +449,6 @@ const createChatroomRouter = ({
           text: `${req.user.nickname}님이 ${invitedNames}님을 초대했습니다.`,
         });
 
-        await Promise.all(
-          targetUserIds.map((targetUserId) =>
-            createNotification(targetUserId, 'room_invite', {
-              roomId: String(room._id),
-              roomName: room.name,
-              inviter: {
-                userId: currentUserId,
-                nickname: req.user.nickname,
-              },
-            })
-          )
-        );
-
         await broadcastRoomUpdated(room.memberIds, room);
         await emitRoomParticipants?.(String(room._id));
 
@@ -511,19 +476,6 @@ const createChatroomRouter = ({
         actorUserId: currentUserId,
         text: `${req.user.nickname}님이 ${invitedNames}님을 초대했습니다.`,
       });
-
-      await Promise.all(
-        targetUserIds.map((targetUserId) =>
-          createNotification(targetUserId, 'room_invite', {
-            roomId: String(nextRoom._id),
-            roomName: nextRoom.name,
-            inviter: {
-              userId: currentUserId,
-              nickname: req.user.nickname,
-            },
-          })
-        )
-      );
 
       await broadcastRoomUpdated(nextMemberIds, nextRoom);
       res.status(201).json({

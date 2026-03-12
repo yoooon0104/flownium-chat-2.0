@@ -511,18 +511,6 @@ function AppShell() {
     void fetchNotifications()
   }, [fetchNotifications, respondToFriendRequest])
 
-  const handleOpenRoomInvite = useCallback(async (notification) => {
-    const roomId = String(notification?.payload?.roomId || '').trim()
-    if (!roomId) return
-
-    await markNotificationRead(notification.id)
-    setActiveTab('rooms')
-    setIsNotificationMenuOpen(false)
-    setIsMobileNotificationView(false)
-    setIsMobileSettingsView(false)
-    emitJoinRoom(roomId)
-  }, [emitJoinRoom, markNotificationRead])
-
   const handleInviteFriends = useCallback(async (userIds) => {
     if (!joinedRoomId) return { ok: false }
 
@@ -818,7 +806,6 @@ function AppShell() {
           pendingSent={pendingSent}
           notificationErrorMessage={notificationErrorMessage}
           onRespondFriendRequest={handleRespondFriendRequest}
-          onOpenRoomInvite={handleOpenRoomInvite}
           isUserMenuOpen={isUserMenuOpen}
           onToggleUserMenu={setIsUserMenuOpen}
           onOpenProfile={() => {
@@ -890,7 +877,6 @@ function AppShell() {
             pendingReceived={pendingReceived}
             notificationErrorMessage={notificationErrorMessage}
             onRespondFriendRequest={handleRespondFriendRequest}
-            onOpenRoomInvite={handleOpenRoomInvite}
             onBack={() => setIsMobileNotificationView(false)}
           />
         )}

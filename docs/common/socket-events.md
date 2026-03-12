@@ -187,7 +187,7 @@ ack 실패:
 {
   "notification": {
     "id": "notificationId",
-    "type": "room_invite",
+    "type": "friend_request",
     "payload": {},
     "isRead": true,
     "createdAt": "2026-03-09T10:00:00.000Z",

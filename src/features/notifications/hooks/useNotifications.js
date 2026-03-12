@@ -25,8 +25,11 @@ export const useNotifications = ({ chatApi }) => {
       return
     }
 
-    setNotifications(Array.isArray(body?.notifications) ? body.notifications : [])
-    setUnreadCount(Number(body?.unreadCount) || 0)
+    const nextNotifications = (Array.isArray(body?.notifications) ? body.notifications : []).filter(
+      (item) => String(item?.type || '').trim() !== 'room_invite'
+    )
+    setNotifications(nextNotifications)
+    setUnreadCount(nextNotifications.filter((item) => !item?.isRead).length)
     setNotificationErrorMessage('')
     setNotificationsLoading(false)
   }, [chatApi])
