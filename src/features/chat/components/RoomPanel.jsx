@@ -17,12 +17,13 @@ const getFriendSectionLabel = (friend) => {
   return first
 }
 
-// 좌측 패널은 친구/방 목록과 상단 유저 액션, 알림 허브를 함께 보여준다.
-// 탈퇴한 친구는 tombstone 행으로 남기되 직접 채팅과 프로필 진입은 막는다.
+// 좌측 패널은 친구/방 목록과 상단 알림, 사용자 메뉴를 함께 보여준다.
+// 탈퇴한 친구는 tombstone으로만 보이고 직접 채팅과 프로필 진입은 막는다.
 function RoomPanel({
   isMobileChatView,
   isMobileNotificationView,
   isMobileSettingsView,
+  isMobileAccountView,
   isMobileViewport,
   activeTab,
   onChangeTab,
@@ -75,12 +76,16 @@ function RoomPanel({
 
   return (
     <aside
-      className={`room-panel ${isMobileChatView || isMobileNotificationView || isMobileSettingsView ? 'mobile-hidden' : ''} flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-[var(--border-strong)] bg-[var(--panel-bg)] shadow-[var(--shadow-panel)] backdrop-blur`}
+      className={`room-panel ${isMobileChatView || isMobileNotificationView || isMobileSettingsView || isMobileAccountView ? 'mobile-hidden' : ''} flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-[var(--border-strong)] bg-[var(--panel-bg)] shadow-[var(--shadow-panel)] backdrop-blur`}
     >
       <div className="flex items-start justify-between gap-3 border-b border-[var(--border-soft)] px-4 pb-4 pt-4 md:px-5 md:pb-5 md:pt-5">
         <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={onOpenProfile}>
           <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-sm font-semibold text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-            {currentUser?.profileImage ? <img src={currentUser.profileImage} alt="" className="h-full w-full object-cover" /> : String(currentUser?.nickname || '?').slice(0, 1).toUpperCase()}
+            {currentUser?.profileImage ? (
+              <img src={currentUser.profileImage} alt="" className="h-full w-full object-cover" />
+            ) : (
+              String(currentUser?.nickname || '?').slice(0, 1).toUpperCase()
+            )}
           </span>
           <span className="min-w-0">
             <strong className="block truncate text-[24px] font-semibold leading-tight tracking-[-0.03em] text-[var(--text-primary)] md:text-[28px]">
@@ -122,8 +127,8 @@ function RoomPanel({
             onOpenSettings={onOpenSettings}
             onLogout={onLogout}
             isFloating={false}
-            buttonLabel="설정 메뉴"
-            buttonSymbol="⋯"
+            buttonLabel="메뉴"
+            buttonSymbol="☰"
           />
         </div>
       </div>
@@ -158,7 +163,7 @@ function RoomPanel({
             className="w-full border-none bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
             value={searchKeyword}
             onChange={(event) => onSearch(event.target.value)}
-            placeholder={activeTab === 'friends' ? '친구 이름 또는 이메일 검색' : '방 이름 또는 메시지 검색'}
+            placeholder={activeTab === 'friends' ? '이메일로 친구 검색' : '채팅방 이름 또는 메시지 검색'}
           />
         </div>
       </div>
@@ -200,7 +205,7 @@ function RoomPanel({
                           {friend.isDeleted ? ' (탈퇴한 회원)' : ''}
                         </strong>
                         <small className="mt-1 block truncate text-xs text-[var(--text-secondary)]">
-                          {friend.isDeleted ? '프로필을 볼 수 없습니다.' : (friend.email || '이메일 미등록')}
+                          {friend.isDeleted ? '프로필을 볼 수 없습니다.' : (friend.email || '이메일 정보를 불러오지 못했습니다.')}
                         </small>
                       </span>
                     </button>

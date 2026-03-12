@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import '../App.css'
+import KakaoLinkPromptModal from '../features/auth/components/KakaoLinkPromptModal'
 import LoginGate from '../features/auth/components/LoginGate'
 import SignupOnboarding from '../features/auth/components/SignupOnboarding'
 import { useKakaoAuth } from '../features/auth/hooks/useKakaoAuth'
@@ -14,6 +15,7 @@ import AddFriendModal from '../features/friends/components/AddFriendModal'
 import FriendActionSheet from '../features/friends/components/FriendActionSheet'
 import { useFriends } from '../features/friends/hooks/useFriends'
 import ProfileModal from '../features/user/components/ProfileModal'
+import AccountScreen from '../features/user/components/AccountScreen'
 import SettingsModal from '../features/user/components/SettingsModal'
 import SettingsScreen from '../features/user/components/SettingsScreen'
 import { useNotifications } from '../features/notifications/hooks/useNotifications'
@@ -69,13 +71,25 @@ function AppShell() {
     startPasswordReset,
     verifyPasswordReset,
     clearPendingEmailVerification,
+    dismissKakaoLinkPrompt,
     clearPendingPasswordReset,
     updateProfileNickname,
+    changePassword,
     deleteAccount,
     clearSession,
   } = useKakaoAuth(API_BASE_URL)
 
-  const { accessToken, user, pendingSignup, pendingEmailVerification, pendingPasswordReset, isInitializing, error, notice } = authState
+  const {
+    accessToken,
+    user,
+    pendingSignup,
+    pendingEmailVerification,
+    pendingPasswordReset,
+    shouldPromptKakaoLink,
+    isInitializing,
+    error,
+    notice,
+  } = authState
 
   const [joinedRoomId, setJoinedRoomId] = useState('')
   const [participants, setParticipants] = useState([])
@@ -86,6 +100,7 @@ function AppShell() {
   const [isMobileChatView, setIsMobileChatView] = useState(false)
   const [isMobileNotificationView, setIsMobileNotificationView] = useState(false)
   const [isMobileSettingsView, setIsMobileSettingsView] = useState(false)
+  const [isMobileAccountView, setIsMobileAccountView] = useState(false)
   const [activeTab, setActiveTab] = useState('friends')
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -107,7 +122,7 @@ function AppShell() {
     if (user?.id) return user
     return {
       id: String(authPayload?.userId || authPayload?.sub || ''),
-      nickname: String(authPayload?.nickname || '게스트'),
+      nickname: String(authPayload?.nickname || 'Guest'),
       profileImage: '',
       email: '',
       linkedProviders: [],
@@ -196,6 +211,7 @@ function AppShell() {
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
     setIsMobileSettingsView(false)
+    setIsMobileAccountView(false)
     setIsParticipantsMenuOpen(false)
     setIsNotificationMenuOpen(false)
     setIsCreateRoomModalOpen(false)
@@ -240,6 +256,7 @@ function AppShell() {
     setIsMobileChatView(true)
     setIsMobileNotificationView(false)
     setIsMobileSettingsView(false)
+    setIsMobileAccountView(false)
     setIsParticipantsMenuOpen(false)
 
     // room_participants 이벤트가 뒤늦게 오더라도, 방 입장 직후 헤더와 참여자 목록이
@@ -287,6 +304,7 @@ function AppShell() {
     setIsParticipantsMenuOpen(false)
     setIsInviteFriendsModalOpen(false)
     setIsMobileChatView(false)
+    setIsMobileAccountView(false)
     clearMessages()
   }, [clearMessages])
 
@@ -433,6 +451,7 @@ function AppShell() {
     setIsMobileChatView(true)
     setIsMobileNotificationView(false)
     setIsMobileSettingsView(false)
+    setIsMobileAccountView(false)
     setErrorMessage('')
     setParticipants([])
     setIsParticipantsMenuOpen(false)
@@ -614,9 +633,10 @@ function AppShell() {
   // 알림 화면이 열려 있으면 notifications를 우선으로 보고, 그 외에는 Friends/Rooms 탭 상태를 그대로 따른다.
   const mobileNavActiveItem = useMemo(() => {
     if (isMobileNotificationView) return 'notifications'
+    if (isMobileAccountView) return 'settings'
     if (isMobileSettingsView) return 'settings'
     return activeTab === 'rooms' ? 'rooms' : 'friends'
-  }, [activeTab, isMobileNotificationView, isMobileSettingsView])
+  }, [activeTab, isMobileAccountView, isMobileNotificationView, isMobileSettingsView])
 
   // 모바일 하단 탭은 단순 화면 전환만 담당한다.
   // 실제 데이터는 기존 Friends/Rooms/Notifications 화면이 그대로 사용하므로, 여기서는 관련 상태만 정리한다.
@@ -625,6 +645,7 @@ function AppShell() {
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
     setIsMobileSettingsView(false)
+    setIsMobileAccountView(false)
     setIsNotificationMenuOpen(false)
   }, [])
 
@@ -633,6 +654,7 @@ function AppShell() {
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
     setIsMobileSettingsView(false)
+    setIsMobileAccountView(false)
     setIsNotificationMenuOpen(false)
   }, [])
 
@@ -640,6 +662,7 @@ function AppShell() {
     setIsMobileChatView(false)
     setIsMobileNotificationView(true)
     setIsMobileSettingsView(false)
+    setIsMobileAccountView(false)
     setIsNotificationMenuOpen(false)
   }, [])
 
@@ -647,6 +670,7 @@ function AppShell() {
     setIsMobileChatView(false)
     setIsMobileNotificationView(false)
     setIsMobileSettingsView(true)
+    setIsMobileAccountView(false)
     setIsNotificationMenuOpen(false)
     setIsUserMenuOpen(false)
   }, [])
@@ -700,7 +724,15 @@ function AppShell() {
   )
 
   if (isInitializing) {
-    return <LoginGate isLoading authError={error} authNotice={notice} onStartKakaoLogin={startKakaoLogin} />
+    return (
+      <LoginGate
+        isLoading
+        authError={error}
+        authNotice={notice}
+        resolvedTheme={resolvedTheme}
+        onStartKakaoLogin={startKakaoLogin}
+      />
+    )
   }
 
   if (!accessToken && pendingSignup?.signupToken) {
@@ -719,7 +751,10 @@ function AppShell() {
       <LoginGate
         isLoading={false}
         authError={error}
+        resolvedTheme={resolvedTheme}
         authNotice={notice}
+        authNotice={notice}
+        resolvedTheme={resolvedTheme}
         pendingEmailVerification={pendingEmailVerification}
         pendingPasswordReset={pendingPasswordReset}
         onStartKakaoLogin={startKakaoLogin}
@@ -741,6 +776,7 @@ function AppShell() {
           isMobileChatView={isMobileChatView}
           isMobileNotificationView={isMobileNotificationView}
           isMobileSettingsView={isMobileSettingsView}
+          isMobileAccountView={isMobileAccountView}
           isMobileViewport={isMobileViewport}
           activeTab={activeTab}
           onChangeTab={setActiveTab}
@@ -786,6 +822,13 @@ function AppShell() {
           onToggleUserMenu={setIsUserMenuOpen}
           onOpenProfile={() => {
             setIsUserMenuOpen(false)
+            if (isMobileViewport) {
+              setIsMobileChatView(false)
+              setIsMobileNotificationView(false)
+              setIsMobileSettingsView(false)
+              setIsMobileAccountView(true)
+              return
+            }
             setIsProfileModalOpen(true)
           }}
           onOpenSettings={() => {
@@ -794,6 +837,7 @@ function AppShell() {
               setIsMobileChatView(false)
               setIsMobileNotificationView(false)
               setIsMobileSettingsView(true)
+              setIsMobileAccountView(false)
               return
             }
             setIsSettingsModalOpen(true)
@@ -850,14 +894,22 @@ function AppShell() {
           />
         )}
 
-        {isMobileSettingsView && (
-          <SettingsScreen
+        {isMobileAccountView && (
+          <AccountScreen
             user={currentUser}
-            themePreference={themePreference}
-            onChangeTheme={handleChangeTheme}
-            onSubmit={updateProfileNickname}
+            onSubmitNickname={updateProfileNickname}
+            onChangePassword={changePassword}
             onStartKakaoLink={startKakaoLink}
             onDeleteAccount={handleDeleteAccount}
+            onBack={() => setIsMobileAccountView(false)}
+            emphasizeKakaoLink={shouldPromptKakaoLink && !currentUser?.linkedProviders?.includes('kakao')}
+          />
+        )}
+
+        {isMobileSettingsView && (
+          <SettingsScreen
+            themePreference={themePreference}
+            onChangeTheme={handleChangeTheme}
             onBack={() => setIsMobileSettingsView(false)}
           />
         )}
@@ -912,23 +964,42 @@ function AppShell() {
         isOpen={isProfileModalOpen}
         user={currentUser}
         onClose={() => setIsProfileModalOpen(false)}
+        onSubmitNickname={updateProfileNickname}
+        onChangePassword={changePassword}
+        onStartKakaoLink={startKakaoLink}
+        onDeleteAccount={handleDeleteAccount}
+        emphasizeKakaoLink={shouldPromptKakaoLink && !currentUser?.linkedProviders?.includes('kakao')}
       />
 
       <SettingsModal
         isOpen={isSettingsModalOpen && !isMobileViewport}
-        user={currentUser}
         themePreference={themePreference}
         onChangeTheme={handleChangeTheme}
         onClose={() => setIsSettingsModalOpen(false)}
-        onSubmit={updateProfileNickname}
-        onStartKakaoLink={startKakaoLink}
-        onDeleteAccount={handleDeleteAccount}
+      />
+
+      <KakaoLinkPromptModal
+        isOpen={shouldPromptKakaoLink && !currentUser?.linkedProviders?.includes('kakao')}
+        onDismiss={dismissKakaoLinkPrompt}
+        onConfirm={() => {
+          dismissKakaoLinkPrompt()
+          if (isMobileViewport) {
+            setIsMobileAccountView(true)
+            setIsMobileSettingsView(false)
+            setIsMobileNotificationView(false)
+            setIsMobileChatView(false)
+            return
+          }
+          setIsProfileModalOpen(true)
+        }}
       />
     </main>
   )
 }
 
 export default AppShell
+
+
 
 
 

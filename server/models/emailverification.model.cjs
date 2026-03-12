@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// 이메일 인증 전 가입 입력값을 임시로 저장해, 인증 성공 시점에만 실제 계정을 생성한다.
+// 이메일 인증이 끝나기 전까지는 가입 입력값과 약관 동의 시점만 임시로 저장한다.
 const emailVerificationSchema = new mongoose.Schema(
   {
     email: {
@@ -23,6 +23,10 @@ const emailVerificationSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    agreedToTermsAt: {
+      type: Date,
+      default: null,
     },
     expiresAt: {
       type: Date,

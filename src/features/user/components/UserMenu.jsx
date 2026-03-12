@@ -9,8 +9,8 @@ function UserMenu({
   onOpenSettings,
   onLogout,
   isFloating = false,
-  buttonLabel = '사용자 메뉴',
-  buttonSymbol = '⋮',
+  buttonLabel = '메뉴',
+  buttonSymbol = '☰',
 }) {
   const menuRef = useRef(null)
 

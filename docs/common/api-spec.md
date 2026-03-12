@@ -142,7 +142,8 @@ MVP2-A 1차 표준:
 {
   "email": "user@example.com",
   "password": "password123",
-  "nickname": "사용자닉네임"
+  "nickname": "사용자닉네임",
+  "agreedToTerms": true
 }
 ```
 
@@ -161,6 +162,7 @@ MVP2-A 1차 표준:
 - `400 INVALID_EMAIL`
 - `400 INVALID_PASSWORD`
 - `400 INVALID_NICKNAME`
+- `400 TERMS_NOT_AGREED`
 - `409 EMAIL_ALREADY_REGISTERED`
 - `429 VERIFICATION_RESEND_COOLDOWN`
 - `500 EMAIL_SIGNUP_START_FAILED`
@@ -346,6 +348,35 @@ MVP2-A 1차 표준:
 - `400 INVALID_NICKNAME`
 - `401 UNAUTHORIZED`
 - `404 USER_NOT_FOUND`
+- `503 DB_NOT_CONNECTED`
+
+### PATCH /auth/password
+- 현재 인증 사용자 비밀번호 변경
+- 헤더: `Authorization: Bearer <accessToken>`
+- 이메일 로그인 identity가 연결된 계정만 사용 가능
+
+요청:
+```json
+{
+  "currentPassword": "oldpass123",
+  "newPassword": "newpass456"
+}
+```
+
+응답:
+```json
+{
+  "changed": true
+}
+```
+
+에러:
+- `400 INVALID_CURRENT_PASSWORD`
+- `400 INVALID_PASSWORD`
+- `400 WEAK_PASSWORD`
+- `401 UNAUTHORIZED`
+- `404 USER_NOT_FOUND`
+- `409 EMAIL_PASSWORD_NOT_AVAILABLE`
 - `503 DB_NOT_CONNECTED`
 
 ### DELETE /auth/account

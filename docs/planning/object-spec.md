@@ -25,6 +25,7 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - 카카오 로그인 시 직접 `kakaoId`로 조회하지 않고 `AuthIdentity(provider='kakao')`로 사용자 식별
 - 카카오 응답 기준으로 `email`, `nickname`, `profileImage`를 동기화
 - `PATCH /auth/profile`로 닉네임 수정 가능
+- `PATCH /auth/password`는 사용자 본체가 아니라 연결된 `AuthIdentity(email)` 비밀번호를 변경한다
 - `DELETE /auth/account` 호출 시 사용자 문서를 tombstone 상태로 전환하고 관련 관계 데이터 정리를 시작
 - tombstone 사용자는 `signupCompletedAt`이 비워지고, 로그인 identity가 제거되어 재진입 시 기존 사용자 복구 대신 새 가입 흐름으로 진입
 
@@ -333,6 +334,7 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - 카카오는 간편로그인 수단으로만 저장한다.
 - 이메일 회원가입은 `AuthIdentity(email)`로 저장한다.
 - 이메일 회원이 설정 화면에서 카카오 계정을 명시적으로 연결하면 `AuthIdentity(kakao)`를 추가한다.
+- 이메일 회원이 내 정보 화면에서 현재 비밀번호 확인 후 `secretHash`를 변경할 수 있다.
 - 카카오 최초 로그인 시 기존 active legacy `User.kakaoId`가 있으면 첫 로그인에서 `AuthIdentity(kakao)`로 승격한다.
 - 이메일 회원가입은 인증 성공 시점에만 `User + AuthIdentity(email)`를 생성한다.
 - 회원탈퇴 시 tombstone `User`는 유지하되, `AuthIdentity`는 제거한다.
@@ -356,6 +358,7 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - `codeHash: string`
 - `passwordHash: string`
 - `nickname: string`
+- `agreedToTermsAt: date|null`
 - `expiresAt: date`
 - `resendAvailableAt: date`
 - `verifiedAt: date|null`
@@ -367,6 +370,7 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 
 - 이메일 회원가입 시작 시 생성 또는 갱신한다.
 - 인증 성공 전까지는 실제 `User`를 만들지 않는다.
+- 회원가입 시작 시 약관 동의 시점을 함께 저장한다.
 - 인증 성공 시 `EmailVerification`은 삭제한다.
 - 개발 단계에서는 서버 로그/DB에서 인증 코드를 확인한다.
 

@@ -9,6 +9,7 @@ const {
   validateNickname,
   validateEmail,
   validatePassword,
+  validateStrongPassword,
   verifySecret,
   verifyAccessToken,
   verifyLinkToken,
@@ -576,8 +577,14 @@ const createAuthRouter = ({
     }
 
     try {
+      const agreedToTerms = req.body?.agreedToTerms === true;
+      if (!agreedToTerms) {
+        sendError(res, 400, 'TERMS_NOT_AGREED', 'agreedToTerms must be true');
+        return;
+      }
+
       const email = validateEmail(req.body?.email);
-      const password = validatePassword(req.body?.password);
+      const password = validateStrongPassword(req.body?.password);
       const nickname = validateNickname(req.body?.nickname);
       const now = new Date();
 
@@ -612,6 +619,7 @@ const createAuthRouter = ({
             codeHash,
             passwordHash,
             nickname,
+            agreedToTermsAt: now,
             expiresAt,
             resendAvailableAt,
             verifiedAt: null,
@@ -643,8 +651,16 @@ const createAuthRouter = ({
         sendError(res, 400, 'INVALID_EMAIL', 'invalid email');
         return;
       }
+      if (message.includes('agreedtoterms')) {
+        sendError(res, 400, 'TERMS_NOT_AGREED', 'agreedToTerms must be true');
+        return;
+      }
       if (message.includes('password must be between')) {
         sendError(res, 400, 'INVALID_PASSWORD', 'password must be between 8 and 72 characters');
+        return;
+      }
+      if (message.includes('password must include both letters and numbers')) {
+        sendError(res, 400, 'WEAK_PASSWORD', 'password must include both letters and numbers');
         return;
       }
       if (message.includes('nickname must be between')) {
@@ -710,7 +726,7 @@ const createAuthRouter = ({
         profileImage: '',
         lastLoginAt: now,
         signupCompletedAt: now,
-        agreedToTermsAt: now,
+        agreedToTermsAt: verification.agreedToTermsAt || now,
         nicknameUpdatedAt: now,
         accountStatus: 'active',
         deletedAt: null,
@@ -1056,6 +1072,60 @@ const createAuthRouter = ({
       const message = String(error.message || '').toLowerCase();
       if (message.includes('nickname must be between')) {
         sendError(res, 400, 'INVALID_NICKNAME', 'nickname must be between 2 and 20 characters');
+        return;
+      }
+
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+    }
+  });
+
+  // 이메일 로그인 계정은 현재 비밀번호 확인 후 새 비밀번호로 변경할 수 있다.
+  router.patch('/password', async (req, res) => {
+    const accessToken = extractBearerToken(req);
+    if (!accessToken) {
+      sendError(res, 401, 'UNAUTHORIZED', 'unauthorized');
+      return;
+    }
+
+    if (!assertDbConnected(res)) {
+      return;
+    }
+
+    try {
+      const auth = verifyAccessToken(accessToken, config.JWT_SECRET);
+      const currentPassword = validatePassword(req.body?.currentPassword);
+      const newPassword = validateStrongPassword(req.body?.newPassword);
+
+      const user = await User.findById(auth.userId);
+      if (!user || isDeletedUser(user)) {
+        sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
+        return;
+      }
+
+      const emailIdentity = await findIdentity('email', String(user.email || '').trim().toLowerCase());
+      if (!emailIdentity?.verifiedAt || !emailIdentity?.secretHash) {
+        sendError(res, 409, 'EMAIL_PASSWORD_NOT_AVAILABLE', 'email password login is not available');
+        return;
+      }
+
+      const matched = await verifySecret(currentPassword, emailIdentity.secretHash);
+      if (!matched) {
+        sendError(res, 400, 'INVALID_CURRENT_PASSWORD', 'current password is invalid');
+        return;
+      }
+
+      emailIdentity.secretHash = await hashSecret(newPassword);
+      await emailIdentity.save();
+
+      res.status(200).json({ changed: true });
+    } catch (error) {
+      const message = String(error.message || '').toLowerCase();
+      if (message.includes('password must be between')) {
+        sendError(res, 400, 'INVALID_PASSWORD', 'password must be between 8 and 72 characters');
+        return;
+      }
+      if (message.includes('password must include both letters and numbers')) {
+        sendError(res, 400, 'WEAK_PASSWORD', 'password must include both letters and numbers');
         return;
       }
 

@@ -1,97 +1,12 @@
-import { useEffect, useState } from 'react'
-
-// 데스크톱 설정 모달은 닉네임 수정, 계정 정보 확인, 테마 변경, 카카오 연결, 회원탈퇴를 한 곳에서 다룬다.
-function SettingsModal({
-  isOpen,
-  user,
-  themePreference,
-  onChangeTheme,
-  onClose,
-  onSubmit,
-  onStartKakaoLink,
-  onDeleteAccount,
-}) {
-  const [nickname, setNickname] = useState('')
-  const [error, setError] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isLinkingKakao, setIsLinkingKakao] = useState(false)
-
-  useEffect(() => {
-    if (!isOpen) return
-    setNickname(String(user?.nickname || ''))
-    setError('')
-    setIsSaving(false)
-    setIsDeleting(false)
-    setIsLinkingKakao(false)
-  }, [isOpen, user])
-
+// 설정 모달은 앱 환경 설정만 다룬다. 계정 정보 관리는 내 정보 화면으로 분리한다.
+function SettingsModal({ isOpen, themePreference, onChangeTheme, onClose }) {
   if (!isOpen) return null
-
-  const normalized = nickname.trim()
-  const isKakaoLinked = Array.isArray(user?.linkedProviders) && user.linkedProviders.includes('kakao')
-  const emailLabel = String(user?.email || '').trim() || '이메일 정보를 불러오지 못했습니다.'
-
-  const handleSave = async () => {
-    if (normalized.length < 2 || normalized.length > 20) {
-      setError('닉네임은 2~20자여야 합니다.')
-      return
-    }
-
-    try {
-      setIsSaving(true)
-      setError('')
-      await onSubmit(normalized)
-      onClose()
-    } catch (nextError) {
-      setError(nextError.message || '설정 저장에 실패했습니다.')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleStartKakaoLink = async () => {
-    if (isKakaoLinked) return
-
-    try {
-      setIsLinkingKakao(true)
-      setError('')
-      await onStartKakaoLink()
-    } catch (nextError) {
-      setError(nextError.message || '카카오 계정 연결에 실패했습니다.')
-      setIsLinkingKakao(false)
-    }
-  }
-
-  const handleDeleteAccount = async () => {
-    const shouldDelete = window.confirm('정말 회원탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.')
-    if (!shouldDelete) return
-
-    try {
-      setIsDeleting(true)
-      setError('')
-      await onDeleteAccount()
-    } catch (nextError) {
-      setError(nextError.message || '회원탈퇴 처리에 실패했습니다.')
-      setIsDeleting(false)
-    }
-  }
 
   return (
     <div className="modal-overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="modal-card" role="dialog" aria-modal="true" aria-label="설정">
         <h3>설정</h3>
-        <p>닉네임, 이메일, 테마와 계정 연결 상태를 확인할 수 있습니다.</p>
-
-        <label className="settings-field">
-          <span>이메일</span>
-          <input value={emailLabel} readOnly disabled />
-        </label>
-
-        <label className="settings-field">
-          <span>닉네임</span>
-          <input value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="닉네임" />
-        </label>
+        <p>앱에서 사용하는 화면 테마를 바꿀 수 있어요.</p>
 
         <label className="settings-field">
           <span>테마</span>
@@ -102,32 +17,9 @@ function SettingsModal({
           </select>
         </label>
 
-        <button
-          type="button"
-          className="secondary"
-          onClick={() => void handleStartKakaoLink()}
-          disabled={isSaving || isDeleting || isLinkingKakao || isKakaoLinked}
-        >
-          {isKakaoLinked ? '카카오 계정 연결됨' : (isLinkingKakao ? '카카오 연결 중...' : '카카오 계정 연결')}
-        </button>
-
-        <button
-          type="button"
-          className="secondary danger-zone-button"
-          onClick={() => void handleDeleteAccount()}
-          disabled={isSaving || isDeleting || isLinkingKakao}
-        >
-          {isDeleting ? '회원탈퇴 처리 중...' : '회원탈퇴'}
-        </button>
-
-        {error && <p className="error-text">{error}</p>}
-
-        <div className="modal-actions">
-          <button type="button" className="secondary" onClick={onClose} disabled={isSaving || isDeleting || isLinkingKakao}>
-            취소
-          </button>
-          <button type="button" onClick={() => void handleSave()} disabled={isSaving || isDeleting || isLinkingKakao}>
-            저장
+        <div className="modal-actions single-column-actions">
+          <button type="button" className="secondary" onClick={onClose}>
+            닫기
           </button>
         </div>
       </section>

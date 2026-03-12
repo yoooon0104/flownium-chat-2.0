@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthSession } from '../../../domain/auth/AuthSession'
 import { UserProfile } from '../../../domain/user/UserProfile'
 import { createAuthApi } from '../../../services/api/authApi'
@@ -11,19 +11,25 @@ const KAKAO_AUTH_IN_PROGRESS_STORAGE_KEY = 'flownium:kakao-auth-in-progress'
 
 const resolveErrorMessage = (body, fallback) => {
   const code = String(body?.error?.code || '').trim()
+
   if (code === 'EMAIL_NOT_REGISTERED') return '가입되지 않은 이메일입니다. 먼저 회원가입을 진행해주세요.'
   if (code === 'EMAIL_NOT_VERIFIED') return '이메일 인증을 먼저 완료해주세요.'
   if (code === 'INVALID_EMAIL_PASSWORD') return '비밀번호가 올바르지 않습니다.'
   if (code === 'ACCOUNT_NOT_AVAILABLE') return '사용할 수 없는 계정입니다.'
   if (code === 'EMAIL_ALREADY_REGISTERED') return '이미 가입된 이메일입니다.'
+  if (code === 'TERMS_NOT_AGREED') return '약관 동의가 필요합니다.'
   if (code === 'INVALID_VERIFICATION_CODE') return '인증 코드가 올바르지 않습니다.'
   if (code === 'VERIFICATION_CODE_EXPIRED') return '인증 코드가 만료되었습니다. 다시 요청해주세요.'
   if (code === 'VERIFICATION_RESEND_COOLDOWN') return '인증 코드를 너무 자주 요청하고 있습니다. 잠시 후 다시 시도해주세요.'
   if (code === 'INVALID_PASSWORD_RESET_CODE') return '재설정 코드가 올바르지 않습니다.'
   if (code === 'PASSWORD_RESET_CODE_EXPIRED') return '재설정 코드가 만료되었습니다. 다시 요청해주세요.'
   if (code === 'PASSWORD_RESET_RESEND_COOLDOWN') return '재설정 코드를 너무 자주 요청하고 있습니다. 잠시 후 다시 시도해주세요.'
+  if (code === 'WEAK_PASSWORD') return '비밀번호는 영문과 숫자를 모두 포함해야 합니다.'
+  if (code === 'INVALID_CURRENT_PASSWORD') return '현재 비밀번호가 올바르지 않습니다.'
+  if (code === 'EMAIL_PASSWORD_NOT_AVAILABLE') return '이 계정은 이메일 비밀번호 변경을 사용할 수 없습니다.'
   if (body?.error?.message) return String(body.error.message)
   if (typeof body?.error === 'string') return body.error
+
   return fallback
 }
 
@@ -36,7 +42,6 @@ const clearKakaoCallbackQuery = () => {
 export const useKakaoAuth = (apiBaseUrl) => {
   const callbackHandledRef = useRef(false)
   const authApi = useMemo(() => createAuthApi(apiBaseUrl), [apiBaseUrl])
-
   const initialSession = useMemo(() => AuthSession.load(), [])
 
   const [accessToken, setAccessToken] = useState(initialSession.accessToken)
@@ -45,6 +50,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
   const [pendingSignup, setPendingSignup] = useState(null)
   const [pendingEmailVerification, setPendingEmailVerification] = useState(null)
   const [pendingPasswordReset, setPendingPasswordReset] = useState(null)
+  const [shouldPromptKakaoLink, setShouldPromptKakaoLink] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -69,6 +75,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     setPendingSignup(null)
     setPendingEmailVerification(null)
     setPendingPasswordReset(null)
+    setShouldPromptKakaoLink(false)
     setError('')
     setNotice('')
   }, [])
@@ -81,6 +88,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     setPendingSignup(null)
     setPendingEmailVerification(null)
     setPendingPasswordReset(null)
+    setShouldPromptKakaoLink(false)
     setError(nextError)
     setNotice('')
   }, [])
@@ -143,6 +151,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
     }
 
     saveSession(body)
+    setShouldPromptKakaoLink(true)
   }, [authApi, saveSession])
 
   const startPasswordReset = useCallback(async (payload) => {
@@ -201,6 +210,10 @@ export const useKakaoAuth = (apiBaseUrl) => {
     setPendingPasswordReset(null)
     setError('')
     setNotice('')
+  }, [])
+
+  const dismissKakaoLinkPrompt = useCallback(() => {
+    setShouldPromptKakaoLink(false)
   }, [])
 
   const updateProfileNickname = useCallback(async (nickname) => {
@@ -262,6 +275,37 @@ export const useKakaoAuth = (apiBaseUrl) => {
 
     throw new Error(resolveErrorMessage(first.body, '회원탈퇴 처리에 실패했습니다.'))
   }, [accessToken, authApi, clearSession, refreshAccessToken])
+
+  const changePassword = useCallback(async ({ currentPassword, newPassword }) => {
+    const currentToken = AuthSession.load().accessToken || accessToken
+    if (!currentToken) {
+      throw new Error('로그인이 필요합니다.')
+    }
+
+    const first = await authApi.changePassword({ currentPassword, newPassword }, currentToken)
+    if (first.ok) {
+      setError('')
+      return true
+    }
+
+    if (first.status === 401) {
+      const refreshed = await refreshAccessToken()
+      if (!refreshed) {
+        throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.')
+      }
+
+      const retriedToken = AuthSession.load().accessToken
+      const retried = await authApi.changePassword({ currentPassword, newPassword }, retriedToken)
+      if (retried.ok) {
+        setError('')
+        return true
+      }
+
+      throw new Error(resolveErrorMessage(retried.body, '비밀번호 변경에 실패했습니다.'))
+    }
+
+    throw new Error(resolveErrorMessage(first.body, '비밀번호 변경에 실패했습니다.'))
+  }, [accessToken, authApi, refreshAccessToken])
 
   const redirectToKakao = useCallback((authorizeUrl) => {
     if (!authorizeUrl) {
@@ -328,14 +372,14 @@ export const useKakaoAuth = (apiBaseUrl) => {
 
         if (code) {
           const state = String(params.get('state') || '').trim()
-          // 같은 인가 코드를 새로고침/중복 렌더로 다시 보내지 않도록 먼저 URL query를 제거한다.
+          // 카카오 인가 코드는 1회용이라 중복 처리되면 바로 실패하므로,
+          // query를 먼저 지우고 sessionStorage로 중복 교환을 막는다.
           clearKakaoCallbackQuery()
 
           if (code === handledCode || code === inProgressCode) {
             throw new Error('이미 처리한 로그인 요청입니다. 처음 화면에서 다시 로그인해주세요.')
           }
 
-          // 카카오 인가 코드는 1회용이므로 처리 중 상태를 먼저 기록해 중복 교환을 차단한다.
           window.sessionStorage.setItem(KAKAO_AUTH_IN_PROGRESS_STORAGE_KEY, code)
 
           const { ok, body } = await authApi.getKakaoCallback(code, state)
@@ -343,7 +387,6 @@ export const useKakaoAuth = (apiBaseUrl) => {
             throw new Error(resolveErrorMessage(body, '카카오 로그인 처리에 실패했습니다.'))
           }
 
-          // 가입 완료 사용자는 즉시 세션을 저장하고 채팅 화면으로 이동한다.
           if (body.resultType === 'LOGIN_SUCCESS') {
             saveSession(body)
           } else if (body.resultType === 'LINK_SUCCESS') {
@@ -417,6 +460,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
       pendingSignup,
       pendingEmailVerification,
       pendingPasswordReset,
+      shouldPromptKakaoLink,
       isInitializing,
       error,
       notice,
@@ -433,9 +477,10 @@ export const useKakaoAuth = (apiBaseUrl) => {
     verifyPasswordReset,
     clearPendingEmailVerification,
     clearPendingPasswordReset,
+    dismissKakaoLinkPrompt,
     updateProfileNickname,
+    changePassword,
     deleteAccount,
     clearSession,
   }
 }
-
