@@ -2,7 +2,10 @@ import AccountPanel from './AccountPanel'
 
 function AccountScreen({
   user,
+  pendingEmailChange,
   onSubmitNickname,
+  onStartEmailChange,
+  onVerifyEmailChange,
   onChangePassword,
   onStartKakaoLink,
   onUnlinkKakao,
@@ -25,7 +28,10 @@ function AccountScreen({
       <div className="settings-screen-body subtle-scroll">
         <AccountPanel
           user={user}
+          pendingEmailChange={pendingEmailChange}
           onSubmitNickname={onSubmitNickname}
+          onStartEmailChange={onStartEmailChange}
+          onVerifyEmailChange={onVerifyEmailChange}
           onChangePassword={onChangePassword}
           onStartKakaoLink={onStartKakaoLink}
           onUnlinkKakao={onUnlinkKakao}

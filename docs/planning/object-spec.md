@@ -335,6 +335,7 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - 이메일 회원가입은 `AuthIdentity(email)`로 저장한다.
 - 이메일 회원이 설정 화면에서 카카오 계정을 명시적으로 연결하면 `AuthIdentity(kakao)`를 추가한다.
 - 이메일 회원이 내 정보 화면에서 현재 비밀번호 확인 후 `secretHash`를 변경할 수 있다.
+- 이메일 회원이 내 정보 화면에서 현재 비밀번호 확인 후 인증 코드 기반 이메일 변경을 진행할 수 있다.
 - 카카오 최초 로그인 시 기존 active legacy `User.kakaoId`가 있으면 첫 로그인에서 `AuthIdentity(kakao)`로 승격한다.
 - 이메일 회원가입은 인증 성공 시점에만 `User + AuthIdentity(email)`를 생성한다.
 - 회원탈퇴 시 tombstone `User`는 유지하되, `AuthIdentity`는 제거한다.
@@ -409,7 +410,39 @@ MVP2-B 1차 구현까지 반영하며, 실계정 검증 후 세부 규칙은 추
 - 이메일별 pending 재설정은 1건만 유지한다.
 - 인증 코드는 6자리, 10분 만료, 60초 재발송 제한을 적용한다.
 
-## 12) 예정 도메인: AnonymousRoom / AnonymousParticipant / GuestSession
+## 12) EmailChangeVerification
+
+### 목적
+
+- 로그인 중인 이메일 회원의 이메일 변경 인증 전 임시 입력값을 저장하는 도메인
+
+### 필드
+
+- `userId: string`
+- `currentEmail: string`
+- `nextEmail: string`
+- `codeHash: string`
+- `expiresAt: date`
+- `resendAvailableAt: date`
+- `verifiedAt: date|null`
+- `attemptCount: number`
+- `createdAt: date`
+- `updatedAt: date`
+
+### 생성/갱신 규칙
+
+- 이메일 변경 시작 시 사용자 기준으로 생성 또는 갱신한다.
+- 현재 비밀번호 확인이 끝나야 인증 코드를 발급한다.
+- 인증 성공 전까지는 실제 `User.email`과 `AuthIdentity(email)`를 바꾸지 않는다.
+- 인증 성공 시 `User.email`, `AuthIdentity(email).providerUserId`, `providerEmail`을 함께 갱신한다.
+- 개발 단계에서는 서버 로그/응답의 `debugCode`로 인증 코드를 확인한다.
+
+### 검증 규칙
+
+- 사용자별 pending 이메일 변경은 1건만 유지한다.
+- 인증 코드는 6자리, 10분 만료, 60초 재발송 제한을 적용한다.
+
+## 13) 예정 도메인: AnonymousRoom / AnonymousParticipant / GuestSession
 
 ### 목적
 

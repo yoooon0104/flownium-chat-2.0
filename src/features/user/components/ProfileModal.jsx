@@ -5,7 +5,10 @@ function ProfileModal({
   isOpen,
   user,
   onClose,
+  pendingEmailChange,
   onSubmitNickname,
+  onStartEmailChange,
+  onVerifyEmailChange,
   onChangePassword,
   onStartKakaoLink,
   onUnlinkKakao,
@@ -30,7 +33,10 @@ function ProfileModal({
         <div className="account-modal-body subtle-scroll">
           <AccountPanel
             user={user}
+            pendingEmailChange={pendingEmailChange}
             onSubmitNickname={onSubmitNickname}
+            onStartEmailChange={onStartEmailChange}
+            onVerifyEmailChange={onVerifyEmailChange}
             onChangePassword={onChangePassword}
             onStartKakaoLink={onStartKakaoLink}
             onUnlinkKakao={onUnlinkKakao}

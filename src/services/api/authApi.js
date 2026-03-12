@@ -149,6 +149,32 @@ export const createAuthApi = (apiBaseUrl) => {
     return { ok: response.ok, status: response.status, body }
   }
 
+  const startEmailChange = async (payload, accessToken) => {
+    const response = await fetch(`${apiBaseUrl}/auth/email/change/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
+  const verifyEmailChange = async (payload, accessToken) => {
+    const response = await fetch(`${apiBaseUrl}/auth/email/change/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
   const deleteAccount = async (accessToken) => {
     const response = await fetch(`${apiBaseUrl}/auth/account`, {
       method: 'DELETE',
@@ -174,6 +200,8 @@ export const createAuthApi = (apiBaseUrl) => {
     getMe,
     updateProfile,
     changePassword,
+    startEmailChange,
+    verifyEmailChange,
     deleteAccount,
   }
 }

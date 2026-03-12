@@ -408,6 +408,85 @@ MVP2-A 1차 표준:
 - `409 EMAIL_PASSWORD_NOT_AVAILABLE`
 - `503 DB_NOT_CONNECTED`
 
+### POST /auth/email/change/start
+- 현재 인증 사용자의 이메일 변경 인증을 시작
+- 헤더: `Authorization: Bearer <accessToken>`
+- verified email identity가 연결된 계정만 사용 가능
+- 현재 비밀번호 확인 후 새 이메일로 6자리 인증 코드를 발급
+- 개발 환경에서는 위 응답에 `debugCode`가 추가될 수 있음
+
+요청:
+```json
+{
+  "currentPassword": "oldpass123",
+  "nextEmail": "next@example.com"
+}
+```
+
+응답:
+```json
+{
+  "currentEmail": "user@example.com",
+  "nextEmail": "next@example.com",
+  "expiresAt": "2026-03-12T10:10:00.000Z",
+  "resendAvailableAt": "2026-03-12T10:01:00.000Z"
+}
+```
+
+대표 오류:
+- `400 INVALID_EMAIL`
+- `400 INVALID_PASSWORD`
+- `400 INVALID_CURRENT_PASSWORD`
+- `401 UNAUTHORIZED`
+- `404 USER_NOT_FOUND`
+- `409 EMAIL_CHANGE_NOT_AVAILABLE`
+- `409 EMAIL_UNCHANGED`
+- `409 EMAIL_ALREADY_REGISTERED`
+- `429 EMAIL_CHANGE_RESEND_COOLDOWN`
+- `500 EMAIL_CHANGE_START_FAILED`
+- `503 DB_NOT_CONNECTED`
+
+### POST /auth/email/change/verify
+- 현재 인증 사용자의 이메일 변경 코드를 검증하고 이메일을 교체
+- 헤더: `Authorization: Bearer <accessToken>`
+- 성공 시 `User.email`과 `AuthIdentity(email)`의 `providerUserId`, `providerEmail`을 함께 갱신
+
+요청:
+```json
+{
+  "code": "123456"
+}
+```
+
+응답:
+```json
+{
+  "changed": true,
+  "user": {
+    "id": "userId",
+    "kakaoId": "",
+    "email": "next@example.com",
+    "nickname": "닉네임",
+    "profileImage": "",
+    "isDeleted": false,
+    "linkedProviders": ["email", "kakao"]
+  }
+}
+```
+
+대표 오류:
+- `400 INVALID_REQUEST`
+- `400 INVALID_EMAIL`
+- `400 INVALID_EMAIL_CHANGE_CODE`
+- `401 UNAUTHORIZED`
+- `404 USER_NOT_FOUND`
+- `404 EMAIL_CHANGE_NOT_FOUND`
+- `409 EMAIL_ALREADY_REGISTERED`
+- `409 EMAIL_CHANGE_NOT_AVAILABLE`
+- `410 EMAIL_CHANGE_CODE_EXPIRED`
+- `500 EMAIL_CHANGE_VERIFY_FAILED`
+- `503 DB_NOT_CONNECTED`
+
 ### DELETE /auth/account
 - 현재 인증 사용자를 탈퇴 처리
 - 헤더: `Authorization: Bearer <accessToken>`
