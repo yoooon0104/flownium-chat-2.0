@@ -315,7 +315,7 @@ MVP2-A 1차 표준:
 모든 친구/알림/채팅방 API는 `Authorization: Bearer <accessToken>` 헤더가 필요합니다.
 
 ### GET /api/friends/search?keyword=
-- 이메일/닉네임 기준 사용자 검색
+- 이메일 기준 사용자 검색
 - 자기 자신 제외
 - 탈퇴 회원은 검색 결과에서 제외
 - 검색 결과에 현재 친구 상태 포함

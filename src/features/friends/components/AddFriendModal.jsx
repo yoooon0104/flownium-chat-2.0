@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 
 // 친구 추가 모달은 사용자 검색과 친구 요청 전송만 담당한다.
-// 검색 키워드는 이메일 또는 닉네임을 기준으로 서버 검색과 연결한다.
+// 검색 키워드는 이메일 기준으로 서버 검색과 연결한다.
 function AddFriendModal({ isOpen, isLoading, results, errorMessage, onSearch, onRequestFriend, onClose }) {
   const [keyword, setKeyword] = useState('')
 
@@ -61,11 +61,11 @@ function AddFriendModal({ isOpen, isLoading, results, errorMessage, onSearch, on
     >
       <section className="modal-card friend-modal" role="dialog" aria-modal="true" aria-label="친구 추가">
         <h3>친구 추가</h3>
-        <p>이메일 또는 닉네임으로 사용자를 검색한다.</p>
+        <p>이메일로 사용자를 검색한다.</p>
         <input
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="이메일 또는 닉네임 검색"
+          placeholder="이메일 검색"
         />
 
         {errorMessage && <p className="error-text modal-error">{errorMessage}</p>}

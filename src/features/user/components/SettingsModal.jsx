@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-// 데스크톱 설정 모달은 닉네임 수정, 테마 변경, 카카오 연결, 회원탈퇴를 한 곳에서 다룬다.
+// 데스크톱 설정 모달은 닉네임 수정, 계정 정보 확인, 테마 변경, 카카오 연결, 회원탈퇴를 한 곳에서 다룬다.
 function SettingsModal({
   isOpen,
   user,
@@ -30,6 +30,7 @@ function SettingsModal({
 
   const normalized = nickname.trim()
   const isKakaoLinked = Array.isArray(user?.linkedProviders) && user.linkedProviders.includes('kakao')
+  const emailLabel = String(user?.email || '').trim() || '이메일 정보를 불러오지 못했습니다.'
 
   const handleSave = async () => {
     if (normalized.length < 2 || normalized.length > 20) {
@@ -80,8 +81,18 @@ function SettingsModal({
     <div className="modal-overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="modal-card" role="dialog" aria-modal="true" aria-label="설정">
         <h3>설정</h3>
-        <p>닉네임과 테마를 바꾸거나 계정 연결 및 회원탈퇴를 진행할 수 있습니다.</p>
-        <input value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="닉네임" />
+        <p>닉네임, 이메일, 테마와 계정 연결 상태를 확인할 수 있습니다.</p>
+
+        <label className="settings-field">
+          <span>이메일</span>
+          <input value={emailLabel} readOnly disabled />
+        </label>
+
+        <label className="settings-field">
+          <span>닉네임</span>
+          <input value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="닉네임" />
+        </label>
+
         <label className="settings-field">
           <span>테마</span>
           <select value={themePreference} onChange={(event) => onChangeTheme(event.target.value)}>
@@ -90,6 +101,7 @@ function SettingsModal({
             <option value="dark">다크 모드</option>
           </select>
         </label>
+
         <button
           type="button"
           className="secondary"
@@ -98,6 +110,7 @@ function SettingsModal({
         >
           {isKakaoLinked ? '카카오 계정 연결됨' : (isLinkingKakao ? '카카오 연결 중...' : '카카오 계정 연결')}
         </button>
+
         <button
           type="button"
           className="secondary danger-zone-button"
@@ -106,7 +119,9 @@ function SettingsModal({
         >
           {isDeleting ? '회원탈퇴 처리 중...' : '회원탈퇴'}
         </button>
+
         {error && <p className="error-text">{error}</p>}
+
         <div className="modal-actions">
           <button type="button" className="secondary" onClick={onClose} disabled={isSaving || isDeleting || isLinkingKakao}>
             취소

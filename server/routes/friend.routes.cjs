@@ -60,7 +60,7 @@ const createFriendRouter = ({
     return notification;
   };
 
-  // 친구 검색은 이메일/닉네임 기준으로 수행하고, 현재 친구 상태를 함께 내려준다.
+  // 친구 검색은 이메일 기준으로 수행하고, 현재 친구 상태를 함께 내려준다.
   router.get("/friends/search", requireAuth, async (req, res) => {
     const me = req.user.userId;
     const keyword = String(req.query.keyword || "").trim();
@@ -79,7 +79,7 @@ const createFriendRouter = ({
       const users = await User.find({
         _id: { $ne: me },
         accountStatus: { $ne: "deleted" },
-        $or: [{ nickname: regex }, { email: regex }],
+        email: regex,
       })
         .limit(20)
         .lean();
