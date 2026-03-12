@@ -81,6 +81,26 @@ export const createAuthApi = (apiBaseUrl) => {
     return { ok: response.ok, status: response.status, body }
   }
 
+  const startPasswordReset = async (payload) => {
+    const response = await fetch(`${apiBaseUrl}/auth/email/password-reset/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
+  const verifyPasswordReset = async (payload) => {
+    const response = await fetch(`${apiBaseUrl}/auth/email/password-reset/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const body = await parseJsonSafe(response)
+    return { ok: response.ok, status: response.status, body }
+  }
+
   const getMe = async (accessToken) => {
     const response = await fetch(`${apiBaseUrl}/auth/me`, {
       method: 'GET',
@@ -124,6 +144,8 @@ export const createAuthApi = (apiBaseUrl) => {
     startEmailSignup,
     verifyEmailSignup,
     loginWithEmail,
+    startPasswordReset,
+    verifyPasswordReset,
     getMe,
     updateProfile,
     deleteAccount,

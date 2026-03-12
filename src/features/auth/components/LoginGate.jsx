@@ -3,36 +3,44 @@ import './LoginGate.css'
 import brandWordmarkLight from '../../../../assets/branding/logo/flownium-wordmark-light.png'
 
 const TEXT = {
-  checking: '\uB85C\uADF8\uC778 \uC0C1\uD0DC\uB97C \uD655\uC778\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4...',
-  intro: '\uCE74\uCE74\uC624 \uB610\uB294 \uC774\uBA54\uC77C\uB85C Flownium\uC744 \uC2DC\uC791\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
-  startKakao: '\uCE74\uCE74\uC624\uB85C \uC2DC\uC791\uD558\uAE30',
-  continueWithEmail: '\uB610\uB294 \uC774\uBA54\uC77C\uB85C \uACC4\uC18D\uD558\uAE30',
-  emailLoginTab: '\uC774\uBA54\uC77C \uB85C\uADF8\uC778',
-  emailSignupTab: '\uC774\uBA54\uC77C \uD68C\uC6D0\uAC00\uC785',
-  email: '\uC774\uBA54\uC77C',
-  nickname: '\uB2C9\uB124\uC784',
-  password: '\uBE44\uBC00\uBC88\uD638',
+  checking: '로그인 상태를 확인하고 있습니다...',
+  intro: '카카오 또는 이메일로 Flownium을 시작할 수 있습니다.',
+  startKakao: '카카오로 시작하기',
+  continueWithEmail: '또는 이메일로 계속하기',
+  emailLoginTab: '이메일 로그인',
+  emailSignupTab: '이메일 회원가입',
+  passwordResetTab: '비밀번호 재설정',
+  email: '이메일',
+  nickname: '닉네임',
+  password: '비밀번호',
   emailPlaceholder: 'name@example.com',
-  nicknamePlaceholder: '\uC0AC\uC6A9\uD560 \uB2C9\uB124\uC784',
-  passwordPlaceholder: '8\uC790 \uC774\uC0C1 \uBE44\uBC00\uBC88\uD638',
-  verificationCode: '\uC778\uC99D \uCF54\uB4DC',
-  verificationCodePlaceholder: '6\uC790\uB9AC \uC778\uC99D \uCF54\uB4DC',
-  loginButton: '\uC774\uBA54\uC77C \uB85C\uADF8\uC778',
-  verifyButton: '\uC774\uBA54\uC77C \uC778\uC99D \uC644\uB8CC',
-  resetButton: '\uB2E4\uC2DC \uC785\uB825',
-  requestCodeButton: '\uC778\uC99D \uCF54\uB4DC \uBC1B\uAE30',
-  debugCodeLabel: '\uAC1C\uBC1C\uC6A9 \uC778\uC99D \uCF54\uB4DC',
+  nicknamePlaceholder: '사용할 닉네임',
+  passwordPlaceholder: '8자 이상 비밀번호',
+  verificationCode: '인증 코드',
+  verificationCodePlaceholder: '6자리 인증 코드',
+  loginButton: '이메일 로그인',
+  verifyButton: '이메일 인증 완료',
+  resetPasswordButton: '비밀번호 재설정 완료',
+  resetButton: '다시 입력',
+  requestCodeButton: '인증 코드 받기',
+  requestResetCodeButton: '재설정 코드 받기',
+  debugCodeLabel: '개발용 인증 코드',
 }
 
 function LoginGate({
   isLoading,
   authError,
+  authNotice,
   pendingEmailVerification,
+  pendingPasswordReset,
   onStartKakaoLogin,
   onStartEmailSignup,
   onVerifyEmailSignup,
   onLoginWithEmail,
+  onStartPasswordReset,
+  onVerifyPasswordReset,
   onClearPendingEmailVerification,
+  onClearPendingPasswordReset,
 }) {
   const [authMode, setAuthMode] = useState('login')
   const [email, setEmail] = useState('')
@@ -46,8 +54,17 @@ function LoginGate({
     setEmail(String(pendingEmailVerification.email || ''))
     setNickname(String(pendingEmailVerification.nickname || ''))
     setPassword(String(pendingEmailVerification.password || ''))
+    setVerificationCode('')
     setAuthMode('signup')
   }, [pendingEmailVerification])
+
+  useEffect(() => {
+    if (!pendingPasswordReset?.email) return
+    setEmail(String(pendingPasswordReset.email || ''))
+    setPassword(String(pendingPasswordReset.password || ''))
+    setVerificationCode('')
+    setAuthMode('reset')
+  }, [pendingPasswordReset])
 
   const handleEmailLogin = async () => {
     if (isSubmitting || !email.trim() || !password) return
@@ -85,7 +102,36 @@ function LoginGate({
     }
   }
 
+  const handlePasswordResetStart = async () => {
+    if (isSubmitting || !email.trim() || !password) return
+
+    try {
+      setIsSubmitting(true)
+      await onStartPasswordReset({ email, password })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handlePasswordResetVerify = async () => {
+    if (isSubmitting || !pendingPasswordReset?.email || !verificationCode.trim()) return
+
+    try {
+      setIsSubmitting(true)
+      await onVerifyPasswordReset({
+        email: pendingPasswordReset.email,
+        code: verificationCode,
+      })
+      setAuthMode('login')
+      setVerificationCode('')
+      setPassword('')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const isPendingVerification = Boolean(pendingEmailVerification?.email)
+  const isPendingPasswordReset = Boolean(pendingPasswordReset?.email)
   const canSubmitEmailLogin = !isSubmitting && Boolean(email.trim()) && Boolean(password)
   const canStartEmailSignup =
     !isSubmitting &&
@@ -95,6 +141,14 @@ function LoginGate({
   const canVerifyEmailSignup =
     !isSubmitting &&
     Boolean(pendingEmailVerification?.email) &&
+    verificationCode.trim().length === 6
+  const canStartPasswordReset =
+    !isSubmitting &&
+    Boolean(email.trim()) &&
+    Boolean(password)
+  const canVerifyPasswordReset =
+    !isSubmitting &&
+    Boolean(pendingPasswordReset?.email) &&
     verificationCode.trim().length === 6
 
   return (
@@ -106,6 +160,7 @@ function LoginGate({
         <p>{isLoading ? TEXT.checking : TEXT.intro}</p>
 
         {authError && <p className="auth-error">{authError}</p>}
+        {authNotice && <p className="auth-notice">{authNotice}</p>}
 
         {!isLoading && (
           <>
@@ -117,13 +172,14 @@ function LoginGate({
               <span>{TEXT.continueWithEmail}</span>
             </div>
 
-            <div className="auth-mode-toggle">
+            <div className="auth-mode-toggle auth-mode-toggle-triple">
               <button
                 type="button"
                 className={authMode === 'login' ? 'active' : ''}
                 onClick={() => {
-                  setAuthMode('login')
                   if (isPendingVerification) onClearPendingEmailVerification()
+                  if (isPendingPasswordReset) onClearPendingPasswordReset()
+                  setAuthMode('login')
                 }}
               >
                 {TEXT.emailLoginTab}
@@ -131,9 +187,22 @@ function LoginGate({
               <button
                 type="button"
                 className={authMode === 'signup' ? 'active' : ''}
-                onClick={() => setAuthMode('signup')}
+                onClick={() => {
+                  if (isPendingPasswordReset) onClearPendingPasswordReset()
+                  setAuthMode('signup')
+                }}
               >
                 {TEXT.emailSignupTab}
+              </button>
+              <button
+                type="button"
+                className={authMode === 'reset' ? 'active' : ''}
+                onClick={() => {
+                  if (isPendingVerification) onClearPendingEmailVerification()
+                  setAuthMode('reset')
+                }}
+              >
+                {TEXT.passwordResetTab}
               </button>
             </div>
 
@@ -145,7 +214,7 @@ function LoginGate({
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder={TEXT.emailPlaceholder}
-                  disabled={isSubmitting || isPendingVerification}
+                  disabled={isSubmitting || isPendingVerification || isPendingPasswordReset}
                 />
               </label>
 
@@ -168,7 +237,7 @@ function LoginGate({
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder={TEXT.passwordPlaceholder}
-                  disabled={isSubmitting || isPendingVerification}
+                  disabled={isSubmitting || isPendingVerification || isPendingPasswordReset}
                 />
               </label>
 
@@ -193,21 +262,65 @@ function LoginGate({
                 </>
               )}
 
+              {authMode === 'reset' && isPendingPasswordReset && (
+                <>
+                  <label className="auth-field">
+                    <span>{TEXT.verificationCode}</span>
+                    <input
+                      value={verificationCode}
+                      onChange={(event) => setVerificationCode(event.target.value)}
+                      placeholder={TEXT.verificationCodePlaceholder}
+                      inputMode="numeric"
+                      maxLength={6}
+                      disabled={isSubmitting}
+                    />
+                  </label>
+                  {pendingPasswordReset?.debugCode && (
+                    <p className="auth-debug-code">
+                      {TEXT.debugCodeLabel}: <strong>{pendingPasswordReset.debugCode}</strong>
+                    </p>
+                  )}
+                </>
+              )}
+
               {authMode === 'login' ? (
                 <button type="button" className="email-action-button" onClick={() => void handleEmailLogin()} disabled={!canSubmitEmailLogin}>
                   {TEXT.loginButton}
                 </button>
-              ) : isPendingVerification ? (
+              ) : authMode === 'signup' ? (
+                isPendingVerification ? (
+                  <div className="auth-action-group">
+                    <button type="button" className="email-action-button" onClick={() => void handleEmailSignupVerify()} disabled={!canVerifyEmailSignup}>
+                      {TEXT.verifyButton}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-action-button"
+                      onClick={() => {
+                        setVerificationCode('')
+                        onClearPendingEmailVerification()
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      {TEXT.resetButton}
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" className="email-action-button" onClick={() => void handleEmailSignupStart()} disabled={!canStartEmailSignup}>
+                    {TEXT.requestCodeButton}
+                  </button>
+                )
+              ) : isPendingPasswordReset ? (
                 <div className="auth-action-group">
-                  <button type="button" className="email-action-button" onClick={() => void handleEmailSignupVerify()} disabled={!canVerifyEmailSignup}>
-                    {TEXT.verifyButton}
+                  <button type="button" className="email-action-button" onClick={() => void handlePasswordResetVerify()} disabled={!canVerifyPasswordReset}>
+                    {TEXT.resetPasswordButton}
                   </button>
                   <button
                     type="button"
                     className="secondary-action-button"
                     onClick={() => {
                       setVerificationCode('')
-                      onClearPendingEmailVerification()
+                      onClearPendingPasswordReset()
                     }}
                     disabled={isSubmitting}
                   >
@@ -215,8 +328,8 @@ function LoginGate({
                   </button>
                 </div>
               ) : (
-                <button type="button" className="email-action-button" onClick={() => void handleEmailSignupStart()} disabled={!canStartEmailSignup}>
-                  {TEXT.requestCodeButton}
+                <button type="button" className="email-action-button" onClick={() => void handlePasswordResetStart()} disabled={!canStartPasswordReset}>
+                  {TEXT.requestResetCodeButton}
                 </button>
               )}
             </div>

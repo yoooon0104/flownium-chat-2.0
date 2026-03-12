@@ -66,13 +66,16 @@ function AppShell() {
     startEmailSignup,
     verifyEmailSignup,
     loginWithEmail,
+    startPasswordReset,
+    verifyPasswordReset,
     clearPendingEmailVerification,
+    clearPendingPasswordReset,
     updateProfileNickname,
     deleteAccount,
     clearSession,
   } = useKakaoAuth(API_BASE_URL)
 
-  const { accessToken, user, pendingSignup, pendingEmailVerification, isInitializing, error } = authState
+  const { accessToken, user, pendingSignup, pendingEmailVerification, pendingPasswordReset, isInitializing, error, notice } = authState
 
   const [joinedRoomId, setJoinedRoomId] = useState('')
   const [participants, setParticipants] = useState([])
@@ -697,7 +700,7 @@ function AppShell() {
   )
 
   if (isInitializing) {
-    return <LoginGate isLoading authError={error} onStartKakaoLogin={startKakaoLogin} />
+    return <LoginGate isLoading authError={error} authNotice={notice} onStartKakaoLogin={startKakaoLogin} />
   }
 
   if (!accessToken && pendingSignup?.signupToken) {
@@ -716,12 +719,17 @@ function AppShell() {
       <LoginGate
         isLoading={false}
         authError={error}
+        authNotice={notice}
         pendingEmailVerification={pendingEmailVerification}
+        pendingPasswordReset={pendingPasswordReset}
         onStartKakaoLogin={startKakaoLogin}
         onStartEmailSignup={startEmailSignup}
         onVerifyEmailSignup={verifyEmailSignup}
         onLoginWithEmail={loginWithEmail}
+        onStartPasswordReset={startPasswordReset}
+        onVerifyPasswordReset={verifyPasswordReset}
         onClearPendingEmailVerification={clearPendingEmailVerification}
+        onClearPendingPasswordReset={clearPendingPasswordReset}
       />
     )
   }

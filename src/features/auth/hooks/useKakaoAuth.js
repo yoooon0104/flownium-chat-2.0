@@ -19,6 +19,9 @@ const resolveErrorMessage = (body, fallback) => {
   if (code === 'INVALID_VERIFICATION_CODE') return '인증 코드가 올바르지 않습니다.'
   if (code === 'VERIFICATION_CODE_EXPIRED') return '인증 코드가 만료되었습니다. 다시 요청해주세요.'
   if (code === 'VERIFICATION_RESEND_COOLDOWN') return '인증 코드를 너무 자주 요청하고 있습니다. 잠시 후 다시 시도해주세요.'
+  if (code === 'INVALID_PASSWORD_RESET_CODE') return '재설정 코드가 올바르지 않습니다.'
+  if (code === 'PASSWORD_RESET_CODE_EXPIRED') return '재설정 코드가 만료되었습니다. 다시 요청해주세요.'
+  if (code === 'PASSWORD_RESET_RESEND_COOLDOWN') return '재설정 코드를 너무 자주 요청하고 있습니다. 잠시 후 다시 시도해주세요.'
   if (body?.error?.message) return String(body.error.message)
   if (typeof body?.error === 'string') return body.error
   return fallback
@@ -41,8 +44,10 @@ export const useKakaoAuth = (apiBaseUrl) => {
   const [user, setUser] = useState(null)
   const [pendingSignup, setPendingSignup] = useState(null)
   const [pendingEmailVerification, setPendingEmailVerification] = useState(null)
+  const [pendingPasswordReset, setPendingPasswordReset] = useState(null)
   const [isInitializing, setIsInitializing] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   const kakaoAuthorizeUrl = useMemo(() => {
     if (!KAKAO_CLIENT_ID || !KAKAO_REDIRECT_URI) return ''
@@ -63,7 +68,9 @@ export const useKakaoAuth = (apiBaseUrl) => {
     setUser(UserProfile.normalize(payload.user || null))
     setPendingSignup(null)
     setPendingEmailVerification(null)
+    setPendingPasswordReset(null)
     setError('')
+    setNotice('')
   }, [])
 
   const clearSession = useCallback((nextError = '') => {
@@ -73,7 +80,9 @@ export const useKakaoAuth = (apiBaseUrl) => {
     setUser(null)
     setPendingSignup(null)
     setPendingEmailVerification(null)
+    setPendingPasswordReset(null)
     setError(nextError)
+    setNotice('')
   }, [])
 
   const refreshAccessToken = useCallback(async () => {
@@ -121,6 +130,7 @@ export const useKakaoAuth = (apiBaseUrl) => {
       debugCode: String(body.debugCode || ''),
     })
     setError('')
+    setNotice('')
     return body
   }, [authApi])
 
@@ -134,6 +144,42 @@ export const useKakaoAuth = (apiBaseUrl) => {
 
     saveSession(body)
   }, [authApi, saveSession])
+
+  const startPasswordReset = useCallback(async (payload) => {
+    const { ok, body } = await authApi.startPasswordReset(payload)
+    if (!ok || !body?.email) {
+      const message = resolveErrorMessage(body, '비밀번호 재설정 시작에 실패했습니다.')
+      setError(message)
+      setNotice('')
+      throw new Error(message)
+    }
+
+    setPendingPasswordReset({
+      email: String(body.email || '').trim().toLowerCase(),
+      password: String(payload?.password || ''),
+      resendAvailableAt: String(body.resendAvailableAt || ''),
+      expiresAt: String(body.expiresAt || ''),
+      debugCode: String(body.debugCode || ''),
+    })
+    setError('')
+    setNotice('')
+    return body
+  }, [authApi])
+
+  const verifyPasswordReset = useCallback(async (payload) => {
+    const { ok, body } = await authApi.verifyPasswordReset(payload)
+    if (!ok || body?.reset !== true) {
+      const message = resolveErrorMessage(body, '비밀번호 재설정에 실패했습니다.')
+      setError(message)
+      setNotice('')
+      throw new Error(message)
+    }
+
+    setPendingPasswordReset(null)
+    setError('')
+    setNotice('비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해주세요.')
+    return body
+  }, [authApi])
 
   const loginWithEmail = useCallback(async (payload) => {
     const { ok, body } = await authApi.loginWithEmail(payload)
@@ -149,6 +195,12 @@ export const useKakaoAuth = (apiBaseUrl) => {
   const clearPendingEmailVerification = useCallback(() => {
     setPendingEmailVerification(null)
     setError('')
+  }, [])
+
+  const clearPendingPasswordReset = useCallback(() => {
+    setPendingPasswordReset(null)
+    setError('')
+    setNotice('')
   }, [])
 
   const updateProfileNickname = useCallback(async (nickname) => {
@@ -364,8 +416,10 @@ export const useKakaoAuth = (apiBaseUrl) => {
       user,
       pendingSignup,
       pendingEmailVerification,
+      pendingPasswordReset,
       isInitializing,
       error,
+      notice,
     },
     setUser,
     startKakaoLogin,
@@ -375,7 +429,10 @@ export const useKakaoAuth = (apiBaseUrl) => {
     startEmailSignup,
     verifyEmailSignup,
     loginWithEmail,
+    startPasswordReset,
+    verifyPasswordReset,
     clearPendingEmailVerification,
+    clearPendingPasswordReset,
     updateProfileNickname,
     deleteAccount,
     clearSession,
