@@ -6,12 +6,14 @@
 function CreateRoomModal({ isOpen, friends, errorMessage, onClose, onSubmit }) {
   const [selectedIds, setSelectedIds] = useState([])
   const [groupName, setGroupName] = useState('')
+  const [searchKeyword, setSearchKeyword] = useState('')
   const [localError, setLocalError] = useState('')
 
   useEffect(() => {
     if (!isOpen) {
       setSelectedIds([])
       setGroupName('')
+      setSearchKeyword('')
       setLocalError('')
       return
     }
@@ -32,6 +34,17 @@ function CreateRoomModal({ isOpen, friends, errorMessage, onClose, onSubmit }) {
     const selectedSet = new Set(selectedIds)
     return friends.filter((friend) => selectedSet.has(friend.id))
   }, [friends, selectedIds])
+
+  const filteredFriends = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase()
+    if (!keyword) return friends
+
+    return friends.filter((friend) => {
+      const nickname = String(friend.nickname || '').toLowerCase()
+      const email = String(friend.email || '').toLowerCase()
+      return nickname.includes(keyword) || email.includes(keyword)
+    })
+  }, [friends, searchKeyword])
 
   if (!isOpen) return null
 
@@ -82,10 +95,21 @@ function CreateRoomModal({ isOpen, friends, errorMessage, onClose, onSubmit }) {
         <h3>채팅 시작</h3>
         <p>친구를 선택하면 1:1 또는 그룹 채팅을 만들 수 있다.</p>
 
+        <input
+          value={searchKeyword}
+          onChange={(event) => setSearchKeyword(event.target.value)}
+          placeholder="이름 또는 이메일로 친구 찾기"
+        />
+
         <ul className="friend-picker-list">
           {friends.length === 0 && <li className="state-item friend-picker-empty">선택 가능한 친구가 없습니다.</li>}
-          {friends.map((friend) => {
+          {friends.length > 0 && filteredFriends.length === 0 && (
+            <li className="state-item friend-picker-empty">검색 결과가 없습니다.</li>
+          )}
+          {filteredFriends.map((friend) => {
             const isSelected = selectedIds.includes(friend.id)
+            const fallbackName = String(friend.nickname || '').trim() || '이름 없음'
+            const fallbackEmail = String(friend.email || '').trim() || '이메일 미등록'
             return (
               <li key={friend.id}>
                 <button
@@ -94,11 +118,11 @@ function CreateRoomModal({ isOpen, friends, errorMessage, onClose, onSubmit }) {
                   onClick={() => toggleFriend(friend.id)}
                 >
                   <span className="friend-avatar">
-                    {friend.profileImage ? <img src={friend.profileImage} alt="" /> : friend.nickname.slice(0, 1).toUpperCase()}
+                    {friend.profileImage ? <img src={friend.profileImage} alt="" /> : fallbackName.slice(0, 1).toUpperCase()}
                   </span>
                   <span className="friend-main">
-                    <strong>{friend.nickname || '이름 없음'}</strong>
-                    <small>{friend.email || '이메일 미등록'}</small>
+                    <strong>{fallbackName}</strong>
+                    <small>{fallbackEmail}</small>
                   </span>
                   <span className={`selection-indicator ${isSelected ? 'checked' : ''}`}>{isSelected ? '선택' : ''}</span>
                 </button>
